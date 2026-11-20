@@ -93,6 +93,9 @@ intake.regenerate_hex,New Hex Suffix,Új hex végződés
 intake.save_and_print,Save & Print Preview,Mentés és nyomtatási előnézet
 intake.save_only,Save Package,Csomag mentése
 intake.quick_add.tooltip,Create a new item directly in the app,Új elem létrehozása az alkalmazásban
+intake.quick_add.title,"Add New {0}","Új elem hozzáadása: {0}"
+intake.live_preview,Live QR & Product Code Preview,Élő QR-kód és termékkód előnézet
+intake.capacity_status,"Used: {0} / {1} kg (Remaining: {2} kg)","Foglalt: {0} / {1} kg (Szabad: {2} kg)"
 intake.saved_success,"Saved {0} package(s) successfully.","{0} csomag sikeresen elmentve."
 intake.validation.weight,Please enter a valid positive weight (kg).,Kérjük adjon meg érvényes pozitív súlyt (kg).
 intake.validation.select_all,Please select all code segments and a warehouse location.,Kérjük válassza ki az összes kódelemet és a raktárhelyet.
@@ -106,6 +109,8 @@ print.preset.a4_4up,A4 Sheet (4 labels per page),A4 Lap (4 címke / oldal)
 print.zoom,Zoom,Nagyítás
 print.copies,Copies,Példányszám
 print.printer,Printer,Nyomtató
+print.no_printers,(System Default / No Printers Detected),(Alapértelmezett / Nem található nyomtató)
+print.page_of,"Page {0} / {1}","Oldal {0} / {1}"
 print.button.print,Print to Printer,Nyomtatás nyomtatóra
 print.button.pdf,Save Label PDF,Címke mentése PDF-be
 print.button.png,Save QR PNG,QR mentése PNG-be

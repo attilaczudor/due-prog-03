@@ -11,8 +11,12 @@ import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.service.AuthService;
+import hu.due.rewear.service.InventoryService;
+import hu.due.rewear.service.LabelPdfExporter;
 import hu.due.rewear.service.ProductCodeService;
+import hu.due.rewear.service.QrCodeService;
 import hu.due.rewear.service.SessionContext;
+import hu.due.rewear.service.TicketLabelPainter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +48,10 @@ public final class AppContext {
     private final OrderItemDao orderItemDao;
 
     private final AuthService authService;
+    private final QrCodeService qrCodeService;
+    private final InventoryService inventoryService;
+    private final TicketLabelPainter ticketLabelPainter;
+    private final LabelPdfExporter labelPdfExporter;
 
     public AppContext() {
         this(new DatabaseManager(), new AppPreferences(), I18nManager.getInstance());
@@ -70,6 +78,10 @@ public final class AppContext {
         this.orderItemDao = new OrderItemDao(databaseManager);
 
         this.authService = new AuthService(userDao, session);
+        this.qrCodeService = new QrCodeService();
+        this.inventoryService = new InventoryService(databaseManager, packageDao, movementDao, productCodeService);
+        this.ticketLabelPainter = new TicketLabelPainter(qrCodeService, i18n);
+        this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
 
         initLocalizationFromPreferences();
     }
@@ -150,5 +162,21 @@ public final class AppContext {
 
     public AuthService getAuthService() {
         return authService;
+    }
+
+    public QrCodeService getQrCodeService() {
+        return qrCodeService;
+    }
+
+    public InventoryService getInventoryService() {
+        return inventoryService;
+    }
+
+    public TicketLabelPainter getTicketLabelPainter() {
+        return ticketLabelPainter;
+    }
+
+    public LabelPdfExporter getLabelPdfExporter() {
+        return labelPdfExporter;
     }
 }

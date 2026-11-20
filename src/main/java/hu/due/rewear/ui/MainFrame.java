@@ -221,7 +221,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
 
     private void registerDefaultViews() {
         registerView(new PlaceholderView(VIEW_DASHBOARD, "nav.dashboard", ctx));
-        registerView(new PlaceholderView(VIEW_INTAKE, "nav.intake", ctx));
+        registerView(new PackageIntakeView(ctx));
         registerView(new PlaceholderView(VIEW_SCANNER, "nav.scanner", ctx));
         registerView(new PlaceholderView(VIEW_INVENTORY, "nav.inventory", ctx));
         registerView(new PlaceholderView(VIEW_LOCATIONS, "nav.locations", ctx));
