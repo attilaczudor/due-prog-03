@@ -1,0 +1,172 @@
+key,en,hu
+app.title,ReWear WMS — Second-Hand Clothing Warehouse,ReWear WMS — Használt Ruha Raktárkezelő
+app.subtitle,Sorted Clothing Inventory & QR Logistics,Válogatott Ruha Készlet- és QR Logisztika
+app.language,Language,Nyelv
+app.theme.light,Light Theme,Világos téma
+app.theme.dark,Dark Theme,Sötét téma
+app.logout,Sign Out,Kijelentkezés
+app.ready,Ready,Kész
+common.save,Save,Mentés
+common.cancel,Cancel,Mégse
+common.add,Add,Hozzáadás
+common.edit,Edit,Szerkesztés
+common.delete,Delete,Törlés
+common.deactivate,Deactivate,Inaktiválás
+common.activate,Activate,Aktiválás
+common.refresh,Refresh,Frissítés
+common.search,Search,Keresés
+common.clear,Clear Filters,Szűrők törlése
+common.close,Close,Bezárás
+common.export.csv,Export CSV,CSV exportálás
+common.export.pdf,Export PDF,PDF exportálás
+common.print,Print,Nyomtatás
+common.yes,Yes,Igen
+common.no,No,Nem
+common.ok,OK,Rendben
+common.all,All,Összes
+common.code,Code,Kód
+common.name.en,Name (EN),Név (EN)
+common.name.hu,Name (HU),Név (HU)
+common.status,Status,Állapot
+common.notes,Notes,Megjegyzés
+common.created_at,Created At,Létrehozva
+common.updated_at,Updated At,Frissítve
+common.actions,Actions,Műveletek
+common.kg,kg,kg
+common.error,Error,Hiba
+common.success,Success,Sikeres művelet
+common.warning,Warning,Figyelmeztetés
+common.confirm,Confirm,Megerősítés
+login.title,Sign In to ReWear WMS,Bejelentkezés — ReWear WMS
+login.username,Username,Felhasználónév
+login.password,Password,Jelszó
+login.button,Sign In,Bejelentkezés
+login.failed,Invalid username or password.,Hibás felhasználónév vagy jelszó.
+login.inactive,This user account is deactivated.,Ez a felhasználói fiók inaktív.
+login.demo_hint,"Demo accounts: admin / admin123, manager / manager123, operator / operator123","Teszt fiókok: admin / admin123, manager / manager123, operator / operator123"
+nav.dashboard,Dashboard,Áttekintés
+nav.intake,Package Intake & QR,Csomagfelvétel és QR
+nav.scanner,QR Scanner Station,QR Szkenner Állomás
+nav.inventory,Inventory,Készlet
+nav.locations,Warehouse Locations,Raktárhelyek
+nav.dictionaries,Code Dictionaries,Kódtörzsek
+nav.customers,Customers,Ügyfelek
+nav.orders,Orders & Dispatch,Rendelések és Kiadás
+nav.admin,Admin & Maintenance,Admin és Karbantartás
+role.ADMIN,Administrator,Adminisztrátor
+role.MANAGER,Warehouse Manager,Raktárvezető
+role.OPERATOR,Sorting Operator,Válogató operátor
+status.package.IN_STOCK,In Stock,Készleten
+status.package.RESERVED,Reserved,Foglalt
+status.package.SHIPPED,Shipped,Kiszállítva
+status.package.DISCARDED,Discarded,Selejtezve
+status.order.DRAFT,Draft,Piszkozat
+status.order.PACKING,Packing,Összekészítés
+status.order.SHIPPED,Shipped,Kiszállítva
+status.order.CANCELLED,Cancelled,Törölve
+movement.INTAKE,Intake,Bevételezés
+movement.RELOCATE,Relocated,Áthelyezés
+movement.SCAN_VERIFY,Scan Verified,Szkennelve ellenőrizve
+movement.RESERVE,Reserved for Order,Rendeléshez foglalva
+movement.RELEASE,Released to Stock,Készletre visszaadva
+movement.SHIP,Shipped,Kiadva
+movement.DISCARD,Discarded,Selejtezve
+dashboard.title,Warehouse Overview,Raktári Áttekintés
+dashboard.kpi.bales,Packages in Stock,Készleten lévő csomagok
+dashboard.kpi.weight,Total Stock Weight,Összes készletsúly
+dashboard.kpi.today_intake,Today's Intake,Mai bevételezés
+dashboard.kpi.open_orders,Open Orders,Nyitott rendelések
+dashboard.chart.by_quality,Stock Weight (kg) by Quality Grade,Készletsúly (kg) minőség szerint
+dashboard.chart.by_type,Stock Weight (kg) by Garment Type,Készletsúly (kg) terméktípus szerint
+dashboard.chart.activity,Intake vs. Shipped Weight (kg),Bevételezett vs. kiadott súly (kg)
+dashboard.recent_movements,Recent Stock Movements,Legutóbbi készletmozgások
+intake.title,New Package Intake & QR Generator,Új csomag felvétele és QR generátor
+intake.target_group,Target Group (What For),Célcsoport (Kinek)
+intake.garment_type,Product / Garment Type,Termék / Ruhatípus
+intake.quality_grade,Quality Grade,Minőségi osztály
+intake.package_type,Package Type,Csomagolás típusa
+intake.weight_kg,Net Weight (kg),Nettó súly (kg)
+intake.location,Warehouse Location,Raktárhely
+intake.quantity,Batch Quantity,Darabszám (köteg)
+intake.generated_code,Generated Product Code,Generált termékkód
+intake.regenerate_hex,New Hex Suffix,Új hex végződés
+intake.save_and_print,Save & Print Preview,Mentés és nyomtatási előnézet
+intake.save_only,Save Package,Csomag mentése
+intake.quick_add.tooltip,Create a new item directly in the app,Új elem létrehozása az alkalmazásban
+intake.saved_success,"Saved {0} package(s) successfully.","{0} csomag sikeresen elmentve."
+intake.validation.weight,Please enter a valid positive weight (kg).,Kérjük adjon meg érvényes pozitív súlyt (kg).
+intake.validation.select_all,Please select all code segments and a warehouse location.,Kérjük válassza ki az összes kódelemet és a raktárhelyet.
+intake.validation.capacity,"Warning: Location capacity ({0} kg) will be exceeded.","Figyelem: A raktárhely kapacitása ({0} kg) túllépésre kerül."
+print.title,Ticket / Label Print Preview,Címke nyomtatási előnézet
+print.preset,Paper / Label Format,Papír / Címke formátum
+print.preset.thermal_100x150,Thermal Label 100 × 150 mm,Hőcímke 100 × 150 mm
+print.preset.thermal_80x100,Thermal Label 80 × 100 mm,Hőcímke 80 × 100 mm
+print.preset.a6,A6 Logistics Card,A6 Logisztikai kártya
+print.preset.a4_4up,A4 Sheet (4 labels per page),A4 Lap (4 címke / oldal)
+print.zoom,Zoom,Nagyítás
+print.copies,Copies,Példányszám
+print.printer,Printer,Nyomtató
+print.button.print,Print to Printer,Nyomtatás nyomtatóra
+print.button.pdf,Save Label PDF,Címke mentése PDF-be
+print.button.png,Save QR PNG,QR mentése PNG-be
+print.success,Print job submitted successfully.,A nyomtatási feladat elküldve.
+print.exported,"Exported to: {0}","Sikeresen exportálva: {0}"
+scanner.title,QR Code Scanner Station,QR Kód Szkenner Állomás
+scanner.input_label,Scan QR Code (USB/Bluetooth Scanner or Paste + Enter):,QR kód beolvasása (USB/Bluetooth szkenner vagy beillesztés + Enter):
+scanner.scan_button,Lookup Code,Kód keresése
+scanner.from_image,Scan from Image (PNG/JPG),Beolvasás képből (PNG/JPG)
+scanner.demo_pick,Demo Quick-Scan,Demó gyors-szkennelés
+scanner.status.waiting,Waiting for QR scan...,Várakozás QR beolvasásra...
+scanner.status.found,Package found in warehouse database.,Csomag megtalálva a raktári adatbázisban.
+scanner.status.valid_not_found,Valid product code format — not registered in local database.,Érvényes kódszerkezet — nem szerepel a helyi adatbázisban.
+scanner.status.invalid,Invalid QR code format.,Érvénytelen QR kód formátum.
+scanner.action.relocate,Relocate Shelf,Áthelyezés másik helyre
+scanner.action.verify,Verify Stocktake,Leltári ellenőrzés
+scanner.action.reprint,Reprint Ticket,Címke újranyomtatása
+scanner.action.add_to_order,Add to Open Order,Hozzáadás nyitott rendeléshez
+inventory.title,Warehouse Inventory,Raktári Készlet
+inventory.batch_print,Batch Print Preview (A4 4-up),Csoportos nyomtatási előnézet (A4 4-es)
+inventory.view_details,Details & History,Részletek és előzmények
+inventory.summary,"Showing {0} package(s) — Total: {1} kg","Megjelenítve: {0} csomag — Összesen: {1} kg"
+locations.title,Warehouse Locations,Raktárhelyek
+locations.zone,Zone,Zóna
+locations.aisle,Aisle,Sor
+locations.shelf,Shelf,Polc
+locations.capacity,Capacity (kg),Kapacitás (kg)
+locations.used,Used (kg),Foglalt (kg)
+dictionaries.title,Product & Package Code Dictionaries,Termék- és Csomagkód Törzsadatok
+dictionaries.tab.targets,Target Groups,Célcsoportok
+dictionaries.tab.garments,Product / Garment Types,Termék / Ruhatípusok
+dictionaries.tab.qualities,Quality Grades,Minőségi osztályok
+dictionaries.tab.packages,Package Types,Csomagolás típusok
+dictionaries.default_price,Default Price / kg,Alapár / kg
+dictionaries.tare_weight,Tare Weight (kg),Tára súly (kg)
+dictionaries.max_weight,Max Weight (kg),Max súly (kg)
+dictionaries.code_hint,Uppercase letters/digits only (1-8 chars, no hyphens),Csak nagybetű és szám (1-8 karakter, kötőjel nélkül)
+customers.title,B2B Customers,B2B Ügyfelek
+customers.company,Company Name,Cégnév
+customers.contact,Contact Person,Kapcsolattartó
+customers.email,Email,E-mail
+customers.phone,Phone,Telefon
+customers.address,Address,Cím
+customers.tax_number,Tax Number,Adószám
+orders.title,Orders & Dispatch,Rendelések és Kiszállítás
+orders.new_order,New Order,Új rendelés
+orders.order_number,Order #,Rendelésszám
+orders.customer,Customer,Ügyfél
+orders.total_weight,Total Weight (kg),Összsúly (kg)
+orders.total_price,Total Price,Végösszeg
+orders.add_by_scan,Scan QR to Add Bale,QR szkennelése rendeléshez
+orders.add_from_stock,Pick from Stock,Kiválasztás készletből
+orders.start_packing,Start Packing,Összekészítés indítása
+orders.mark_shipped,Ship Order,Rendelés kiszállítása
+orders.cancel_order,Cancel Order,Rendelés törlése
+orders.export_delivery_note,PDF Delivery Note,PDF Szállítólevél
+admin.title,Administration & Maintenance,Adminisztráció és Karbantartás
+admin.tab.users,Users & Roles,Felhasználók és Jogosultságok
+admin.tab.audit,Audit Log,Mozgásnapló (Audit)
+admin.tab.maintenance,Database & Translations,Adatbázis és Fordítások
+admin.db.backup,Backup Database (.db),Adatbázis mentése (.db)
+admin.db.restore,Restore Database (.db),Adatbázis visszaállítása (.db)
+admin.i18n.export,Export translations.csv,translations.csv exportálása
+admin.i18n.reload,Load External translations.csv,Külső translations.csv betöltése
