@@ -157,6 +157,7 @@ public final class ThemeManager {
         extra.put("ToggleButton.hoverBackground", hoverHex);
         extra.put("ToggleButton.selectedBackground", fgHex);
         extra.put("ToggleButton.selectedForeground", bgHex);
+        extra.put("ToggleButton.selectedHoverBackground", dark ? "#E6E6E6" : "#1A1A1A");
         extra.put("TextField.background", bgHex);
         extra.put("TextField.foreground", fgHex);
         extra.put("TextField.caretForeground", fgHex);
@@ -190,7 +191,12 @@ public final class ThemeManager {
         extra.put("TabbedPane.selectedBackground", fgHex);
         extra.put("TabbedPane.selectedForeground", bgHex);
         extra.put("TabbedPane.hoverColor", hoverHex);
+        extra.put("TabbedPane.hoverForeground", fgHex);
+        extra.put("TabbedPane.focusColor", fgHex);
+        extra.put("TabbedPane.focusForeground", bgHex);
         extra.put("TabbedPane.underlineColor", fgHex);
+        extra.put("TabbedPane.inactiveUnderlineColor", borderHex);
+        extra.put("TabbedPane.tabSeparatorColor", borderHex);
         extra.put("TabbedPane.contentAreaColor", borderHex);
         extra.put("Separator.foreground", borderHex);
         extra.put("OptionPane.background", bgHex);
