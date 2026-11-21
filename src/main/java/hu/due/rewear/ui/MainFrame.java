@@ -462,8 +462,10 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     }
 
     public void setStatusMessage(String message) {
+        java.nio.file.Path dbPath = ctx.getDatabaseManager().getDatabasePath();
         statusBarLabel.setText(message.toUpperCase(Locale.ROOT)
-                + "  //  DB: " + ctx.getDatabaseManager().getDatabasePath().getFileName());
+                + "  //  DB: ./data/" + dbPath.getFileName());
+        statusBarLabel.setToolTipText(dbPath.toString());
     }
 
     private void performLogout() {

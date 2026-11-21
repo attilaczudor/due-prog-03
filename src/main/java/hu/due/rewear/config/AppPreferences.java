@@ -16,7 +16,7 @@ import java.util.Properties;
 public final class AppPreferences {
 
     private static final Logger LOG = LoggerFactory.getLogger(AppPreferences.class);
-    public static final Path DEFAULT_PREFS_PATH = Path.of("data", "app.properties");
+    public static final Path DEFAULT_PREFS_PATH = AppPaths.defaultPreferencesPath();
 
     private static final String KEY_LANGUAGE = "ui.language";
     private static final String KEY_DARK_THEME = "ui.darkTheme";

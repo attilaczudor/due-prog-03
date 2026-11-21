@@ -16,7 +16,7 @@ import java.util.Objects;
  */
 public final class DatabaseManager {
 
-    public static final Path DEFAULT_DB_PATH = Path.of("data", "rewear-wms.db");
+    public static final Path DEFAULT_DB_PATH = AppPaths.defaultDatabasePath();
 
     @FunctionalInterface
     public interface SqlFunction<T> {
