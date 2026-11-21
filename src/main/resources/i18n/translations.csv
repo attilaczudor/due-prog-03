@@ -255,3 +255,5 @@ profile.perm.core,"Dashboard, Package Intake & QR Printing, QR Scanner, Inventor
 profile.perm.catalog,Warehouse Locations & Code Dictionaries Management,Raktárhelyek és kódtörzsek kezelése
 profile.perm.orders,"Customers, Orders, Live QR Packing & PDF Delivery Notes","Ügyfelek, rendelések, élő QR összekészítés és PDF szállítólevél"
 profile.perm.admin,"Users & Roles, Audit Log, DB Backup/Restore & CSV Translations","Felhasználók, napló, adatbázis mentés/visszaállítás és CSV fordítások"
+sidebar.collapse,Collapse sidebar,Oldalsáv összecsukása
+sidebar.expand,Expand sidebar,Oldalsáv kinyitása

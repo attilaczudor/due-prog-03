@@ -4,6 +4,7 @@ import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CategoryWeightStat;
+import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.StockMovement;
 import org.knowm.xchart.CategoryChart;
@@ -21,17 +22,23 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTable;
+import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridLayout;
+import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /**
  * Brutalist Monochrome Warehouse Dashboard featuring live KPI cards,
@@ -68,6 +75,7 @@ public final class DashboardView extends JPanel implements NavigableView {
         @Override public boolean isCellEditable(int r, int c) { return false; }
     };
     private final JTable recentTable = new JTable(recentModel);
+    private List<StockMovement> recentMovements = List.of();
 
     public DashboardView(AppContext ctx) {
         this.ctx = ctx;
@@ -112,10 +120,35 @@ public final class DashboardView extends JPanel implements NavigableView {
         recentPanel.add(recentHeader, BorderLayout.NORTH);
 
         BrutalistStyle.styleTable(recentTable);
+        recentTable.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        recentTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 1) {
+                    int row = recentTable.rowAtPoint(e.getPoint());
+                    if (row >= 0 && row < recentMovements.size()) {
+                        openMovementPackageDetails(recentMovements.get(row));
+                    }
+                }
+            }
+        });
         recentPanel.add(new JScrollPane(recentTable), BorderLayout.CENTER);
         center.add(recentPanel, BorderLayout.CENTER);
 
         add(center, BorderLayout.CENTER);
+    }
+
+    private void openMovementPackageDetails(StockMovement movement) {
+        Optional<InventoryPackage> pkgOpt = ctx.getPackageDao().findById(movement.packageId());
+        if (pkgOpt.isEmpty() && movement.packageQrCode() != null) {
+            pkgOpt = ctx.getPackageDao().findByQrCode(movement.packageQrCode());
+        }
+        if (pkgOpt.isPresent()) {
+            Window owner = SwingUtilities.getWindowAncestor(this);
+            if (EditPackageDialog.showDialog(owner, ctx, pkgOpt.get()) != null) {
+                refreshData();
+            }
+        }
     }
 
     private static void configureKpiCard(JPanel card, JLabel title, JLabel value) {
@@ -248,7 +281,8 @@ public final class DashboardView extends JPanel implements NavigableView {
         rebuildCharts();
 
         recentModel.setRowCount(0);
-        for (StockMovement m : ctx.getMovementDao().findRecent(15)) {
+        recentMovements = ctx.getMovementDao().findRecent(15);
+        for (StockMovement m : recentMovements) {
             String fromTo = (m.fromLocationCode() != null ? m.fromLocationCode() : "—")
                     + " -> " + (m.toLocationCode() != null ? m.toLocationCode() : "—");
             recentModel.addRow(new Object[]{
