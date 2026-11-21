@@ -127,15 +127,11 @@ public final class DeliveryNotePdfExporter {
         float contentW = pageW - 2 * margin;
         float y = margin;
 
-        // Top Brutalist Header Bar with crisp ReWear logo
+        // Top Brutalist Header Bar with crisp vector ReWear SVG logo
         g.setColor(Color.BLACK);
         g.fillRect(Math.round(margin), Math.round(y), Math.round(contentW), 40);
-        BufferedImage logoWhite = LogoAssets.logoImage(true);
-        float titleStartX = margin + 10;
-        if (logoWhite != null) {
-            g.drawImage(logoWhite, Math.round(margin + 6), Math.round(y + 4), 32, 32, null);
-            titleStartX = margin + 46;
-        }
+        LogoAssets.paintLogo(g, margin + 6, y + 4, 32, true);
+        float titleStartX = margin + 46;
         g.setColor(Color.WHITE);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
         g.drawString(i18n.t("orders.delivery_note.title"), titleStartX, y + 25);

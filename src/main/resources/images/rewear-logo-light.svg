@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <!-- ReWear WMS Brutalist Vector Logo (Light / Black on Transparent) -->
+  <g fill="none" stroke="#000000">
+    <!-- macOS-style rounded outer frame -->
+    <rect x="20" y="20" width="472" height="472" rx="84" ry="84" stroke-width="18"/>
+
+    <!-- Top-Left QR Finder -->
+    <rect x="70" y="68" width="76" height="76" stroke-width="14"/>
+    <rect x="91" y="89" width="34" height="34" fill="#000000" stroke="none"/>
+
+    <!-- Top-Right QR Finder -->
+    <rect x="366" y="68" width="76" height="76" stroke-width="14"/>
+    <rect x="387" y="89" width="34" height="34" fill="#000000" stroke="none"/>
+
+    <!-- Bottom-Left QR Finder -->
+    <rect x="70" y="276" width="76" height="76" stroke-width="14"/>
+    <rect x="91" y="297" width="34" height="34" fill="#000000" stroke="none"/>
+
+    <!-- Bottom-Right 2x2 QR Module Grid -->
+    <rect x="366" y="276" width="28" height="28" stroke-width="11"/>
+    <rect x="414" y="276" width="28" height="28" stroke-width="11"/>
+    <rect x="366" y="324" width="28" height="28" stroke-width="11"/>
+    <rect x="414" y="324" width="28" height="28" stroke-width="11"/>
+
+    <!-- Central Clothes Hanger Hook + Triangle -->
+    <path d="M 224 98 A 32 32 0 1 1 256 130 L 256 154" stroke-width="16" stroke-linecap="butt" stroke-linejoin="miter"/>
+    <path d="M 74 246 L 256 152 L 438 246 Z" stroke-width="17" stroke-linejoin="miter"/>
+  </g>
+
+  <!-- Geometric Brutalist REWEAR Wordmark (horizontally centered: x=74.5..437.5) -->
+  <g fill="#000000" fill-rule="evenodd" transform="translate(-9.5, 0)">
+    <!-- R (x: 84..132) -->
+    <path d="M 84 384 H 116 C 127 384 133 391 133 402 C 133 411 128 417 120 419 L 134 444 H 120 L 107 421 H 97 V 444 H 84 Z M 97 395 V 410 H 113 C 118 410 120 407 120 402.5 C 120 398 118 395 113 395 Z"/>
+    <!-- E (x: 145..189) -->
+    <path d="M 145 384 H 189 V 396 H 158 V 408 H 185 V 419 H 158 V 432 H 190 V 444 H 145 Z"/>
+    <!-- W (x: 199..267) -->
+    <path d="M 199 384 H 212 L 221 426 L 230 384 H 242 L 251 426 L 260 384 H 273 L 258 444 H 244 L 236 406 L 228 444 H 214 Z"/>
+    <!-- E (x: 283..327) -->
+    <path d="M 283 384 H 327 V 396 H 296 V 408 H 323 V 419 H 296 V 432 H 328 V 444 H 283 Z"/>
+    <!-- A (x: 336..388) -->
+    <path d="M 355 384 H 369 L 389 444 H 375 L 371 431 H 353 L 349 444 H 335 Z M 362 399 L 356 420 H 368 Z"/>
+    <!-- R (x: 396..446 -> shifted compactly: let's center whole wordmark) -->
+    <path d="M 397 384 H 429 C 440 384 446 391 446 402 C 446 411 441 417 433 419 L 447 444 H 433 L 420 421 H 410 V 444 H 397 Z M 410 395 V 410 H 426 C 431 410 433 407 433 402.5 C 433 398 431 395 426 395 Z"/>
+  </g>
+</svg>

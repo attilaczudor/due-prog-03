@@ -81,17 +81,11 @@ public final class TicketLabelPainter {
         double cursorY = borderInset;
         double headerBottomY = cursorY + headerH;
 
-        // Left: ReWear Logo
-        double logoSize = headerH * 0.82;
+        // Left: Crisp Vector ReWear SVG Logo (macOS rounded corners)
+        double logoSize = headerH * 0.84;
         double logoX = innerX + pad * 0.15;
         double logoY = cursorY + (headerH - logoSize) / 2.0;
-        BufferedImage logo = LogoAssets.logoImage(false);
-        if (logo != null) {
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
-            g.drawImage(logo, (int) Math.round(logoX), (int) Math.round(logoY),
-                    (int) Math.round(logoSize), (int) Math.round(logoSize), null);
-            g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
-        }
+        LogoAssets.paintLogo(g, logoX, logoY, logoSize, false);
 
         // Right: Inverted solid black combined product code badge (e.g. B-DRS-CR-A)
         String combinedCode = pkg.targetGroupCode() + "-" + pkg.garmentTypeCode() + "-"
