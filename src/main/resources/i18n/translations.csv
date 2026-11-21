@@ -203,7 +203,16 @@ admin.title,Administration & Maintenance,Adminisztráció és Karbantartás
 admin.tab.users,Users & Roles,Felhasználók és Jogosultságok
 admin.tab.audit,Audit Log,Mozgásnapló (Audit)
 admin.tab.maintenance,Database & Translations,Adatbázis és Fordítások
+admin.user.full_name,Full Name,Teljes név
+admin.user.role,Role,Jogosultság
+admin.user.reset_pw,Reset Password,Jelszó visszaállítása
+admin.user.new_pw_prompt,Enter new password (min 6 chars):,Adja meg az új jelszót (min. 6 karakter):
+admin.user.cannot_disable_self,You cannot deactivate your own active admin account.,Saját aktív admin fiókját nem inaktiválhatja.
 admin.db.backup,Backup Database (.db),Adatbázis mentése (.db)
 admin.db.restore,Restore Database (.db),Adatbázis visszaállítása (.db)
+admin.db.restore_confirm,Replace the active database with this backup file? A safety copy of current data will be saved first.,Lecseréli az aktív adatbázist erre a mentésre? A jelenlegi adatról biztonsági mentés készül.
+admin.db.restored,Database restored successfully.,Adatbázis sikeresen visszaállítva.
 admin.i18n.export,Export translations.csv,translations.csv exportálása
 admin.i18n.reload,Load External translations.csv,Külső translations.csv betöltése
+admin.i18n.reset,Reset to Bundled Translations,Alapértelmezett fordítások visszaállítása
+admin.i18n.loaded,"Loaded languages: {0}","Betöltött nyelvek: {0}"

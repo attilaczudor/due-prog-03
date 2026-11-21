@@ -207,7 +207,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     }
 
     private void registerDefaultViews() {
-        registerView(new PlaceholderView(VIEW_DASHBOARD, "nav.dashboard", ctx));
+        registerView(new DashboardView(ctx));
         registerView(new PackageIntakeView(ctx));
         registerView(new QrScannerView(ctx));
         registerView(new InventoryView(ctx));
@@ -215,7 +215,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerView(new DictionariesView(ctx));
         registerView(new CustomersView(ctx));
         registerView(new OrdersView(ctx));
-        registerView(new PlaceholderView(VIEW_ADMIN, "nav.admin", ctx));
+        registerView(new AdminView(ctx));
     }
 
     public void registerView(NavigableView view) {
