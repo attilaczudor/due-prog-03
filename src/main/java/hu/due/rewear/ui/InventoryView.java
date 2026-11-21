@@ -39,6 +39,7 @@ import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.GridLayout;
 import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -123,7 +124,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         searchRow.add(clearBtn);
         searchRow.add(refreshBtn);
 
-        JPanel dropdownRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        JPanel dropdownRow = new JPanel(new GridLayout(1, 5, 6, 0));
         dropdownRow.add(statusFilter);
         dropdownRow.add(targetFilter);
         dropdownRow.add(garmentFilter);
