@@ -30,7 +30,7 @@ import java.util.function.Consumer;
 
 /**
  * Bilingual Brutalist Monochrome sign-in window with live language selector,
- * Light/Dark theme toggle, and 1-click demo quick-fill buttons.
+ * Light/Dark theme toggle, and 1-click quick-fill buttons.
  */
 public final class LoginFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
 
@@ -39,15 +39,17 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
 
     private final JPanel cardPanel = new JPanel(new BorderLayout(0, 12));
     private final JLabel logoLabel = new JLabel("", SwingConstants.CENTER);
-    private final JLabel versionTagLabel = new JLabel("DUE-PROG-03", SwingConstants.CENTER);
-    private final JLabel subtitleLabel = new JLabel("", SwingConstants.CENTER);
+    private final JLabel loginHeadingLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel usernameLabel = new JLabel();
     private final JLabel passwordLabel = new JLabel();
     private final JTextField usernameField = new JTextField(20);
     private final JPasswordField passwordField = new JPasswordField(20);
     private final JLabel errorLabel = new JLabel(" ", SwingConstants.CENTER);
     private final JButton loginButton = new JButton();
-    private final JLabel demoHintLabel = new JLabel("", SwingConstants.CENTER);
+    private final JLabel loginAsLabel = new JLabel("", SwingConstants.CENTER);
+    private final JButton adminBtn = new JButton("ADMIN");
+    private final JButton managerBtn = new JButton("MANAGER");
+    private final JButton operatorBtn = new JButton("OPERATOR");
 
     private final JLabel langLabel = new JLabel();
     private final JComboBox<String> langCombo = new JComboBox<>();
@@ -70,7 +72,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
         pack();
-        setMinimumSize(new Dimension(500, 500));
+        setMinimumSize(new Dimension(480, 460));
         setLocationRelativeTo(null);
     }
 
@@ -103,17 +105,14 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
         logoLabel.setAlignmentX(CENTER_ALIGNMENT);
-        versionTagLabel.setAlignmentX(CENTER_ALIGNMENT);
-        subtitleLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
-        subtitleLabel.setAlignmentX(CENTER_ALIGNMENT);
+        loginHeadingLabel.setFont(ThemeManager.monoFont(Font.BOLD, 16f));
+        loginHeadingLabel.setAlignmentX(CENTER_ALIGNMENT);
 
         center.add(Box.createVerticalStrut(4));
         center.add(logoLabel);
-        center.add(Box.createVerticalStrut(10));
-        center.add(versionTagLabel);
-        center.add(Box.createVerticalStrut(6));
-        center.add(subtitleLabel);
-        center.add(Box.createVerticalStrut(16));
+        center.add(Box.createVerticalStrut(12));
+        center.add(loginHeadingLabel);
+        center.add(Box.createVerticalStrut(14));
 
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -147,22 +146,22 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         center.add(Box.createVerticalStrut(10));
 
         loginButton.setAlignmentX(CENTER_ALIGNMENT);
-        loginButton.setPreferredSize(new Dimension(220, 38));
-        loginButton.setMaximumSize(new Dimension(260, 38));
+        loginButton.setPreferredSize(new Dimension(220, 36));
+        loginButton.setMaximumSize(new Dimension(260, 36));
         loginButton.addActionListener(e -> attemptLogin());
         center.add(loginButton);
 
         cardPanel.add(center, BorderLayout.CENTER);
         outer.add(cardPanel, BorderLayout.CENTER);
 
-        // Bottom demo quick-fill panel
+        // Bottom quick-fill panel ("Login as:" + equal-sized role buttons)
         JPanel footer = new JPanel();
         footer.setLayout(new BoxLayout(footer, BoxLayout.Y_AXIS));
         footer.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
 
-        demoHintLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
-        demoHintLabel.setAlignmentX(CENTER_ALIGNMENT);
-        footer.add(demoHintLabel);
+        loginAsLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
+        loginAsLabel.setAlignmentX(CENTER_ALIGNMENT);
+        footer.add(loginAsLabel);
         footer.add(Box.createVerticalStrut(6));
 
         JPanel quickFillPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
@@ -171,11 +170,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
             passwordField.setText(creds[1]);
             errorLabel.setText(" ");
         };
-        JButton adminBtn = new JButton("ADMIN");
         adminBtn.addActionListener(e -> fill.accept(new String[]{"admin", "admin123"}));
-        JButton managerBtn = new JButton("MANAGER");
         managerBtn.addActionListener(e -> fill.accept(new String[]{"manager", "manager123"}));
-        JButton operatorBtn = new JButton("OPERATOR");
         operatorBtn.addActionListener(e -> fill.accept(new String[]{"operator", "operator123"}));
 
         quickFillPanel.add(adminBtn);
@@ -192,10 +188,13 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private void applyBrutalistStyling() {
         BrutalistStyle.applyBoxCard(cardPanel, 18, 22);
         logoLabel.setIcon(LogoAssets.logoIcon(108, ThemeManager.isDarkMode()));
-        BrutalistStyle.styleBoxedTag(versionTagLabel, false);
+        loginHeadingLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
-        subtitleLabel.setForeground(ThemeManager.muted());
-        demoHintLabel.setForeground(ThemeManager.muted());
+        BrutalistStyle.styleSecondaryButton(adminBtn);
+        BrutalistStyle.styleSecondaryButton(managerBtn);
+        BrutalistStyle.styleSecondaryButton(operatorBtn);
+        BrutalistStyle.matchButtonSizes(adminBtn, managerBtn, operatorBtn);
+        loginAsLabel.setForeground(ThemeManager.muted());
     }
 
     private void populateLanguages() {
@@ -237,11 +236,11 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         setTitle(i18n.t("login.title"));
-        subtitleLabel.setText(i18n.t("app.subtitle"));
+        loginHeadingLabel.setText(i18n.t("login.button").toUpperCase(Locale.ROOT));
         usernameLabel.setText(i18n.t("login.username"));
         passwordLabel.setText(i18n.t("login.password"));
         loginButton.setText(i18n.t("login.button"));
-        demoHintLabel.setText(i18n.t("login.demo_hint"));
+        loginAsLabel.setText(i18n.t("login.login_as"));
         langLabel.setText(i18n.t("app.language") + ":");
         updateThemeButtonText();
     }

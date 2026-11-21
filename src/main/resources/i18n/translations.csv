@@ -44,6 +44,7 @@ login.button,Sign In,Bejelentkezés
 login.failed,Invalid username or password.,Hibás felhasználónév vagy jelszó.
 login.inactive,This user account is deactivated.,Ez a felhasználói fiók inaktív.
 login.demo_hint,"Demo accounts: admin / admin123, manager / manager123, operator / operator123","Teszt fiókok: admin / admin123, manager / manager123, operator / operator123"
+login.login_as,Login as:,Bejelentkezés mint:
 nav.dashboard,Dashboard,Áttekintés
 nav.intake,Package Intake & QR,Csomagfelvétel és QR
 nav.scanner,QR Scanner Station,QR Szkenner Állomás
