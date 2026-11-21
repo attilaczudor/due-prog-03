@@ -12,7 +12,6 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
@@ -33,8 +32,9 @@ import java.util.Map;
 
 /**
  * Main ReWear WMS application window styled in stark Brutalist Monochrome (Light & Dark),
- * with RBAC-filtered sidebar navigation, bottom-left language/theme controls & circular user avatar
- * profile bar with settings gear trigger, minimal top bar, and modular CardLayout workspace.
+ * with RBAC-filtered sidebar navigation, clean bottom-left circular user avatar profile bar
+ * with settings gear trigger (hosting profile, role/permissions, language, theme & logout),
+ * minimal top bar, and modular CardLayout workspace.
  */
 public final class MainFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
 
@@ -55,7 +55,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JPanel contentHost = new JPanel(cardLayout);
     private final Map<String, NavigableView> views = new LinkedHashMap<>();
     private final Map<String, JToggleButton> navButtons = new LinkedHashMap<>();
-    private final ButtonGroup navGroup = new ButtonGroup();
+    private ButtonGroup navGroup = new ButtonGroup();
 
     private final JPanel sidebar = new JPanel(new BorderLayout());
     private final JPanel brandPanel = new JPanel();
@@ -64,12 +64,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JLabel brandTagLabel = new JLabel("DUE-PROG-03");
     private final JPanel navList = new JPanel();
 
-    // Sidebar bottom controls: language/theme row + circular avatar / name / role / gear button
+    // Sidebar bottom footer: circular avatar | name + role | gear button
     private final JPanel sidebarFooter = new JPanel();
-    private final JPanel utilityRow = new JPanel(new BorderLayout(6, 0));
-    private final JComboBox<String> langCombo = new JComboBox<>();
-    private final JButton themeToggleButton = new JButton();
-
     private final JPanel profilePanel = new JPanel(new BorderLayout(10, 0));
     private final AvatarBadge avatarBadge = new AvatarBadge(38);
     private final JPanel userMetaPanel = new JPanel();
@@ -83,7 +79,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JLabel statusBarLabel = new JLabel();
 
     private String currentViewKey;
-    private boolean updatingLanguageCombo = false;
 
     public MainFrame(AppContext ctx, Runnable onLogout) {
         this.ctx = ctx;
@@ -96,7 +91,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         buildUi();
         registerDefaultViews();
-        populateLanguageCombo();
         refreshUserProfileCard();
         applyTranslations();
         applyBrutalistChrome();
@@ -127,34 +121,10 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         sidebar.add(brandPanel, BorderLayout.NORTH);
 
         navList.setLayout(new BoxLayout(navList, BoxLayout.Y_AXIS));
-        SessionContext session = ctx.getSession();
-
-        addNavButton(navList, VIEW_DASHBOARD, "nav.dashboard");
-        addNavButton(navList, VIEW_INTAKE, "nav.intake");
-        addNavButton(navList, VIEW_SCANNER, "nav.scanner");
-        addNavButton(navList, VIEW_INVENTORY, "nav.inventory");
-
-        if (session.canManageLocationsAndDictionaries()) {
-            navList.add(Box.createVerticalStrut(8));
-            navList.add(createHairlineSeparator());
-            navList.add(Box.createVerticalStrut(8));
-            addNavButton(navList, VIEW_LOCATIONS, "nav.locations");
-            addNavButton(navList, VIEW_DICTIONARIES, "nav.dictionaries");
-        }
-        if (session.canManageOrders()) {
-            addNavButton(navList, VIEW_CUSTOMERS, "nav.customers");
-            addNavButton(navList, VIEW_ORDERS, "nav.orders");
-        }
-        if (session.canManageUsersAndMaintenance()) {
-            navList.add(Box.createVerticalStrut(8));
-            navList.add(createHairlineSeparator());
-            navList.add(Box.createVerticalStrut(8));
-            addNavButton(navList, VIEW_ADMIN, "nav.admin");
-        }
-        navList.add(Box.createVerticalGlue());
+        rebuildSidebarNavigation();
         sidebar.add(navList, BorderLayout.CENTER);
 
-        // Sidebar Bottom Footer: Quick Language + Theme Row, then Profile Strip (Avatar | Name + Role | Gear)
+        // Sidebar Bottom Footer: Profile Strip ([Avatar] [Name / Role] [Gear])
         sidebarFooter.setLayout(new BoxLayout(sidebarFooter, BoxLayout.Y_AXIS));
 
         JSeparator topSep = createHairlineSeparator();
@@ -162,35 +132,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         sidebarFooter.add(topSep);
         sidebarFooter.add(Box.createVerticalStrut(10));
 
-        langCombo.setPreferredSize(new Dimension(68, 30));
-        langCombo.addActionListener(e -> {
-            if (!updatingLanguageCombo && langCombo.getSelectedItem() instanceof String code) {
-                ctx.getI18n().setLanguage(code.toLowerCase(Locale.ROOT));
-                ctx.getPreferences().setLanguage(code.toLowerCase(Locale.ROOT));
-            }
-        });
-
-        themeToggleButton.setFont(ThemeManager.monoFont(Font.BOLD, 11f));
-        themeToggleButton.setPreferredSize(new Dimension(140, 30));
-        themeToggleButton.addActionListener(e -> {
-            boolean nextDark = !ctx.getPreferences().isDarkTheme();
-            ctx.getPreferences().setDarkTheme(nextDark);
-            ThemeManager.applyTheme(nextDark);
-        });
-
-        utilityRow.add(langCombo, BorderLayout.WEST);
-        utilityRow.add(themeToggleButton, BorderLayout.CENTER);
-        utilityRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
-        utilityRow.setAlignmentX(LEFT_ALIGNMENT);
-        sidebarFooter.add(utilityRow);
-
-        sidebarFooter.add(Box.createVerticalStrut(10));
-        JSeparator midSep = createHairlineSeparator();
-        midSep.setAlignmentX(LEFT_ALIGNMENT);
-        sidebarFooter.add(midSep);
-        sidebarFooter.add(Box.createVerticalStrut(10));
-
-        // Profile Strip: [Avatar] [Name / Role] [Gear]
         MouseAdapter openProfileOnClick = new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -259,6 +200,55 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         setContentPane(root);
     }
 
+    private void rebuildSidebarNavigation() {
+        navList.removeAll();
+        navButtons.clear();
+        navGroup = new ButtonGroup();
+
+        SessionContext session = ctx.getSession();
+        addNavButton(navList, VIEW_DASHBOARD, "nav.dashboard");
+        addNavButton(navList, VIEW_INTAKE, "nav.intake");
+        addNavButton(navList, VIEW_SCANNER, "nav.scanner");
+        addNavButton(navList, VIEW_INVENTORY, "nav.inventory");
+
+        if (session.canManageLocationsAndDictionaries()) {
+            navList.add(Box.createVerticalStrut(8));
+            navList.add(createHairlineSeparator());
+            navList.add(Box.createVerticalStrut(8));
+            addNavButton(navList, VIEW_LOCATIONS, "nav.locations");
+            addNavButton(navList, VIEW_DICTIONARIES, "nav.dictionaries");
+        }
+        if (session.canManageOrders()) {
+            addNavButton(navList, VIEW_CUSTOMERS, "nav.customers");
+            addNavButton(navList, VIEW_ORDERS, "nav.orders");
+        }
+        if (session.canManageUsersAndMaintenance()) {
+            navList.add(Box.createVerticalStrut(8));
+            navList.add(createHairlineSeparator());
+            navList.add(Box.createVerticalStrut(8));
+            addNavButton(navList, VIEW_ADMIN, "nav.admin");
+        }
+        navList.add(Box.createVerticalGlue());
+
+        I18nManager i18n = ctx.getI18n();
+        for (JToggleButton btn : navButtons.values()) {
+            Object key = btn.getClientProperty("i18nKey");
+            if (key instanceof String i18nKey) {
+                btn.setText(i18n.t(i18nKey).toUpperCase(Locale.ROOT));
+            }
+        }
+        if (currentViewKey != null && !navButtons.containsKey(currentViewKey)) {
+            currentViewKey = VIEW_DASHBOARD;
+            cardLayout.show(contentHost, VIEW_DASHBOARD);
+        }
+        if (currentViewKey != null && navButtons.containsKey(currentViewKey)) {
+            navButtons.get(currentViewKey).setSelected(true);
+        }
+        updateNavButtonStyles();
+        navList.revalidate();
+        navList.repaint();
+    }
+
     private static JSeparator createHairlineSeparator() {
         JSeparator sep = new JSeparator();
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
@@ -318,8 +308,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 this,
                 ctx,
                 () -> {
+                    rebuildSidebarNavigation();
                     refreshUserProfileCard();
                     if (currentViewKey != null && views.containsKey(currentViewKey)) {
+                        activeViewTitleLabel.setText(
+                                ctx.getI18n().t(views.get(currentViewKey).getTitleI18nKey()).toUpperCase(Locale.ROOT));
                         views.get(currentViewKey).refreshData();
                     }
                 },
@@ -361,7 +354,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         brandLogoLabel.setIcon(LogoAssets.logoIcon(48, ThemeManager.isDarkMode()));
         navList.setBackground(ThemeManager.bg());
         sidebarFooter.setBackground(ThemeManager.bg());
-        utilityRow.setBackground(ThemeManager.bg());
         profilePanel.setBackground(ThemeManager.bg());
         sidebar.setBorder(BrutalistStyle.hairlineRightRule(14, 12));
 
@@ -396,19 +388,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 + "  //  DB: " + ctx.getDatabaseManager().getDatabasePath().getFileName());
     }
 
-    public void populateLanguageCombo() {
-        updatingLanguageCombo = true;
-        try {
-            langCombo.removeAllItems();
-            for (String lang : ctx.getI18n().getAvailableLanguages()) {
-                langCombo.addItem(lang.toUpperCase(Locale.ROOT));
-            }
-            langCombo.setSelectedItem(ctx.getI18n().getActiveLanguage().toUpperCase(Locale.ROOT));
-        } finally {
-            updatingLanguageCombo = false;
-        }
-    }
-
     private void performLogout() {
         ctx.getI18n().removeListener(this);
         ThemeManager.removeListener(this);
@@ -417,15 +396,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         onLogout.run();
     }
 
-    private void updateThemeButtonText() {
-        boolean isDark = ctx.getPreferences().isDarkTheme();
-        themeToggleButton.setText(ctx.getI18n().t(isDark ? "app.theme.light" : "app.theme.dark").toUpperCase(Locale.ROOT));
-    }
-
     private void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         setTitle(i18n.t("app.title"));
-        updateThemeButtonText();
         settingsButton.setToolTipText(i18n.t("profile.settings.tooltip"));
         refreshUserProfileCard();
 
@@ -446,13 +419,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     @Override
     public void onLanguageChanged(String languageCode) {
-        populateLanguageCombo();
         applyTranslations();
     }
 
     @Override
     public void onThemeChanged(boolean dark) {
-        updateThemeButtonText();
         applyBrutalistChrome();
         repaint();
     }

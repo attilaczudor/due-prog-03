@@ -103,14 +103,20 @@ public final class AuthService {
     }
 
     public User updateOwnProfile(long userId, String fullName, String email, String phone, byte[] avatarPng) {
+        return updateOwnProfile(userId, fullName, email, phone, avatarPng, null);
+    }
+
+    public User updateOwnProfile(long userId, String fullName, String email, String phone,
+                                 byte[] avatarPng, Long newRoleId) {
         if (fullName == null || fullName.isBlank()) {
             throw new IllegalArgumentException("Full name is required.");
         }
-        userDao.updateAccountSettings(userId, fullName.trim(), email, phone, avatarPng);
+        Long effectiveRoleId = (newRoleId != null && session.isAdmin()) ? newRoleId : null;
+        userDao.updateAccountSettings(userId, fullName.trim(), email, phone, avatarPng, effectiveRoleId);
         User updated = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("Updated user not found: " + userId));
         session.updateCurrentUser(updated);
-        LOG.info("Updated profile settings for user '{}'", updated.username());
+        LOG.info("Updated profile settings for user '{}' (role={})", updated.username(), updated.roleCode());
         return updated;
     }
 }

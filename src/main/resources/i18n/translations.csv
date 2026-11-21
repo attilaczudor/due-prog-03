@@ -241,3 +241,16 @@ profile.error.password_mismatch,New passwords do not match.,Az új jelszavak nem
 profile.error.password_short,New password must be at least 6 characters.,Az új jelszónak legalább 6 karakternek kell lennie.
 profile.error.password_wrong,Current password is incorrect.,A jelenlegi jelszó hibás.
 profile.error.image,Could not read the selected image file.,A kiválasztott képfájl nem olvasható.
+profile.appearance.section,Appearance & Language,Megjelenés és nyelv
+profile.language,Language,Nyelv
+profile.theme,Theme,Téma
+profile.theme.light,Light Mode,Világos mód
+profile.theme.dark,Dark Mode,Sötét mód
+profile.role.section,Role & Permissions,Szerepkör és jogosultságok
+profile.role.label,Account Role,Fiók szerepköre
+profile.role.permissions,Capabilities for selected role:,A kiválasztott szerepkör jogosultságai:
+profile.role.admin_only,Only Administrators can change account roles.,A szerepkör módosításához Adminisztrátor jogosultság szükséges.
+profile.perm.core,"Dashboard, Package Intake & QR Printing, QR Scanner, Inventory","Áttekintés, Csomagfelvétel és QR nyomtatás, QR Szkenner, Készlet"
+profile.perm.catalog,Warehouse Locations & Code Dictionaries Management,Raktárhelyek és kódtörzsek kezelése
+profile.perm.orders,"Customers, Orders, Live QR Packing & PDF Delivery Notes","Ügyfelek, rendelések, élő QR összekészítés és PDF szállítólevél"
+profile.perm.admin,"Users & Roles, Audit Log, DB Backup/Restore & CSV Translations","Felhasználók, napló, adatbázis mentés/visszaállítás és CSV fordítások"

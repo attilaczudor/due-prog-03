@@ -123,7 +123,14 @@ public final class UserDao {
     }
 
     public void updateAccountSettings(long userId, String fullName, String email, String phone, byte[] avatarPng) {
-        String sql = "UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ? WHERE id = ?";
+        updateAccountSettings(userId, fullName, email, phone, avatarPng, null);
+    }
+
+    public void updateAccountSettings(long userId, String fullName, String email, String phone,
+                                      byte[] avatarPng, Long roleId) {
+        String sql = roleId != null
+                ? "UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ?, role_id = ? WHERE id = ?"
+                : "UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ? WHERE id = ?";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, fullName.trim());
@@ -134,7 +141,12 @@ public final class UserDao {
             } else {
                 ps.setNull(4, java.sql.Types.BLOB);
             }
-            ps.setLong(5, userId);
+            if (roleId != null) {
+                ps.setLong(5, roleId);
+                ps.setLong(6, userId);
+            } else {
+                ps.setLong(5, userId);
+            }
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException("Failed to update user account settings: " + userId, e);

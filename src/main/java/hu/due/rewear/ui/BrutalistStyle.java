@@ -8,6 +8,7 @@ import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JTable;
 import javax.swing.border.Border;
+import java.awt.Dimension;
 import java.awt.Font;
 
 /**
@@ -61,8 +62,39 @@ public final class BrutalistStyle {
         button.setFont(ThemeManager.monoFont(Font.BOLD, 12.5f));
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.fg(), 1),
-                BorderFactory.createEmptyBorder(6, 14, 6, 14)
+                BorderFactory.createEmptyBorder(5, 14, 5, 14)
         ));
+    }
+
+    /** Styles a secondary button with the exact same border & padding metrics as primary buttons. */
+    public static void styleSecondaryButton(JButton button) {
+        button.setBackground(ThemeManager.bg());
+        button.setForeground(ThemeManager.fg());
+        button.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
+        button.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(ThemeManager.border(), 1),
+                BorderFactory.createEmptyBorder(5, 14, 5, 14)
+        ));
+    }
+
+    /** Equalizes preferred and minimum sizes across a group of buttons so they align identically. */
+    public static void matchButtonSizes(JButton... buttons) {
+        if (buttons == null || buttons.length == 0) {
+            return;
+        }
+        int maxW = 0;
+        int maxH = 0;
+        for (JButton b : buttons) {
+            b.setPreferredSize(null);
+            Dimension d = b.getPreferredSize();
+            maxW = Math.max(maxW, d.width);
+            maxH = Math.max(maxH, d.height);
+        }
+        Dimension uniform = new Dimension(maxW, maxH);
+        for (JButton b : buttons) {
+            b.setPreferredSize(uniform);
+            b.setMinimumSize(uniform);
+        }
     }
 
     /** Styles a label as a crisp boxed brutalist tag (like [ LIVE CDC ] or [ LLM-CPU ]). */
