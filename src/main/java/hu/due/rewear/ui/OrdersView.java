@@ -67,7 +67,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final JLabel orderStatusTag = new JLabel(" ");
     private final JLabel orderMetaLabel = new JLabel(" ");
 
-    private final JPanel scanBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+    private final JPanel scanBarPanel = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 6));
     private final JLabel scanLabel = new JLabel();
     private final JTextField scanQrField = new JTextField(26);
     private final JButton scanAddBtn = new JButton();
@@ -148,7 +148,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         itemsContainer.add(new JScrollPane(itemsTable), BorderLayout.CENTER);
         rightPanel.add(itemsContainer, BorderLayout.CENTER);
 
-        JPanel lifecycleBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+        JPanel lifecycleBar = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
         lifecycleBar.add(startPackingBtn);
         lifecycleBar.add(shipOrderBtn);
         lifecycleBar.add(cancelOrderBtn);

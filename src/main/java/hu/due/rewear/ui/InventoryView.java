@@ -41,6 +41,8 @@ import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
 import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
@@ -117,7 +119,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         JPanel topPanel = new JPanel(new BorderLayout(0, 6));
 
         filterBarPanel = new JPanel(new BorderLayout(0, 4));
-        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        JPanel searchRow = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 4));
         searchRow.add(searchField);
         searchRow.add(locationFilter);
         searchRow.add(searchBtn);
@@ -136,7 +138,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(filterBarPanel, 6, 8);
         topPanel.add(filterBarPanel, BorderLayout.NORTH);
 
-        JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        JPanel actionRow = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         actionRow.add(editBtn);
         actionRow.add(detailsBtn);
         actionRow.add(relocateBtn);
@@ -151,6 +153,13 @@ public final class InventoryView extends JPanel implements NavigableView {
         topPanel.add(actionRow, BorderLayout.SOUTH);
 
         add(topPanel, BorderLayout.NORTH);
+        addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                topPanel.revalidate();
+                revalidate();
+            }
+        });
 
         // Table
         table.setAutoCreateRowSorter(true);

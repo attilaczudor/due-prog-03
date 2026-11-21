@@ -149,7 +149,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
         inputPromptLabel.setFont(inputPromptLabel.getFont().deriveFont(Font.BOLD, 13f));
         scanBox.add(inputPromptLabel, BorderLayout.NORTH);
 
-        JPanel inputRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        JPanel inputRow = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         scanInputField.setFont(new Font(Font.MONOSPACED, Font.BOLD, 15));
         scanInputField.setPreferredSize(new Dimension(380, 34));
         lookupBtn.setPreferredSize(new Dimension(130, 34));
@@ -231,7 +231,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
         JPanel rightPanel = rightPanelBox;
         BrutalistStyle.applyBoxCard(rightPanel, 14, 16);
 
-        JPanel actionGrid = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        JPanel actionGrid = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 6));
         relocateBtn.setPreferredSize(new Dimension(175, 36));
         verifyBtn.setPreferredSize(new Dimension(175, 36));
         reprintBtn.setPreferredSize(new Dimension(165, 36));
