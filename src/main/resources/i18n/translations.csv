@@ -125,6 +125,17 @@ scanner.status.waiting,Waiting for QR scan...,Várakozás QR beolvasásra...
 scanner.status.found,Package found in warehouse database.,Csomag megtalálva a raktári adatbázisban.
 scanner.status.valid_not_found,Valid product code format — not registered in local database.,Érvényes kódszerkezet — nem szerepel a helyi adatbázisban.
 scanner.status.invalid,Invalid QR code format.,Érvénytelen QR kód formátum.
+scanner.status.no_qr_in_image,No QR code detected in the selected image.,Nem található QR kód a kiválasztott képen.
+scanner.drop_hint,Tip: You can also drag & drop a QR PNG/JPG image directly onto this screen.,Tipp: QR PNG/JPG képfájlt közvetlenül erre a felületre is behúzhat.
+scanner.history,Package Movement History,Csomag mozgástörténete
+scanner.field.timestamp,Entry Date & Time,Bevételezés ideje
+scanner.field.hex,Hex Suffix,Hex végződés
+scanner.field.operator,Recorded By,Rögzítette
+scanner.relocate.prompt,Select destination warehouse location:,Válassza ki a cél raktárhelyet:
+scanner.verify.done,Stocktake verification recorded.,Leltári ellenőrzés rögzítve.
+scanner.order.select,Select open order to attach this package:,Válasszon nyitott rendelést a csomag hozzáadásához:
+scanner.order.added,"Package attached to order {0}.","A csomag hozzáadva a(z) {0} rendeléshez."
+scanner.order.none_open,No open (Draft/Packing) orders available.,Nincs nyitott (Piszkozat/Összekészítés) rendelés.
 scanner.action.relocate,Relocate Shelf,Áthelyezés másik helyre
 scanner.action.verify,Verify Stocktake,Leltári ellenőrzés
 scanner.action.reprint,Reprint Ticket,Címke újranyomtatása

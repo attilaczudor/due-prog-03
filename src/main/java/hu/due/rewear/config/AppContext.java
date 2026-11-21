@@ -13,8 +13,10 @@ import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.service.AuthService;
 import hu.due.rewear.service.InventoryService;
 import hu.due.rewear.service.LabelPdfExporter;
+import hu.due.rewear.service.OrderService;
 import hu.due.rewear.service.ProductCodeService;
 import hu.due.rewear.service.QrCodeService;
+import hu.due.rewear.service.ScannerService;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.TicketLabelPainter;
 import org.slf4j.Logger;
@@ -50,6 +52,8 @@ public final class AppContext {
     private final AuthService authService;
     private final QrCodeService qrCodeService;
     private final InventoryService inventoryService;
+    private final OrderService orderService;
+    private final ScannerService scannerService;
     private final TicketLabelPainter ticketLabelPainter;
     private final LabelPdfExporter labelPdfExporter;
 
@@ -80,6 +84,8 @@ public final class AppContext {
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
         this.inventoryService = new InventoryService(databaseManager, packageDao, movementDao, productCodeService);
+        this.orderService = new OrderService(databaseManager, orderDao, orderItemDao, packageDao, movementDao);
+        this.scannerService = new ScannerService(productCodeService, qrCodeService, packageDao, movementDao);
         this.ticketLabelPainter = new TicketLabelPainter(qrCodeService, i18n);
         this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
 
@@ -170,6 +176,14 @@ public final class AppContext {
 
     public InventoryService getInventoryService() {
         return inventoryService;
+    }
+
+    public OrderService getOrderService() {
+        return orderService;
+    }
+
+    public ScannerService getScannerService() {
+        return scannerService;
     }
 
     public TicketLabelPainter getTicketLabelPainter() {
