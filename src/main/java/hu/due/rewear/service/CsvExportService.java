@@ -95,10 +95,11 @@ public final class CsvExportService {
             writeRow(w, List.of(
                     "Invoice Number", "Direction", "Category", "Order Ref", "Partner",
                     "Tax Number", "Status", "Issue Date", "Due Date", "Paid Date",
-                    "Currency", "EUR/HUF Rate", "Net", "VAT %", "VAT", "Gross"
+                    "Currency", "Tax Type", "Net", "VAT %", "VAT", "Gross"
             ));
             for (Invoice inv : invoices) {
-                var cur = inv.currencyCode();
+                String cur = inv.effectiveCurrencyCode();
+                int dec = inv.currencyDecimals();
                 writeRow(w, List.of(
                         inv.invoiceNumber(),
                         i18n.t("invoice.direction." + inv.direction().name()),
@@ -110,12 +111,12 @@ public final class CsvExportService {
                         inv.issueDate().toString(),
                         inv.dueDate().toString(),
                         inv.paidDate() != null ? inv.paidDate().toString() : "",
-                        cur.name(),
-                        inv.effectiveExchangeRate().toPlainString(),
-                        cur.formatPlain(inv.netAmount()),
+                        cur,
+                        inv.effectiveTaxTypeCode(),
+                        hu.due.rewear.model.CurrencyDef.roundForScale(inv.netAmount(), dec).toPlainString(),
                         inv.vatRate().toPlainString(),
-                        cur.formatPlain(inv.vatAmount()),
-                        cur.formatPlain(inv.grossAmount())
+                        hu.due.rewear.model.CurrencyDef.roundForScale(inv.vatAmount(), dec).toPlainString(),
+                        hu.due.rewear.model.CurrencyDef.roundForScale(inv.grossAmount(), dec).toPlainString()
                 ));
             }
         }

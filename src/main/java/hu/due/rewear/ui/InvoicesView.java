@@ -4,6 +4,7 @@ import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CurrencyCode;
+import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.FinancialSummary;
 import hu.due.rewear.model.Invoice;
@@ -12,12 +13,14 @@ import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
+import hu.due.rewear.model.TaxType;
 import hu.due.rewear.service.DocumentPageSource;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JCheckBox;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
@@ -25,6 +28,8 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSplitPane;
+import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -36,7 +41,6 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Cursor;
-import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
@@ -50,31 +54,34 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
- * Brutalist Monochrome Invoices & Financial Overview screen supporting both
- * Outgoing Invoices (revenue, linked to orders or manual) and Incoming Invoices (warehouse expenses),
- * with live Income / Expenses / Net Balance P&L KPIs, reversible status changes, A4 PDF Preview/Print/Email,
- * and CSV export.
+ * Brutalist Monochrome Invoices & Financial Overview workspace with two tabs:
+ * 1) Invoices: strictly separated per-currency ledgers (HUF, EUR, USD, ...) with zero forced FX conversion,
+ *    country-aware VAT auto-selection (HU 27%, EU 0%, Non-EU 0%), order & supplier auto-fill, A4 PDF Preview/Print/Email.
+ * 2) Invoice Settings: full CRUD management for Tax Types (VAT rates & country scopes) and operating Currencies.
  */
 public final class InvoicesView extends JPanel implements NavigableView {
 
     private final AppContext ctx;
 
-    // Currency & Exchange Rate Control Bar
-    private final JPanel fxBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
-    private final JLabel reportingCurLabel = new JLabel();
-    private final JButton reportHufBtn = new JButton("HUF");
-    private final JButton reportEurBtn = new JButton("EUR");
-    private final JLabel fxRateLabel = new JLabel();
-    private final JTextField fxRateField = new JTextField("400.00", 7);
-    private final JLabel fxSuffixLabel = new JLabel("HUF");
-    private final JButton saveFxBtn = new JButton();
+    private final JTabbedPane tabs = new JTabbedPane();
+    private final JPanel invoicesTab = new JPanel(new BorderLayout(0, 10));
+    private final JPanel settingsTab = new JPanel(new BorderLayout(0, 10));
+
+    // --- Tab 1: Separate Currency Ledger Bar (NO FX conversion) ---
+    private final JPanel currencyLedgerBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
+    private final JLabel currencyLedgerLabel = new JLabel();
+    private final Map<String, JButton> ledgerButtons = new LinkedHashMap<>();
+    private String selectedLedgerCurrency = null; // null == ALL (shown separately per currency)
 
     // 4 Financial KPI Cards
     private final JPanel kpiCardIncome = new JPanel();
@@ -87,10 +94,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JLabel kpiTitleBalance = new JLabel();
     private final JLabel kpiTitleUnpaid = new JLabel();
 
-    private final JLabel kpiValIncome = new JLabel("0 HUF");
-    private final JLabel kpiValExpense = new JLabel("0 HUF");
-    private final JLabel kpiValBalance = new JLabel("0 HUF");
-    private final JLabel kpiValUnpaid = new JLabel("0 HUF");
+    private final JLabel kpiValIncome = new JLabel("—");
+    private final JLabel kpiValExpense = new JLabel("—");
+    private final JLabel kpiValBalance = new JLabel("—");
+    private final JLabel kpiValUnpaid = new JLabel("—");
 
     private final JLabel kpiSubIncome = new JLabel(" ");
     private final JLabel kpiSubExpense = new JLabel(" ");
@@ -101,7 +108,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JPanel filterCard = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
     private final JTextField searchField = new JTextField(16);
     private final JComboBox<FilterItem<InvoiceDirection>> directionFilter = new JComboBox<>();
-    private final JComboBox<FilterItem<CurrencyCode>> currencyFilter = new JComboBox<>();
     private final JComboBox<FilterItem<InvoiceStatus>> statusFilter = new JComboBox<>();
     private final JComboBox<FilterItem<InvoiceCategory>> categoryFilter = new JComboBox<>();
     private final JButton refreshBtn = new JButton();
@@ -114,13 +120,32 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JButton previewDocBtn = new JButton();
     private final JButton exportCsvBtn = new JButton();
 
-    private final DefaultTableModel tableModel = new DefaultTableModel() {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
+    private final DefaultTableModel tableModel = nonEditableModel();
     private final JTable table = new JTable(tableModel);
+
+    // --- Tab 2: Invoice Settings (Tax Types + Currencies) ---
+    private final JPanel taxCard = new JPanel(new BorderLayout(0, 8));
+    private final JLabel taxSectionTitle = new JLabel();
+    private final JButton addTaxBtn = new JButton();
+    private final JButton editTaxBtn = new JButton();
+    private final JButton toggleTaxBtn = new JButton();
+    private final JButton deleteTaxBtn = new JButton();
+    private final DefaultTableModel taxModel = nonEditableModel();
+    private final JTable taxTable = new JTable(taxModel);
+
+    private final JPanel currencyCard = new JPanel(new BorderLayout(0, 8));
+    private final JLabel currencySectionTitle = new JLabel();
+    private final JButton addCurrencyBtn = new JButton();
+    private final JButton editCurrencyBtn = new JButton();
+    private final JButton toggleCurrencyBtn = new JButton();
+    private final JButton deleteCurrencyBtn = new JButton();
+    private final DefaultTableModel currencyModel = nonEditableModel();
+    private final JTable currencyTable = new JTable(currencyModel);
 
     private List<Invoice> allInvoices = List.of();
     private List<Invoice> filteredInvoices = List.of();
+    private List<TaxType> allTaxTypes = List.of();
+    private List<CurrencyDef> allCurrencies = List.of();
     private boolean updatingControls = false;
 
     private record FilterItem<T>(T value, String label) {
@@ -131,39 +156,49 @@ public final class InvoicesView extends JPanel implements NavigableView {
         @Override public String toString() { return label; }
     }
 
+    private record TaxChoice(TaxType tax, String label) {
+        @Override public String toString() { return label; }
+    }
+
+    private record ScopeOption(String code, String label) {
+        @Override public String toString() { return label; }
+    }
+
     public InvoicesView(AppContext ctx) {
         this.ctx = ctx;
 
-        setLayout(new BorderLayout(0, 12));
+        setLayout(new BorderLayout());
         setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
 
-        buildUi();
+        buildInvoicesTab();
+        buildSettingsTab();
+        tabs.addTab("", invoicesTab);
+        tabs.addTab("", settingsTab);
+        add(tabs, BorderLayout.CENTER);
+
         wireEvents();
         applyTranslations();
         applyTheme();
         refreshData();
     }
 
-    private void buildUi() {
+    private static DefaultTableModel nonEditableModel() {
+        return new DefaultTableModel() {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+    }
+
+    private void buildInvoicesTab() {
+        invoicesTab.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+
         JPanel northStack = new JPanel();
         northStack.setLayout(new BoxLayout(northStack, BoxLayout.Y_AXIS));
         northStack.setOpaque(false);
 
-        // 0. Reporting Currency & Exchange Rate Strip
-        fxBar.setAlignmentX(LEFT_ALIGNMENT);
-        reportingCurLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
-        fxRateLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
-        fxSuffixLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
-        fxRateField.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
-        fxBar.add(reportingCurLabel);
-        fxBar.add(reportHufBtn);
-        fxBar.add(reportEurBtn);
-        fxBar.add(Box.createHorizontalStrut(12));
-        fxBar.add(fxRateLabel);
-        fxBar.add(fxRateField);
-        fxBar.add(fxSuffixLabel);
-        fxBar.add(saveFxBtn);
-        northStack.add(fxBar);
+        // 0. Separate Currency Ledger Selector Bar
+        currencyLedgerBar.setAlignmentX(LEFT_ALIGNMENT);
+        currencyLedgerLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
+        northStack.add(currencyLedgerBar);
         northStack.add(Box.createVerticalStrut(8));
 
         // 1. Financial KPI Cards
@@ -185,7 +220,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         filterCard.setAlignmentX(LEFT_ALIGNMENT);
         filterCard.add(searchField);
         filterCard.add(directionFilter);
-        filterCard.add(currencyFilter);
         filterCard.add(statusFilter);
         filterCard.add(categoryFilter);
         filterCard.add(refreshBtn);
@@ -203,18 +237,18 @@ public final class InvoicesView extends JPanel implements NavigableView {
         actionBar.add(exportCsvBtn);
         northStack.add(actionBar);
 
-        add(northStack, BorderLayout.NORTH);
+        invoicesTab.add(northStack, BorderLayout.NORTH);
 
         // 4. Invoices Table
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         table.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         BrutalistStyle.styleTable(table);
-        add(new JScrollPane(table), BorderLayout.CENTER);
+        invoicesTab.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        addComponentListener(new ComponentAdapter() {
+        invoicesTab.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
-                fxBar.revalidate();
+                currencyLedgerBar.revalidate();
                 filterCard.revalidate();
                 actionBar.revalidate();
                 northStack.revalidate();
@@ -222,10 +256,53 @@ public final class InvoicesView extends JPanel implements NavigableView {
         });
     }
 
+    private void buildSettingsTab() {
+        settingsTab.setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+
+        // Top Card: Tax Types
+        JPanel taxHeader = new JPanel(new BorderLayout(8, 0));
+        taxHeader.setOpaque(false);
+        taxSectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        taxHeader.add(taxSectionTitle, BorderLayout.WEST);
+        JPanel taxBtns = new JPanel(new WrapLayout(FlowLayout.RIGHT, 6, 2));
+        taxBtns.setOpaque(false);
+        taxBtns.add(addTaxBtn);
+        taxBtns.add(editTaxBtn);
+        taxBtns.add(toggleTaxBtn);
+        taxBtns.add(deleteTaxBtn);
+        taxHeader.add(taxBtns, BorderLayout.CENTER);
+        taxCard.add(taxHeader, BorderLayout.NORTH);
+        taxTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        BrutalistStyle.styleTable(taxTable);
+        taxCard.add(new JScrollPane(taxTable), BorderLayout.CENTER);
+
+        // Bottom Card: Currencies
+        JPanel curHeader = new JPanel(new BorderLayout(8, 0));
+        curHeader.setOpaque(false);
+        currencySectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        curHeader.add(currencySectionTitle, BorderLayout.WEST);
+        JPanel curBtns = new JPanel(new WrapLayout(FlowLayout.RIGHT, 6, 2));
+        curBtns.setOpaque(false);
+        curBtns.add(addCurrencyBtn);
+        curBtns.add(editCurrencyBtn);
+        curBtns.add(toggleCurrencyBtn);
+        curBtns.add(deleteCurrencyBtn);
+        curHeader.add(curBtns, BorderLayout.CENTER);
+        currencyCard.add(curHeader, BorderLayout.NORTH);
+        currencyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        BrutalistStyle.styleTable(currencyTable);
+        currencyCard.add(new JScrollPane(currencyTable), BorderLayout.CENTER);
+
+        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, taxCard, currencyCard);
+        split.setResizeWeight(0.55);
+        split.setDividerLocation(310);
+        settingsTab.add(split, BorderLayout.CENTER);
+    }
+
     private static void configureKpiCard(JPanel card, JLabel title, JLabel val, JLabel sub) {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         title.setFont(ThemeManager.monoFont(Font.BOLD, 10.5f));
-        val.setFont(ThemeManager.monoFont(Font.BOLD, 20f));
+        val.setFont(ThemeManager.monoFont(Font.BOLD, 17f));
         sub.setFont(ThemeManager.monoFont(Font.PLAIN, 10.5f));
         card.add(title);
         card.add(Box.createVerticalStrut(4));
@@ -235,14 +312,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
     }
 
     private void wireEvents() {
-        reportHufBtn.addActionListener(e -> switchReportingCurrency(CurrencyCode.HUF));
-        reportEurBtn.addActionListener(e -> switchReportingCurrency(CurrencyCode.EUR));
-        saveFxBtn.addActionListener(e -> handleSaveFxRate());
-        fxRateField.addActionListener(e -> handleSaveFxRate());
-
         searchField.addActionListener(e -> applyFiltersAndRender());
         directionFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
-        currencyFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         statusFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         categoryFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         refreshBtn.addActionListener(e -> refreshData());
@@ -266,37 +337,74 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 }
             }
         });
+
+        // Settings tab events
+        addTaxBtn.addActionListener(e -> openTaxDialog(null));
+        editTaxBtn.addActionListener(e -> {
+            int r = taxTable.getSelectedRow();
+            if (r >= 0 && r < allTaxTypes.size()) openTaxDialog(allTaxTypes.get(r));
+        });
+        toggleTaxBtn.addActionListener(e -> handleToggleTax());
+        deleteTaxBtn.addActionListener(e -> handleDeleteTax());
+
+        addCurrencyBtn.addActionListener(e -> openCurrencyDialog(null));
+        editCurrencyBtn.addActionListener(e -> {
+            int r = currencyTable.getSelectedRow();
+            if (r >= 0 && r < allCurrencies.size()) openCurrencyDialog(allCurrencies.get(r));
+        });
+        toggleCurrencyBtn.addActionListener(e -> handleToggleCurrency());
+        deleteCurrencyBtn.addActionListener(e -> handleDeleteCurrency());
     }
 
-    private void switchReportingCurrency(CurrencyCode target) {
-        ctx.getInvoiceService().setReportingCurrency(target);
-        styleReportingButtons();
-        applyFiltersAndRender();
-    }
-
-    private void handleSaveFxRate() {
+    private void rebuildCurrencyLedgerBar() {
         I18nManager i18n = ctx.getI18n();
-        try {
-            BigDecimal rate = CurrencyCode.parseAmount(fxRateField.getText());
-            ctx.getInvoiceService().updateEurToHufRate(rate);
-            BigDecimal saved = ctx.getInvoiceService().getCurrentEurToHufRate();
-            fxRateField.setText(CurrencyCode.EUR.formatPlain(saved));
+        currencyLedgerBar.removeAll();
+        ledgerButtons.clear();
+
+        currencyLedgerBar.add(currencyLedgerLabel);
+
+        JButton allBtn = new JButton(i18n.t("common.all").toUpperCase(Locale.ROOT));
+        allBtn.addActionListener(e -> {
+            selectedLedgerCurrency = null;
+            styleCurrencyLedgerButtons();
             applyFiltersAndRender();
-            JOptionPane.showMessageDialog(this, i18n.t("currency.fx_saved", CurrencyCode.EUR.formatPlain(saved)),
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        });
+        ledgerButtons.put("__ALL__", allBtn);
+        currencyLedgerBar.add(allBtn);
+
+        List<CurrencyDef> activeCurrencies = ctx.getFinanceConfigDao().findCurrencies(true);
+        boolean stillValid = selectedLedgerCurrency == null;
+        for (CurrencyDef cur : activeCurrencies) {
+            String code = cur.code();
+            if (code.equalsIgnoreCase(selectedLedgerCurrency)) {
+                stillValid = true;
+            }
+            JButton btn = new JButton(code);
+            btn.addActionListener(e -> {
+                selectedLedgerCurrency = code;
+                styleCurrencyLedgerButtons();
+                applyFiltersAndRender();
+            });
+            ledgerButtons.put(code, btn);
+            currencyLedgerBar.add(btn);
         }
+        if (!stillValid) {
+            selectedLedgerCurrency = null;
+        }
+        styleCurrencyLedgerButtons();
+        currencyLedgerBar.revalidate();
+        currencyLedgerBar.repaint();
     }
 
-    private void styleReportingButtons() {
-        CurrencyCode active = ctx.getInvoiceService().getReportingCurrency();
-        if (active == CurrencyCode.HUF) {
-            BrutalistStyle.stylePrimaryButton(reportHufBtn);
-            BrutalistStyle.styleSecondaryButton(reportEurBtn);
-        } else {
-            BrutalistStyle.styleSecondaryButton(reportHufBtn);
-            BrutalistStyle.stylePrimaryButton(reportEurBtn);
+    private void styleCurrencyLedgerButtons() {
+        for (Map.Entry<String, JButton> e : ledgerButtons.entrySet()) {
+            boolean active = ("__ALL__".equals(e.getKey()) && selectedLedgerCurrency == null)
+                    || e.getKey().equalsIgnoreCase(selectedLedgerCurrency);
+            if (active) {
+                BrutalistStyle.stylePrimaryButton(e.getValue());
+            } else {
+                BrutalistStyle.styleSecondaryButton(e.getValue());
+            }
         }
     }
 
@@ -347,7 +455,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         List<DocumentPageSource> docs = new ArrayList<>();
         docs.add(ctx.getInvoicePdfExporter().createPageSource(inv, items));
 
-        // If this invoice is linked to an Order, also offer its Delivery Note right in the preview checkboxes!
         if (inv.orderId() != null) {
             ctx.getOrderDao().findById(inv.orderId()).ifPresent(ord -> {
                 Customer cust = ctx.getCustomerDao().findById(ord.customerId()).orElse(null);
@@ -361,8 +468,38 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 ctx.getI18n().t("invoice.pdf.title") + " — " + inv.invoiceNumber());
     }
 
+    private JComboBox<TaxChoice> buildTaxTypeCombo(String lang) {
+        JComboBox<TaxChoice> combo = new JComboBox<>();
+        for (TaxType t : ctx.getFinanceConfigDao().findTaxTypes(true)) {
+            combo.addItem(new TaxChoice(t, t.displayLabel(lang)));
+        }
+        return combo;
+    }
+
+    private static void selectTaxInCombo(JComboBox<TaxChoice> combo, TaxType target) {
+        if (target == null) return;
+        for (int i = 0; i < combo.getItemCount(); i++) {
+            if (combo.getItemAt(i).tax().code().equalsIgnoreCase(target.code())) {
+                combo.setSelectedIndex(i);
+                return;
+            }
+        }
+    }
+
+    private JComboBox<String> buildCurrencyCombo(String preferred) {
+        JComboBox<String> combo = new JComboBox<>();
+        for (CurrencyDef c : ctx.getFinanceConfigDao().findCurrencies(true)) {
+            combo.addItem(c.code());
+        }
+        if (preferred != null) {
+            combo.setSelectedItem(preferred);
+        }
+        return combo;
+    }
+
     private void openNewOutgoingDialog() {
         I18nManager i18n = ctx.getI18n();
+        String lang = i18n.getActiveLanguage();
         List<Order> orders = ctx.getOrderDao().findAll();
         JComboBox<Object> orderPicker = new JComboBox<>();
         orderPicker.addItem(i18n.t("invoice.manual_entry"));
@@ -370,17 +507,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
             orderPicker.addItem(o);
         }
 
-        JComboBox<CurrencyCode> curCombo = new JComboBox<>(CurrencyCode.values());
-        curCombo.setSelectedItem(ctx.getInvoiceService().getReportingCurrency());
-        JTextField partnerF = new JTextField(22);
-        JTextField taxF = new JTextField(22);
-        JTextField addressF = new JTextField(22);
-        JTextField emailF = new JTextField(22);
-        JTextField descF = new JTextField(22);
+        String defaultCur = selectedLedgerCurrency != null ? selectedLedgerCurrency : "HUF";
+        JComboBox<String> curCombo = buildCurrencyCombo(defaultCur);
+        JComboBox<TaxChoice> taxCombo = buildTaxTypeCombo(lang);
+        selectTaxInCombo(taxCombo, ctx.getFinanceConfigDao().resolveDefaultTaxTypeForCountry("HU"));
+
+        JTextField partnerF = new JTextField(24);
+        JTextField taxF = new JTextField(24);
+        JTextField addressF = new JTextField(24);
+        JTextField emailF = new JTextField(24);
+        JTextField descF = new JTextField(24);
         JTextField qtyF = new JTextField("1", 10);
         JTextField unitF = new JTextField("kg", 8);
         JTextField priceF = new JTextField("0", 10);
-        JTextField vatF = new JTextField("27", 8);
         JLabel priceLabel = new JLabel(i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:");
 
         curCombo.addActionListener(e -> priceLabel.setText(
@@ -390,7 +529,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
         orderPicker.addActionListener(e -> {
             if (orderPicker.getSelectedItem() instanceof Order ord) {
-                CurrencyCode ordCur = ord.effectiveCurrency();
+                String ordCur = ord.effectiveCurrencyCode();
+                int dec = ctx.getFinanceConfigDao().decimalPlacesFor(ordCur);
                 curCombo.setSelectedItem(ordCur);
                 curCombo.setEnabled(false);
 
@@ -401,14 +541,13 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 emailF.setText(cust != null && cust.email() != null ? cust.email() : "");
 
                 var ordItems = ctx.getOrderItemDao().findByOrderId(ord.id());
-                String lang = i18n.getActiveLanguage();
                 if (ordItems.size() == 1) {
                     var item = ordItems.get(0);
                     descF.setText(item.packageQrCode() + " (" + item.localizedSummary(lang) + ")");
                 } else {
                     descF.setText(ord.orderNumber() + " — " + ordItems.size() + " "
                             + ("hu".equalsIgnoreCase(lang) ? "csomag" : "package(s)")
-                            + " (" + ordCur.format(ord.totalPrice()) + ")");
+                            + " (" + CurrencyDef.formatAmount(ord.totalPrice(), ordCur, dec) + ")");
                 }
 
                 BigDecimal weight = ord.totalWeightKg() != null ? ord.totalWeightKg() : BigDecimal.ZERO;
@@ -416,16 +555,17 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 unitF.setText("kg");
 
                 if (weight.compareTo(BigDecimal.ZERO) > 0 && ord.totalPrice() != null) {
-                    BigDecimal avgPerKg = ord.totalPrice().divide(weight, ordCur.scale(), java.math.RoundingMode.HALF_UP);
-                    priceF.setText(ordCur.formatPlain(avgPerKg));
+                    BigDecimal avgPerKg = ord.totalPrice().divide(weight, dec, RoundingMode.HALF_UP);
+                    priceF.setText(CurrencyDef.roundForScale(avgPerKg, dec).toPlainString());
                 } else {
-                    priceF.setText(ordCur.formatPlain(BigDecimal.ZERO));
+                    priceF.setText(CurrencyDef.roundForScale(BigDecimal.ZERO, dec).toPlainString());
                 }
 
-                ctx.getInvoiceDao().findByOrderId(ord.id()).ifPresentOrElse(
-                        existingInv -> vatF.setText(existingInv.vatRate().stripTrailingZeros().toPlainString()),
-                        () -> vatF.setText("27")
-                );
+                // Auto-select VAT type from customer's country (HU -> 27%, AT/SK/DE/EU -> 0%, Non-EU -> 0%)
+                TaxType autoTax = ctx.getInvoiceDao().findByOrderId(ord.id())
+                        .flatMap(inv -> ctx.getFinanceConfigDao().findTaxTypeByCode(inv.effectiveTaxTypeCode()))
+                        .orElseGet(() -> ctx.getInvoiceService().resolveDefaultTaxForCustomer(cust));
+                selectTaxInCombo(taxCombo, autoTax);
 
                 for (JTextField f : autoFields) {
                     f.setEditable(false);
@@ -434,7 +574,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 }
             } else {
                 curCombo.setEnabled(true);
-                curCombo.setSelectedItem(ctx.getInvoiceService().getReportingCurrency());
+                curCombo.setSelectedItem(defaultCur);
+                selectTaxInCombo(taxCombo, ctx.getFinanceConfigDao().resolveDefaultTaxTypeForCountry("HU"));
                 partnerF.setText("");
                 taxF.setText("");
                 addressF.setText("");
@@ -443,7 +584,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 qtyF.setText("1");
                 unitF.setText("kg");
                 priceF.setText("0");
-                vatF.setText("27");
                 for (JTextField f : autoFields) {
                     f.setEditable(true);
                     f.setBackground(ThemeManager.bg());
@@ -469,7 +609,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; form.add(priceLabel, gbc);
         gbc.gridx = 1; gbc.weightx = 1; form.add(priceF, gbc);
         r++;
-        addFormRow(form, gbc, r, i18n.t("invoice.vat_rate"), vatF);
+        addFormRow(form, gbc, r, i18n.t("invoice.tax_type") + " *", taxCombo);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.new_outgoing"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
@@ -477,19 +617,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
         }
 
         try {
-            BigDecimal vatRate = CurrencyCode.parseAmount(vatF.getText());
+            TaxType chosenTax = taxCombo.getSelectedItem() instanceof TaxChoice tc ? tc.tax() : null;
             long userId = ctx.getSession().requireCurrentUser().id();
             Invoice created;
             if (orderPicker.getSelectedItem() instanceof Order chosenOrder) {
-                created = ctx.getInvoiceService().ensureInvoiceForOrder(chosenOrder.id(), vatRate, userId);
+                created = ctx.getInvoiceService().ensureInvoiceForOrder(chosenOrder.id(), chosenTax, userId);
             } else {
-                CurrencyCode chosenCur = curCombo.getSelectedItem() instanceof CurrencyCode cc ? cc : CurrencyCode.EUR;
+                String chosenCur = curCombo.getSelectedItem() != null ? curCombo.getSelectedItem().toString() : "EUR";
                 BigDecimal qty = CurrencyCode.parseAmount(qtyF.getText());
                 BigDecimal unitPrice = CurrencyCode.parseAmount(priceF.getText());
                 created = ctx.getInvoiceService().createManualInvoice(
-                        InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, null,
+                        InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, null, null,
                         partnerF.getText(), taxF.getText(), addressF.getText(), emailF.getText(),
-                        descF.getText(), qty, unitF.getText(), unitPrice, vatRate, chosenCur,
+                        descF.getText(), qty, unitF.getText(), unitPrice, chosenTax, chosenCur,
                         LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
             }
             refreshDataSelecting(created.id());
@@ -500,27 +640,49 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     private void openNewIncomingDialog() {
         I18nManager i18n = ctx.getI18n();
+        String lang = i18n.getActiveLanguage();
+
+        List<Customer> suppliers = ctx.getCustomerDao().findSuppliers(true);
+        JComboBox<Object> supplierPicker = new JComboBox<>();
+        supplierPicker.addItem(i18n.t("invoice.manual_entry"));
+        for (Customer sup : suppliers) {
+            supplierPicker.addItem(sup);
+        }
+
         JComboBox<FilterItem<InvoiceCategory>> catCombo = new JComboBox<>();
         for (InvoiceCategory cat : InvoiceCategory.values()) {
             if (cat.defaultDirection() == InvoiceDirection.INCOMING) {
                 catCombo.addItem(new FilterItem<>(cat, i18n.t("invoice.category." + cat.name())));
             }
         }
-        JComboBox<CurrencyCode> curCombo = new JComboBox<>(CurrencyCode.values());
-        curCombo.setSelectedItem(ctx.getInvoiceService().getReportingCurrency());
-        JTextField invNoF = new JTextField(22);
-        JTextField partnerF = new JTextField(22);
-        JTextField taxF = new JTextField(22);
-        JTextField addressF = new JTextField(22);
-        JTextField emailF = new JTextField(22);
-        JTextField descF = new JTextField(22);
+        String defaultCur = selectedLedgerCurrency != null ? selectedLedgerCurrency : "HUF";
+        JComboBox<String> curCombo = buildCurrencyCombo(defaultCur);
+        JComboBox<TaxChoice> taxCombo = buildTaxTypeCombo(lang);
+        selectTaxInCombo(taxCombo, ctx.getFinanceConfigDao().resolveDefaultTaxTypeForCountry("HU"));
+
+        JTextField invNoF = new JTextField(24);
+        JTextField partnerF = new JTextField(24);
+        JTextField taxF = new JTextField(24);
+        JTextField addressF = new JTextField(24);
+        JTextField emailF = new JTextField(24);
+        JTextField descF = new JTextField(24);
         JTextField qtyF = new JTextField("1", 10);
         JTextField unitF = new JTextField("db", 8);
         JTextField priceF = new JTextField("0", 10);
-        JTextField vatF = new JTextField("27", 8);
         JLabel priceLabel = new JLabel(i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:");
         curCombo.addActionListener(e -> priceLabel.setText(
                 i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:"));
+
+        supplierPicker.addActionListener(e -> {
+            if (supplierPicker.getSelectedItem() instanceof Customer sup) {
+                partnerF.setText(sup.name());
+                taxF.setText(sup.taxNumber() != null ? sup.taxNumber() : "");
+                addressF.setText(sup.address() != null ? sup.address() : "");
+                emailF.setText(sup.email() != null ? sup.email() : "");
+                curCombo.setSelectedItem(sup.effectiveCurrencyCode());
+                selectTaxInCombo(taxCombo, ctx.getInvoiceService().resolveDefaultTaxForCustomer(sup));
+            }
+        });
 
         JComboBox<StatusChoice> initStatusCombo = new JComboBox<>();
         for (InvoiceStatus st : List.of(InvoiceStatus.ISSUED, InvoiceStatus.PAID, InvoiceStatus.DRAFT)) {
@@ -532,6 +694,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         gbc.insets = new Insets(4, 4, 4, 6);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
+        addFormRow(form, gbc, r++, i18n.t("invoice.from_supplier"), supplierPicker);
         addFormRow(form, gbc, r++, i18n.t("invoice.category") + " *", catCombo);
         addFormRow(form, gbc, r++, i18n.t("currency.label") + " *", curCombo);
         addFormRow(form, gbc, r++, i18n.t("invoice.number_optional"), invNoF);
@@ -545,7 +708,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; form.add(priceLabel, gbc);
         gbc.gridx = 1; gbc.weightx = 1; form.add(priceF, gbc);
         r++;
-        addFormRow(form, gbc, r++, i18n.t("invoice.vat_rate"), vatF);
+        addFormRow(form, gbc, r++, i18n.t("invoice.tax_type") + " *", taxCombo);
         addFormRow(form, gbc, r, i18n.t("common.status"), initStatusCombo);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.new_incoming"),
@@ -557,22 +720,184 @@ public final class InvoicesView extends JPanel implements NavigableView {
             @SuppressWarnings("unchecked")
             FilterItem<InvoiceCategory> catItem = (FilterItem<InvoiceCategory>) catCombo.getSelectedItem();
             StatusChoice stChoice = (StatusChoice) initStatusCombo.getSelectedItem();
-            CurrencyCode chosenCur = curCombo.getSelectedItem() instanceof CurrencyCode cc ? cc : CurrencyCode.EUR;
+            TaxType chosenTax = taxCombo.getSelectedItem() instanceof TaxChoice tc ? tc.tax() : null;
+            String chosenCur = curCombo.getSelectedItem() != null ? curCombo.getSelectedItem().toString() : "EUR";
+            Long partnerId = supplierPicker.getSelectedItem() instanceof Customer sup ? sup.id() : null;
+
             BigDecimal qty = CurrencyCode.parseAmount(qtyF.getText());
             BigDecimal price = CurrencyCode.parseAmount(priceF.getText());
-            BigDecimal vatRate = CurrencyCode.parseAmount(vatF.getText());
             Invoice created = ctx.getInvoiceService().createManualInvoice(
                     InvoiceDirection.INCOMING,
                     catItem != null ? catItem.value() : InvoiceCategory.OTHER_EXPENSE,
                     invNoF.getText(),
+                    partnerId,
                     partnerF.getText(), taxF.getText(), addressF.getText(), emailF.getText(),
-                    descF.getText(), qty, unitF.getText(), price, vatRate, chosenCur,
+                    descF.getText(), qty, unitF.getText(), price, chosenTax, chosenCur,
                     LocalDate.now(), LocalDate.now().plusDays(14),
                     stChoice != null ? stChoice.status() : InvoiceStatus.ISSUED,
                     ctx.getSession().requireCurrentUser().id());
             refreshDataSelecting(created.id());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    // --- Tab 2: Tax Types & Currencies Settings CRUD ---
+
+    private void openTaxDialog(TaxType existing) {
+        I18nManager i18n = ctx.getI18n();
+        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
+        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 22);
+        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 22);
+        JTextField rateF = new JTextField(existing != null ? existing.ratePercent().stripTrailingZeros().toPlainString() : "0", 10);
+
+        JComboBox<ScopeOption> scopeCombo = new JComboBox<>(new ScopeOption[]{
+                new ScopeOption("HU", i18n.t("invoice.settings.scope.HU")),
+                new ScopeOption("EU", i18n.t("invoice.settings.scope.EU")),
+                new ScopeOption("NON_EU", i18n.t("invoice.settings.scope.NON_EU")),
+                new ScopeOption("ANY", i18n.t("invoice.settings.scope.ANY"))
+        });
+        if (existing != null) {
+            for (int i = 0; i < scopeCombo.getItemCount(); i++) {
+                if (scopeCombo.getItemAt(i).code().equalsIgnoreCase(existing.countryScope())) {
+                    scopeCombo.setSelectedIndex(i);
+                    break;
+                }
+            }
+        }
+        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JPanel form = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 6);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        int r = 0;
+        addFormRow(form, gbc, r++, i18n.t("common.code") + " *", codeF);
+        addFormRow(form, gbc, r++, i18n.t("common.name.en") + " *", enF);
+        addFormRow(form, gbc, r++, i18n.t("common.name.hu") + " *", huF);
+        addFormRow(form, gbc, r++, i18n.t("invoice.settings.tax_rate") + " *", rateF);
+        addFormRow(form, gbc, r++, i18n.t("invoice.settings.country_scope"), scopeCombo);
+        if (existing != null) {
+            gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
+        }
+
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.settings.taxes"),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            BigDecimal rate = CurrencyCode.parseAmount(rateF.getText());
+            ScopeOption sc = (ScopeOption) scopeCombo.getSelectedItem();
+            String scope = sc != null ? sc.code() : "ANY";
+            if (enF.getText().trim().isEmpty() || huF.getText().trim().isEmpty()) {
+                throw new IllegalArgumentException("English and Hungarian names are required.");
+            }
+            if (existing == null) {
+                ctx.getFinanceConfigDao().insertTaxType(codeF.getText(), enF.getText(), huF.getText(), rate, scope);
+            } else {
+                ctx.getFinanceConfigDao().updateTaxType(existing.id(), codeF.getText(), enF.getText(), huF.getText(),
+                        rate, scope, activeBox.isSelected());
+            }
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleToggleTax() {
+        int r = taxTable.getSelectedRow();
+        if (r < 0 || r >= allTaxTypes.size()) return;
+        TaxType t = allTaxTypes.get(r);
+        ctx.getFinanceConfigDao().updateTaxType(t.id(), t.code(), t.nameEn(), t.nameHu(),
+                t.ratePercent(), t.countryScope(), !t.active());
+        refreshData();
+    }
+
+    private void handleDeleteTax() {
+        int r = taxTable.getSelectedRow();
+        if (r < 0 || r >= allTaxTypes.size()) return;
+        I18nManager i18n = ctx.getI18n();
+        TaxType t = allTaxTypes.get(r);
+        if (ctx.getFinanceConfigDao().isTaxTypeReferenced(t.code())) {
+            JOptionPane.showMessageDialog(this, i18n.t("invoice.settings.in_use", t.code()),
+                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (JOptionPane.showConfirmDialog(this, i18n.t("dictionaries.delete_confirm", t.code()),
+                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+            ctx.getFinanceConfigDao().deleteTaxType(t.id());
+            refreshData();
+        }
+    }
+
+    private void openCurrencyDialog(CurrencyDef existing) {
+        I18nManager i18n = ctx.getI18n();
+        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 10);
+        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 22);
+        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 22);
+        JTextField symF = new JTextField(existing != null ? existing.symbol() : "", 8);
+        JComboBox<Integer> decCombo = new JComboBox<>(new Integer[]{2, 0});
+        decCombo.setSelectedItem(existing != null ? existing.decimalPlaces() : 2);
+        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JPanel form = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 6);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        int r = 0;
+        addFormRow(form, gbc, r++, i18n.t("common.code") + " (ISO, e.g. USD) *", codeF);
+        addFormRow(form, gbc, r++, i18n.t("common.name.en") + " *", enF);
+        addFormRow(form, gbc, r++, i18n.t("common.name.hu") + " *", huF);
+        addFormRow(form, gbc, r++, i18n.t("invoice.settings.symbol") + " *", symF);
+        addFormRow(form, gbc, r++, i18n.t("invoice.settings.decimals"), decCombo);
+        if (existing != null) {
+            gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
+        }
+
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.settings.currencies"),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            if (enF.getText().trim().isEmpty() || huF.getText().trim().isEmpty()) {
+                throw new IllegalArgumentException("English and Hungarian names are required.");
+            }
+            int dec = decCombo.getSelectedItem() instanceof Integer d ? d : 2;
+            if (existing == null) {
+                ctx.getFinanceConfigDao().insertCurrency(codeF.getText(), enF.getText(), huF.getText(), symF.getText(), dec);
+            } else {
+                ctx.getFinanceConfigDao().updateCurrency(existing.id(), codeF.getText(), enF.getText(), huF.getText(),
+                        symF.getText(), dec, activeBox.isSelected());
+            }
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleToggleCurrency() {
+        int r = currencyTable.getSelectedRow();
+        if (r < 0 || r >= allCurrencies.size()) return;
+        CurrencyDef c = allCurrencies.get(r);
+        ctx.getFinanceConfigDao().updateCurrency(c.id(), c.code(), c.nameEn(), c.nameHu(),
+                c.symbol(), c.decimalPlaces(), !c.active());
+        refreshData();
+    }
+
+    private void handleDeleteCurrency() {
+        int r = currencyTable.getSelectedRow();
+        if (r < 0 || r >= allCurrencies.size()) return;
+        I18nManager i18n = ctx.getI18n();
+        CurrencyDef c = allCurrencies.get(r);
+        if (ctx.getFinanceConfigDao().isCurrencyReferenced(c.code())) {
+            JOptionPane.showMessageDialog(this, i18n.t("invoice.settings.in_use", c.code()),
+                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        if (JOptionPane.showConfirmDialog(this, i18n.t("dictionaries.delete_confirm", c.code()),
+                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
+            ctx.getFinanceConfigDao().deleteCurrency(c.id());
+            refreshData();
         }
     }
 
@@ -613,12 +938,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 directionFilter.addItem(new FilterItem<>(d, i18n.t("invoice.direction." + d.name())));
             }
 
-            currencyFilter.removeAllItems();
-            currencyFilter.addItem(new FilterItem<>(null, i18n.t("currency.label") + ": " + i18n.t("common.all")));
-            for (CurrencyCode c : CurrencyCode.values()) {
-                currencyFilter.addItem(new FilterItem<>(c, c.name()));
-            }
-
             statusFilter.removeAllItems();
             statusFilter.addItem(new FilterItem<>(null, i18n.t("common.status") + ": " + i18n.t("common.all")));
             for (InvoiceStatus s : InvoiceStatus.values()) {
@@ -647,9 +966,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         InvoiceDirection selDir = directionFilter.getSelectedItem() instanceof FilterItem<?> fi
                 ? (InvoiceDirection) fi.value() : null;
         @SuppressWarnings("unchecked")
-        CurrencyCode selCur = currencyFilter.getSelectedItem() instanceof FilterItem<?> fi
-                ? (CurrencyCode) fi.value() : null;
-        @SuppressWarnings("unchecked")
         InvoiceStatus selStatus = statusFilter.getSelectedItem() instanceof FilterItem<?> fi
                 ? (InvoiceStatus) fi.value() : null;
         @SuppressWarnings("unchecked")
@@ -658,12 +974,15 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
         List<Invoice> result = new ArrayList<>();
         for (Invoice inv : allInvoices) {
+            if (selectedLedgerCurrency != null && !inv.effectiveCurrencyCode().equalsIgnoreCase(selectedLedgerCurrency)) {
+                continue;
+            }
             if (selDir != null && inv.direction() != selDir) continue;
-            if (selCur != null && inv.currencyCode() != selCur) continue;
             if (selStatus != null && inv.status() != selStatus) continue;
             if (selCat != null && inv.category() != selCat) continue;
             if (!q.isEmpty()) {
-                String hay = (inv.invoiceNumber() + " " + inv.partnerName() + " " + inv.currency() + " "
+                String hay = (inv.invoiceNumber() + " " + inv.partnerName() + " " + inv.effectiveCurrencyCode() + " "
+                        + inv.effectiveTaxTypeCode() + " "
                         + (inv.orderNumber() != null ? inv.orderNumber() : "")).toLowerCase(Locale.ROOT);
                 if (!hay.contains(q)) continue;
             }
@@ -671,32 +990,59 @@ public final class InvoicesView extends JPanel implements NavigableView {
         }
         filteredInvoices = result;
 
-        // Consolidated dual-currency P&L KPIs in active reporting currency + native EUR/HUF split
+        // Pure per-currency P&L KPIs (NO cross-currency FX conversion!)
         FinancialSummary summary = ctx.getInvoiceService().computeSummary(filteredInvoices);
-        CurrencyCode rep = summary.reportingCurrency();
-        BigDecimal currentFx = ctx.getInvoiceService().getCurrentEurToHufRate();
+        if (selectedLedgerCurrency != null) {
+            int dec = ctx.getFinanceConfigDao().decimalPlacesFor(selectedLedgerCurrency);
+            FinancialSummary.CurrencyTotals t = summary.forCurrency(selectedLedgerCurrency, dec);
+            kpiValIncome.setText("+" + CurrencyDef.formatAmount(t.totalIncome(), t.currency(), t.decimalPlaces()));
+            kpiSubIncome.setText(i18n.t("invoice.kpi.paid_sub",
+                    CurrencyDef.formatAmount(t.paidIncome(), t.currency(), t.decimalPlaces())));
 
-        kpiValIncome.setText("+" + rep.format(summary.totalIncome()));
-        kpiSubIncome.setText("EUR: " + CurrencyCode.EUR.formatNumber(summary.incomeEur())
-                + "  |  HUF: " + CurrencyCode.HUF.formatNumber(summary.incomeHuf()));
+            kpiValExpense.setText("-" + CurrencyDef.formatAmount(t.totalExpenses(), t.currency(), t.decimalPlaces()));
+            kpiSubExpense.setText(i18n.t("invoice.kpi.paid_sub",
+                    CurrencyDef.formatAmount(t.paidExpenses(), t.currency(), t.decimalPlaces())));
 
-        kpiValExpense.setText("-" + rep.format(summary.totalExpenses()));
-        kpiSubExpense.setText("EUR: " + CurrencyCode.EUR.formatNumber(summary.expenseEur())
-                + "  |  HUF: " + CurrencyCode.HUF.formatNumber(summary.expenseHuf()));
+            kpiValBalance.setText(CurrencyDef.formatSignedAmount(t.netBalance(), t.currency(), t.decimalPlaces()));
+            kpiSubBalance.setText(t.currency() + "  |  " + i18n.t("invoice.direction.short.OUTGOING")
+                    + " / " + i18n.t("invoice.direction.short.INCOMING"));
 
-        kpiValBalance.setText(rep.formatSigned(summary.netBalance()));
-        kpiSubBalance.setText(i18n.t("invoice.kpi.paid_sub",
-                rep.formatSigned(summary.paidIncome().subtract(summary.paidExpenses())))
-                + "  (@ " + CurrencyCode.EUR.formatPlain(currentFx) + ")");
+            kpiValUnpaid.setText(CurrencyDef.formatAmount(t.unpaidAmount(), t.currency(), t.decimalPlaces()));
+            kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", t.unpaidCount()));
+        } else {
+            // Show separate clean lines per currency that has non-zero activity (or first 2 active)
+            List<FinancialSummary.CurrencyTotals> visible = summary.byCurrency().values().stream()
+                    .filter(t -> t.totalIncome().signum() != 0 || t.totalExpenses().signum() != 0 || t.unpaidCount() > 0)
+                    .toList();
+            if (visible.isEmpty()) {
+                visible = summary.byCurrency().values().stream().limit(2).toList();
+            }
+            kpiValIncome.setText(buildMultiCurrencyHtml(visible, t ->
+                    "+" + CurrencyDef.formatAmount(t.totalIncome(), t.currency(), t.decimalPlaces())));
+            kpiSubIncome.setText(buildMultiCurrencyInline(visible, t ->
+                    CurrencyDef.formatAmount(t.paidIncome(), t.currency(), t.decimalPlaces()), i18n.t("status.invoice.PAID")));
 
-        kpiValUnpaid.setText(rep.format(summary.unpaidAmount()));
-        kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", summary.unpaidCount())
-                + "  |  EUR: " + CurrencyCode.EUR.formatNumber(summary.unpaidEur())
-                + " / HUF: " + CurrencyCode.HUF.formatNumber(summary.unpaidHuf()));
+            kpiValExpense.setText(buildMultiCurrencyHtml(visible, t ->
+                    "-" + CurrencyDef.formatAmount(t.totalExpenses(), t.currency(), t.decimalPlaces())));
+            kpiSubExpense.setText(buildMultiCurrencyInline(visible, t ->
+                    CurrencyDef.formatAmount(t.paidExpenses(), t.currency(), t.decimalPlaces()), i18n.t("status.invoice.PAID")));
+
+            kpiValBalance.setText(buildMultiCurrencyHtml(visible, t ->
+                    CurrencyDef.formatSignedAmount(t.netBalance(), t.currency(), t.decimalPlaces())));
+            kpiSubBalance.setText(i18n.t("invoice.direction.short.OUTGOING") + " / "
+                    + i18n.t("invoice.direction.short.INCOMING"));
+
+            int totalUnpaidCount = visible.stream().mapToInt(FinancialSummary.CurrencyTotals::unpaidCount).sum();
+            kpiValUnpaid.setText(buildMultiCurrencyHtml(visible, t ->
+                    CurrencyDef.formatAmount(t.unpaidAmount(), t.currency(), t.decimalPlaces())));
+            kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", totalUnpaidCount));
+        }
 
         tableModel.setRowCount(0);
         for (Invoice inv : filteredInvoices) {
-            CurrencyCode cur = inv.currencyCode();
+            String cur = inv.effectiveCurrencyCode();
+            int dec = ctx.getFinanceConfigDao().decimalPlacesFor(cur);
+            String vatLabel = inv.effectiveTaxTypeCode() + " (" + inv.vatRate().stripTrailingZeros().toPlainString() + "%)";
             tableModel.addRow(new Object[]{
                     inv.invoiceNumber(),
                     inv.direction(),
@@ -704,10 +1050,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
                     i18n.t("invoice.category." + inv.category().name()),
                     inv.orderNumber() != null ? inv.orderNumber() : "—",
                     inv.issueDate().toString(),
-                    inv.dueDate().toString(),
-                    cur.name(),
-                    cur.format(inv.netAmount()),
-                    cur.format(inv.grossAmount()),
+                    cur,
+                    vatLabel,
+                    CurrencyDef.formatAmount(inv.netAmount(), cur, dec),
+                    CurrencyDef.formatAmount(inv.grossAmount(), cur, dec),
                     inv.status()
             });
         }
@@ -718,8 +1064,66 @@ public final class InvoicesView extends JPanel implements NavigableView {
         syncSelectedInvoiceControls();
     }
 
+    private static String buildMultiCurrencyHtml(List<FinancialSummary.CurrencyTotals> list,
+                                                 java.util.function.Function<FinancialSummary.CurrencyTotals, String> fmt) {
+        if (list.isEmpty()) return "—";
+        if (list.size() == 1) return fmt.apply(list.get(0));
+        StringBuilder sb = new StringBuilder("<html>");
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) sb.append("<br>");
+            sb.append(fmt.apply(list.get(i)));
+        }
+        sb.append("</html>");
+        return sb.toString();
+    }
+
+    private static String buildMultiCurrencyInline(List<FinancialSummary.CurrencyTotals> list,
+                                                   java.util.function.Function<FinancialSummary.CurrencyTotals, String> fmt,
+                                                   String prefix) {
+        if (list.isEmpty()) return " ";
+        StringBuilder sb = new StringBuilder(prefix).append(": ");
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) sb.append(" | ");
+            sb.append(fmt.apply(list.get(i)));
+        }
+        return sb.toString();
+    }
+
+    private void refreshSettingsTables() {
+        I18nManager i18n = ctx.getI18n();
+        String yes = i18n.t("common.yes").toUpperCase(Locale.ROOT);
+        String no = i18n.t("common.no").toUpperCase(Locale.ROOT);
+
+        allTaxTypes = ctx.getFinanceConfigDao().findTaxTypes(false);
+        taxModel.setRowCount(0);
+        for (TaxType t : allTaxTypes) {
+            taxModel.addRow(new Object[]{
+                    t.code(),
+                    t.nameEn(),
+                    t.nameHu(),
+                    t.rateDisplay(),
+                    i18n.t("invoice.settings.scope." + t.countryScope()),
+                    t.active() ? yes : no
+            });
+        }
+
+        allCurrencies = ctx.getFinanceConfigDao().findCurrencies(false);
+        currencyModel.setRowCount(0);
+        for (CurrencyDef c : allCurrencies) {
+            currencyModel.addRow(new Object[]{
+                    c.code(),
+                    c.nameEn(),
+                    c.nameHu(),
+                    c.symbol(),
+                    Integer.toString(c.decimalPlaces()),
+                    c.active() ? yes : no
+            });
+        }
+    }
+
     private void refreshDataSelecting(long invoiceId) {
         allInvoices = ctx.getInvoiceDao().findAll();
+        rebuildCurrencyLedgerBar();
         applyFiltersAndRender();
         for (int i = 0; i < filteredInvoices.size(); i++) {
             if (filteredInvoices.get(i).id() == invoiceId) {
@@ -747,8 +1151,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     @Override
     public void refreshData() {
-        fxRateField.setText(CurrencyCode.EUR.formatPlain(ctx.getInvoiceService().getCurrentEurToHufRate()));
-        styleReportingButtons();
+        refreshSettingsTables();
+        rebuildCurrencyLedgerBar();
         allInvoices = ctx.getInvoiceDao().findAll();
         applyFiltersAndRender();
     }
@@ -756,10 +1160,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
-        reportingCurLabel.setText(i18n.t("currency.reporting").toUpperCase(Locale.ROOT) + ":");
-        fxRateLabel.setText(i18n.t("currency.fx_rate").toUpperCase(Locale.ROOT) + ": 1 EUR =");
-        saveFxBtn.setText(i18n.t("currency.fx_save").toUpperCase(Locale.ROOT));
+        tabs.setTitleAt(0, i18n.t("invoice.tab.list").toUpperCase(Locale.ROOT));
+        tabs.setTitleAt(1, i18n.t("invoice.tab.settings").toUpperCase(Locale.ROOT));
 
+        currencyLedgerLabel.setText(i18n.t("invoice.currency_view").toUpperCase(Locale.ROOT) + ":");
         kpiTitleIncome.setText(i18n.t("invoice.kpi.income").toUpperCase(Locale.ROOT));
         kpiTitleExpense.setText(i18n.t("invoice.kpi.expenses").toUpperCase(Locale.ROOT));
         kpiTitleBalance.setText(i18n.t("invoice.kpi.balance").toUpperCase(Locale.ROOT));
@@ -772,6 +1176,18 @@ public final class InvoicesView extends JPanel implements NavigableView {
         previewDocBtn.setText(i18n.t("invoice.preview_btn").toUpperCase(Locale.ROOT));
         exportCsvBtn.setText(i18n.t("common.export.csv").toUpperCase(Locale.ROOT));
 
+        taxSectionTitle.setText(i18n.t("invoice.settings.taxes").toUpperCase(Locale.ROOT));
+        addTaxBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
+        editTaxBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
+        toggleTaxBtn.setText(i18n.t("common.activate").toUpperCase(Locale.ROOT) + " / " + i18n.t("common.deactivate").toUpperCase(Locale.ROOT));
+        deleteTaxBtn.setText(i18n.t("common.delete").toUpperCase(Locale.ROOT));
+
+        currencySectionTitle.setText(i18n.t("invoice.settings.currencies").toUpperCase(Locale.ROOT));
+        addCurrencyBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
+        editCurrencyBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
+        toggleCurrencyBtn.setText(i18n.t("common.activate").toUpperCase(Locale.ROOT) + " / " + i18n.t("common.deactivate").toUpperCase(Locale.ROOT));
+        deleteCurrencyBtn.setText(i18n.t("common.delete").toUpperCase(Locale.ROOT));
+
         populateFilterCombos();
 
         tableModel.setColumnIdentifiers(new Object[]{
@@ -781,10 +1197,28 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 i18n.t("invoice.category").toUpperCase(Locale.ROOT),
                 i18n.t("orders.number").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.issue_date").toUpperCase(Locale.ROOT),
-                i18n.t("invoice.due_date").toUpperCase(Locale.ROOT),
                 i18n.t("currency.label").toUpperCase(Locale.ROOT),
+                i18n.t("invoice.vat").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.net_amount").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.gross_amount").toUpperCase(Locale.ROOT),
+                i18n.t("common.status").toUpperCase(Locale.ROOT)
+        });
+
+        taxModel.setColumnIdentifiers(new Object[]{
+                i18n.t("common.code").toUpperCase(Locale.ROOT),
+                i18n.t("common.name.en").toUpperCase(Locale.ROOT),
+                i18n.t("common.name.hu").toUpperCase(Locale.ROOT),
+                i18n.t("invoice.settings.tax_rate").toUpperCase(Locale.ROOT),
+                i18n.t("invoice.settings.country_scope").toUpperCase(Locale.ROOT),
+                i18n.t("common.status").toUpperCase(Locale.ROOT)
+        });
+
+        currencyModel.setColumnIdentifiers(new Object[]{
+                i18n.t("common.code").toUpperCase(Locale.ROOT),
+                i18n.t("common.name.en").toUpperCase(Locale.ROOT),
+                i18n.t("common.name.hu").toUpperCase(Locale.ROOT),
+                i18n.t("invoice.settings.symbol").toUpperCase(Locale.ROOT),
+                i18n.t("invoice.settings.decimals").toUpperCase(Locale.ROOT),
                 i18n.t("common.status").toUpperCase(Locale.ROOT)
         });
 
@@ -794,12 +1228,13 @@ public final class InvoicesView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         setBackground(ThemeManager.bg());
-        BrutalistStyle.applyBoxCard(fxBar, 6, 10);
-        reportingCurLabel.setForeground(ThemeManager.fg());
-        fxRateLabel.setForeground(ThemeManager.fg());
-        fxSuffixLabel.setForeground(ThemeManager.fg());
-        styleReportingButtons();
-        BrutalistStyle.styleSecondaryButton(saveFxBtn);
+        invoicesTab.setBackground(ThemeManager.bg());
+        settingsTab.setBackground(ThemeManager.bg());
+
+        BrutalistStyle.applyBoxCard(currencyLedgerBar, 6, 10);
+        currencyLedgerLabel.setForeground(ThemeManager.fg());
+        styleCurrencyLedgerButtons();
+
         for (JPanel card : List.of(kpiCardIncome, kpiCardExpense, kpiCardBalance, kpiCardUnpaid)) {
             BrutalistStyle.applyBoxCard(card, 12, 14);
         }
@@ -818,7 +1253,25 @@ public final class InvoicesView extends JPanel implements NavigableView {
         BrutalistStyle.styleSecondaryButton(exportCsvBtn);
         BrutalistStyle.styleSecondaryButton(refreshBtn);
         BrutalistStyle.styleTable(table);
+
+        BrutalistStyle.applyBoxCard(taxCard, 10, 12);
+        BrutalistStyle.applyBoxCard(currencyCard, 10, 12);
+        taxSectionTitle.setForeground(ThemeManager.fg());
+        currencySectionTitle.setForeground(ThemeManager.fg());
+        BrutalistStyle.stylePrimaryButton(addTaxBtn);
+        BrutalistStyle.styleSecondaryButton(editTaxBtn);
+        BrutalistStyle.styleSecondaryButton(toggleTaxBtn);
+        BrutalistStyle.styleSecondaryButton(deleteTaxBtn);
+        BrutalistStyle.stylePrimaryButton(addCurrencyBtn);
+        BrutalistStyle.styleSecondaryButton(editCurrencyBtn);
+        BrutalistStyle.styleSecondaryButton(toggleCurrencyBtn);
+        BrutalistStyle.styleSecondaryButton(deleteCurrencyBtn);
+        BrutalistStyle.styleTable(taxTable);
+        BrutalistStyle.styleTable(currencyTable);
+
         table.repaint();
+        taxTable.repaint();
+        currencyTable.repaint();
     }
 
     private final class DirectionCellRenderer extends DefaultTableCellRenderer {

@@ -10,7 +10,9 @@ import hu.due.rewear.dao.RoleDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
+import hu.due.rewear.model.CountryDirectory;
 import hu.due.rewear.model.CurrencyCode;
+import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
@@ -20,6 +22,7 @@ import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.service.ProductCodeService;
 import org.mindrot.jbcrypt.BCrypt;
@@ -103,10 +106,15 @@ public final class DemoDataSeeder {
                     List<OrderItem> items = orderItemDao.findByOrderId(ord.id());
                     if (items.isEmpty()) continue;
                     Customer cust = customerDao.findById(ord.customerId()).orElse(null);
-                    CurrencyCode cur = ord.effectiveCurrency();
-                    BigDecimal net = cur.round(ord.totalPrice());
-                    BigDecimal vat = cur.round(net.multiply(vat27).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-                    BigDecimal gross = cur.round(net.add(vat));
+                    String cur = ord.effectiveCurrencyCode();
+                    int dec = ord.currencyDecimals();
+                    boolean isHu = cust == null || CountryDirectory.isHungary(cust.effectiveCountryCode());
+                    BigDecimal appliedVat = isHu ? vat27 : BigDecimal.ZERO;
+                    String taxCode = isHu ? "HU-27" : "EU-0";
+                    BigDecimal net = CurrencyDef.roundForScale(ord.totalPrice(), dec);
+                    BigDecimal vat = CurrencyDef.roundForScale(
+                            net.multiply(appliedVat).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), dec);
+                    BigDecimal gross = CurrencyDef.roundForScale(net.add(vat), dec);
                     boolean paid = ord.status() == OrderStatus.SHIPPED && outSeq == 1;
                     String invNo = String.format("INV-OUT-%d-%04d", today.getYear(), outSeq++);
                     long invId = invoiceDao.insert(conn, invNo, InvoiceDirection.OUTGOING,
@@ -119,12 +127,13 @@ public final class DemoDataSeeder {
                             today.minusDays(paid ? 5 : 1),
                             today.plusDays(paid ? 9 : 13),
                             paid ? today.minusDays(3) : null,
-                            net, vat27, vat, gross, cur.name(), CurrencyCode.DEFAULT_EUR_HUF_RATE,
+                            net, appliedVat, taxCode, vat, gross, cur, CurrencyCode.DEFAULT_EUR_HUF_RATE,
                             creatorId, now.minusDays(paid ? 5 : 1));
                     for (OrderItem oi : items) {
                         String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
                         invoiceDao.insertItem(conn, invId, desc, oi.weightKg(), "kg",
-                                cur.round(oi.pricePerKg()), cur.round(oi.lineTotal()));
+                                CurrencyDef.roundForScale(oi.pricePerKg(), dec),
+                                CurrencyDef.roundForScale(oi.lineTotal(), dec));
                     }
                 }
             }
@@ -245,15 +254,24 @@ public final class DemoDataSeeder {
         locations.put("B-01-02", locationDao.insert(conn, "B-01-02", "B", "01", "02", new BigDecimal("800")));
         locations.put("C-01-01", locationDao.insert(conn, "C-01-01", "C", "01", "01", new BigDecimal("1200")));
 
-        // 8. Customers (Hungarian B2B in HUF, Slovak export partner in EUR)
-        long cust1 = customerDao.insert(conn, "Duna Vintage Kft.", "Szabó Márta", "marta@dunavintage.hu",
-                "+36 30 555 1201", "2400 Dunaújváros, Vasmű út 18.", "24891234-2-07", CurrencyCode.HUF, now.minusDays(20));
-        long cust2 = customerDao.insert(conn, "Pannon Textil Outlet Bt.", "Tóth Gábor", "rendeles@pannontextil.hu",
-                "+36 20 444 9832", "8000 Székesfehérvár, Budai út 44.", "21904411-2-07", CurrencyCode.HUF, now.minusDays(18));
-        long cust3 = customerDao.insert(conn, "GreenLoop Second-Hand S.R.O.", "Jana Nováková", "supply@greenloop.sk",
-                "+421 905 331 890", "811 06 Bratislava, Obchodná 22", "SK2024119822", CurrencyCode.EUR, now.minusDays(15));
-        long cust4 = customerDao.insert(conn, "Alföld Ruhabázis Kft.", "Varga László", "info@alfoldruha.hu",
-                "+36 70 312 6640", "6000 Kecskemét, Izsáki út 10.", "26778890-2-03", CurrencyCode.HUF, now.minusDays(9));
+        // 8. Business Partners: Buyers (Customers) + Providers (Suppliers) across HU, AT, SK, DE
+        long cust1 = customerDao.insert(conn, "Duna Vintage Kft.", PartnerType.CUSTOMER, "Szabó Márta", "marta@dunavintage.hu",
+                "+36 30 555 1201", "2400 Dunaújváros, Vasmű út 18.", "24891234-2-07", "HU", "HUF", now.minusDays(20));
+        long cust2 = customerDao.insert(conn, "Pannon Textil Outlet Bt.", PartnerType.CUSTOMER, "Tóth Gábor", "rendeles@pannontextil.hu",
+                "+36 20 444 9832", "8000 Székesfehérvár, Budai út 44.", "21904411-2-07", "HU", "HUF", now.minusDays(18));
+        long cust3 = customerDao.insert(conn, "GreenLoop Second-Hand S.R.O.", PartnerType.CUSTOMER, "Jana Nováková", "supply@greenloop.sk",
+                "+421 905 331 890", "811 06 Bratislava, Obchodná 22", "SK2024119822", "SK", "EUR", now.minusDays(15));
+        customerDao.insert(conn, "Alföld Ruhabázis Kft.", PartnerType.CUSTOMER, "Varga László", "info@alfoldruha.hu",
+                "+36 70 312 6640", "6000 Kecskemét, Izsáki út 10.", "26778890-2-03", "HU", "HUF", now.minusDays(9));
+        customerDao.insert(conn, "Alpine Second-Hand GmbH", PartnerType.CUSTOMER, "Lukas Gruber", "office@alpinesecondhand.at",
+                "+43 1 512 8890", "1010 Wien, Mariahilfer Str. 48", "ATU68219034", "AT", "EUR", now.minusDays(7));
+        // Providers / Suppliers we pay
+        customerDao.insert(conn, "EuroTex Import GmbH", PartnerType.SUPPLIER, "Klaus Weber", "billing@eurotex-import.de",
+                "+49 89 4120 991", "80331 München, Industriestr. 14", "DE294810221", "DE", "EUR", now.minusDays(14));
+        customerDao.insert(conn, "Duna Ipari Park Kft.", PartnerType.SUPPLIER, "Kovács Zoltán", "penzugy@dunaiparipark.hu",
+                "+36 25 510 200", "2400 Dunaújváros, Papírgyári út 12.", "14820911-2-07", "HU", "HUF", now.minusDays(14));
+        customerDao.insert(conn, "MVM Next Energiakereskedelmi Zrt.", PartnerType.SUPPLIER, "Ügyfélszolgálat", "szamlazas@mvm.hu",
+                "+36 1 474 9999", "1081 Budapest, II. János Pál pápa tér 20.", "26713111-2-44", "HU", "HUF", now.minusDays(14));
 
         // 9. Inventory Packages + Stock Movements
         record SeedBale(LocalDateTime ts, String t, String g, String q, String p, String w, String hex,

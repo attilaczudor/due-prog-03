@@ -349,3 +349,28 @@ currency.fx_save,Save Rate,Árfolyam mentése
 currency.fx_saved,"Exchange rate updated to 1 EUR = {0} HUF.","Árfolyam frissítve: 1 EUR = {0} HUF."
 customers.preferred_currency,Default Currency,Alapértelmezett deviza
 orders.currency_change_confirm,"Switch order {0} to {1} and recalculate all line item prices in {1}?","Átváltja a(z) {0} rendelést {1} devizára és újraszámolja a tételek árait {1} devizában?"
+partners.type,Partner Type,Partner típusa
+partners.type.CUSTOMER,Customer (Buyer),Vevő (Ügyfél)
+partners.type.SUPPLIER,Provider (Supplier),Szállító / Szolgáltató
+partners.type.BOTH,Buyer & Provider,Vevő és Szállító
+partners.country,Country,Ország
+partners.filter.all,All Partners,Minden partner
+partners.filter.buyers,Buyers Only,Csak vevők
+partners.filter.suppliers,Providers Only,Csak szállítók
+partners.history,Partner Orders & Invoices,Partner rendelései és számlái
+invoice.tab.list,Invoices,Számlák
+invoice.tab.settings,Invoice Settings (Tax & Currencies),Számlabeállítások (ÁFA és Devizák)
+invoice.currency_view,Currency Ledger,Deviza nézet
+invoice.tax_type,VAT / Tax Type,ÁFA típus
+invoice.from_supplier,From Saved Provider (Optional),Mentett szállítóból (opcionális)
+invoice.settings.taxes,VAT / Tax Types,ÁFA / Adótípusok
+invoice.settings.currencies,Currencies,Devizák
+invoice.settings.tax_rate,Rate (%),Kulcs (%)
+invoice.settings.country_scope,Country Scope,Ország / Hatály
+invoice.settings.scope.HU,Hungary (HU),Magyarország (HU)
+invoice.settings.scope.EU,EU International (0%),EU nemzetközi (0%)
+invoice.settings.scope.NON_EU,Outside EU (Export),EU-n kívüli (Export)
+invoice.settings.scope.ANY,Any / Manual,Bármely / Kézi
+invoice.settings.symbol,Symbol,Szimbólum
+invoice.settings.decimals,Decimals,Tizedesjegyek
+invoice.settings.in_use,"Cannot delete ''{0}'' because existing records reference it. Deactivate it instead.","A(z) ''{0}'' nem törölhető, mert meglévő tételek hivatkoznak rá. Használja az Inaktiválás gombot."

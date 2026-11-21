@@ -1,10 +1,32 @@
--- ReWear WMS (due-prog-03) — 3NF SQLite Schema (15 Tables)
+-- ReWear WMS (due-prog-03) — 3NF SQLite Schema (17 Tables)
 PRAGMA foreign_keys = ON;
 
--- 0. Portable Workspace Settings (FX rate, reporting currency, etc.)
+-- 0. Portable Workspace Settings
 CREATE TABLE IF NOT EXISTS app_settings (
     setting_key TEXT PRIMARY KEY,
     setting_value TEXT NOT NULL
+);
+
+-- 0b. Configurable Currencies (HUF, EUR, USD, GBP, ...)
+CREATE TABLE IF NOT EXISTS currencies (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name_en TEXT NOT NULL,
+    name_hu TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    decimal_places INTEGER NOT NULL DEFAULT 2 CHECK (decimal_places IN (0, 2)),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
+);
+
+-- 0c. Configurable VAT / Tax Types (HU 27%, EU B2B 0%, Export 0%, ...)
+CREATE TABLE IF NOT EXISTS tax_types (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE,
+    name_en TEXT NOT NULL,
+    name_hu TEXT NOT NULL,
+    rate_percent REAL NOT NULL DEFAULT 0 CHECK (rate_percent >= 0),
+    country_scope TEXT NOT NULL DEFAULT 'ANY' CHECK (country_scope IN ('HU', 'EU', 'NON_EU', 'ANY')),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
 -- 1. Roles
@@ -109,16 +131,18 @@ CREATE TABLE IF NOT EXISTS inventory_packages (
     FOREIGN KEY (created_by) REFERENCES users(id)
 );
 
--- 9. B2B Wholesale Customers
+-- 9. B2B Business Partners (Buyers / Customers & Providers / Suppliers)
 CREATE TABLE IF NOT EXISTS customers (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
+    partner_type TEXT NOT NULL DEFAULT 'CUSTOMER' CHECK (partner_type IN ('CUSTOMER', 'SUPPLIER', 'BOTH')),
     contact_name TEXT,
     email TEXT,
     phone TEXT,
     address TEXT,
     tax_number TEXT,
-    preferred_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (preferred_currency IN ('EUR', 'HUF')),
+    country_code TEXT NOT NULL DEFAULT 'HU',
+    preferred_currency TEXT NOT NULL DEFAULT 'EUR',
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
     created_at TEXT NOT NULL
 );
@@ -130,7 +154,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_id INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT', 'PACKING', 'SHIPPED', 'CANCELLED')),
-    currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR', 'HUF')),
+    currency TEXT NOT NULL DEFAULT 'EUR',
     total_weight_kg REAL NOT NULL DEFAULT 0 CHECK (total_weight_kg >= 0),
     total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0),
     notes TEXT,
@@ -189,9 +213,10 @@ CREATE TABLE IF NOT EXISTS invoices (
     paid_date TEXT,
     net_amount REAL NOT NULL DEFAULT 0 CHECK (net_amount >= 0),
     vat_rate REAL NOT NULL DEFAULT 27 CHECK (vat_rate >= 0),
+    tax_type_code TEXT,
     vat_amount REAL NOT NULL DEFAULT 0 CHECK (vat_amount >= 0),
     gross_amount REAL NOT NULL DEFAULT 0 CHECK (gross_amount >= 0),
-    currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR', 'HUF')),
+    currency TEXT NOT NULL DEFAULT 'EUR',
     exchange_rate REAL NOT NULL DEFAULT 400.0 CHECK (exchange_rate > 0),
     created_by INTEGER NOT NULL,
     created_at TEXT NOT NULL,

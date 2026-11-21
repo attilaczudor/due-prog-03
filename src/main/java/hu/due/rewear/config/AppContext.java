@@ -2,6 +2,7 @@ package hu.due.rewear.config;
 
 import hu.due.rewear.dao.CustomerDao;
 import hu.due.rewear.dao.DictionaryDao;
+import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
@@ -57,6 +58,7 @@ public final class AppContext {
     private final OrderItemDao orderItemDao;
     private final InvoiceDao invoiceDao;
     private final SettingsDao settingsDao;
+    private final FinanceConfigDao financeConfigDao;
 
     private final AuthService authService;
     private final QrCodeService qrCodeService;
@@ -96,12 +98,13 @@ public final class AppContext {
         this.orderItemDao = new OrderItemDao(databaseManager);
         this.invoiceDao = new InvoiceDao(databaseManager);
         this.settingsDao = new SettingsDao(databaseManager);
+        this.financeConfigDao = new FinanceConfigDao(databaseManager);
 
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
         this.inventoryService = new InventoryService(databaseManager, packageDao, movementDao, productCodeService);
         this.orderService = new OrderService(databaseManager, orderDao, orderItemDao, packageDao, movementDao);
-        this.invoiceService = new InvoiceService(databaseManager, invoiceDao, orderDao, orderItemDao, customerDao, settingsDao);
+        this.invoiceService = new InvoiceService(databaseManager, invoiceDao, orderDao, orderItemDao, customerDao, financeConfigDao);
         this.scannerService = new ScannerService(productCodeService, qrCodeService, packageDao, movementDao);
         this.ticketLabelPainter = new TicketLabelPainter(qrCodeService, i18n);
         this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
@@ -193,6 +196,10 @@ public final class AppContext {
 
     public SettingsDao getSettingsDao() {
         return settingsDao;
+    }
+
+    public FinanceConfigDao getFinanceConfigDao() {
+        return financeConfigDao;
     }
 
     public AuthService getAuthService() {

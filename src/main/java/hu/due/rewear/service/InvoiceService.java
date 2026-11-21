@@ -2,11 +2,12 @@ package hu.due.rewear.service;
 
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.dao.CustomerDao;
+import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
-import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.model.CurrencyCode;
+import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.FinancialSummary;
 import hu.due.rewear.model.Invoice;
@@ -16,6 +17,7 @@ import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
+import hu.due.rewear.model.TaxType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -23,12 +25,14 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 /**
- * Manages multi-currency (EUR & HUF) Outgoing (revenue) and Incoming (expense) invoices,
- * order-linked invoice generation, reversible payment statuses, and consolidated P&L reporting.
+ * Manages multi-currency Outgoing (revenue) and Incoming (expense) invoices with country-aware
+ * configurable VAT/Tax types and strictly separated per-currency financial summaries (no forced FX conversion).
  */
 public final class InvoiceService {
 
@@ -40,76 +44,84 @@ public final class InvoiceService {
     private final OrderDao orderDao;
     private final OrderItemDao orderItemDao;
     private final CustomerDao customerDao;
-    private final SettingsDao settingsDao;
-
-    public InvoiceService(DatabaseManager db,
-                          InvoiceDao invoiceDao,
-                          OrderDao orderDao,
-                          OrderItemDao orderItemDao,
-                          CustomerDao customerDao) {
-        this(db, invoiceDao, orderDao, orderItemDao, customerDao, new SettingsDao(db));
-    }
+    private final FinanceConfigDao financeConfigDao;
 
     public InvoiceService(DatabaseManager db,
                           InvoiceDao invoiceDao,
                           OrderDao orderDao,
                           OrderItemDao orderItemDao,
                           CustomerDao customerDao,
-                          SettingsDao settingsDao) {
+                          FinanceConfigDao financeConfigDao) {
         this.db = db;
         this.invoiceDao = invoiceDao;
         this.orderDao = orderDao;
         this.orderItemDao = orderItemDao;
         this.customerDao = customerDao;
-        this.settingsDao = settingsDao;
-    }
-
-    public BigDecimal getCurrentEurToHufRate() {
-        return settingsDao.getEurToHufRate();
-    }
-
-    public void updateEurToHufRate(BigDecimal rate) {
-        settingsDao.setEurToHufRate(rate);
-    }
-
-    public CurrencyCode getReportingCurrency() {
-        return settingsDao.getReportingCurrency();
-    }
-
-    public void setReportingCurrency(CurrencyCode currency) {
-        settingsDao.setReportingCurrency(currency);
+        this.financeConfigDao = financeConfigDao;
     }
 
     /**
-     * Returns the existing Outgoing invoice for an order (refreshing its line items & currency if still DRAFT/ISSUED),
+     * Resolves the automatic tax type for a partner's country:
+     * Hungary (HU) -> HU-27 (27%), other EU countries (AT, SK, DE, ...) -> EU-0 (0%), Non-EU -> EXPORT-0 (0%).
+     */
+    public TaxType resolveDefaultTaxForCustomer(Customer customer) {
+        String country = customer != null ? customer.effectiveCountryCode() : "HU";
+        return financeConfigDao.resolveDefaultTaxTypeForCountry(country);
+    }
+
+    /** Auto-resolves tax type from the order customer's country. */
+    public Invoice ensureInvoiceForOrder(long orderId, long userId) {
+        return ensureInvoiceForOrder(orderId, (TaxType) null, userId);
+    }
+
+    /** Backwards-compatible overload accepting an explicit VAT rate. */
+    public Invoice ensureInvoiceForOrder(long orderId, BigDecimal vatRate, long userId) {
+        if (vatRate == null) {
+            return ensureInvoiceForOrder(orderId, (TaxType) null, userId);
+        }
+        String code = vatRate.compareTo(BigDecimal.ZERO) == 0 ? "EU-0" : "HU-27";
+        TaxType matched = financeConfigDao.findTaxTypes(false).stream()
+                .filter(t -> t.ratePercent().compareTo(vatRate) == 0)
+                .findFirst()
+                .orElse(new TaxType(0, code, code, code, vatRate, "ANY", true));
+        return ensureInvoiceForOrder(orderId, matched, userId);
+    }
+
+    /**
+     * Returns the existing Outgoing invoice for an order (refreshing line items, currency & tax type if DRAFT/ISSUED),
      * or creates a new Outgoing invoice populated from the order and customer data in the order's currency.
      */
-    public Invoice ensureInvoiceForOrder(long orderId, BigDecimal vatRate, long userId) {
+    public Invoice ensureInvoiceForOrder(long orderId, TaxType chosenTax, long userId) {
         Order order = orderDao.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
         Customer customer = customerDao.findById(order.customerId())
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + order.customerId()));
         List<OrderItem> orderItems = orderItemDao.findByOrderId(orderId);
-        BigDecimal effectiveVat = vatRate != null ? vatRate : DEFAULT_VAT_RATE;
-        CurrencyCode cur = order.effectiveCurrency();
-        BigDecimal fxRate = settingsDao.getEurToHufRate();
+        TaxType effectiveTax = chosenTax != null ? chosenTax : resolveDefaultTaxForCustomer(customer);
+        BigDecimal vatRate = effectiveTax.ratePercent();
+        String taxCode = effectiveTax.code();
+
+        String cur = order.effectiveCurrencyCode();
+        int decimals = financeConfigDao.decimalPlacesFor(cur);
 
         Optional<Invoice> existingOpt = invoiceDao.findByOrderId(orderId);
         if (existingOpt.isPresent()) {
             Invoice existing = existingOpt.get();
             if (existing.status() == InvoiceStatus.DRAFT || existing.status() == InvoiceStatus.ISSUED) {
-                syncOrderItemsIntoInvoice(existing.id(), orderItems, existing.vatRate(), cur, fxRate);
+                TaxType syncTax = chosenTax != null ? chosenTax : financeConfigDao.findTaxTypeByCode(existing.effectiveTaxTypeCode())
+                        .orElse(effectiveTax);
+                syncOrderItemsIntoInvoice(existing.id(), orderItems, syncTax.ratePercent(), syncTax.code(), cur, decimals);
                 return invoiceDao.findById(existing.id()).orElseThrow();
             }
             return existing;
         }
 
-        BigDecimal netTotal = cur.round(orderItems.stream()
+        BigDecimal netTotal = CurrencyDef.roundForScale(orderItems.stream()
                 .map(OrderItem::lineTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
-        BigDecimal vatAmount = cur.round(netTotal.multiply(effectiveVat)
-                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-        BigDecimal grossAmount = cur.round(netTotal.add(vatAmount));
+                .reduce(BigDecimal.ZERO, BigDecimal::add), decimals);
+        BigDecimal vatAmount = CurrencyDef.roundForScale(netTotal.multiply(vatRate)
+                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
+        BigDecimal grossAmount = CurrencyDef.roundForScale(netTotal.add(vatAmount), decimals);
 
         LocalDate today = LocalDate.now();
         LocalDate dueDate = today.plusDays(14);
@@ -120,37 +132,42 @@ public final class InvoiceService {
             long id = invoiceDao.insert(conn, invNo, InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES,
                     order.id(), customer.id(), customer.name(), customer.taxNumber(), customer.address(),
                     customer.email(), InvoiceStatus.ISSUED, today, dueDate, null,
-                    netTotal, effectiveVat, vatAmount, grossAmount, cur.name(), fxRate, userId, now);
+                    netTotal, vatRate, taxCode, vatAmount, grossAmount, cur,
+                    CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, now);
             for (OrderItem oi : orderItems) {
                 String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
                 invoiceDao.insertItem(conn, id, desc, oi.weightKg(), "kg",
-                        cur.round(oi.pricePerKg()), cur.round(oi.lineTotal()));
+                        CurrencyDef.roundForScale(oi.pricePerKg(), decimals),
+                        CurrencyDef.roundForScale(oi.lineTotal(), decimals));
             }
             return id;
         });
 
         Invoice created = invoiceDao.findById(invoiceId).orElseThrow();
-        LOG.info("Created outgoing invoice {} ({}) for order {}", created.invoiceNumber(), cur, order.orderNumber());
+        LOG.info("Created outgoing invoice {} ({} / {}) for order {}",
+                created.invoiceNumber(), cur, taxCode, order.orderNumber());
         return created;
     }
 
     private void syncOrderItemsIntoInvoice(long invoiceId, List<OrderItem> orderItems,
-                                           BigDecimal vatRate, CurrencyCode cur, BigDecimal fxRate) {
-        BigDecimal netTotal = cur.round(orderItems.stream()
+                                           BigDecimal vatRate, String taxCode, String cur, int decimals) {
+        BigDecimal netTotal = CurrencyDef.roundForScale(orderItems.stream()
                 .map(OrderItem::lineTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add));
-        BigDecimal vatAmount = cur.round(netTotal.multiply(vatRate)
-                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-        BigDecimal grossAmount = cur.round(netTotal.add(vatAmount));
+                .reduce(BigDecimal.ZERO, BigDecimal::add), decimals);
+        BigDecimal vatAmount = CurrencyDef.roundForScale(netTotal.multiply(vatRate)
+                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
+        BigDecimal grossAmount = CurrencyDef.roundForScale(netTotal.add(vatAmount), decimals);
 
         db.runInTransaction(conn -> {
             invoiceDao.deleteItemsByInvoiceId(conn, invoiceId);
             for (OrderItem oi : orderItems) {
                 String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
                 invoiceDao.insertItem(conn, invoiceId, desc, oi.weightKg(), "kg",
-                        cur.round(oi.pricePerKg()), cur.round(oi.lineTotal()));
+                        CurrencyDef.roundForScale(oi.pricePerKg(), decimals),
+                        CurrencyDef.roundForScale(oi.lineTotal(), decimals));
             }
-            invoiceDao.updateAmounts(conn, invoiceId, netTotal, vatRate, vatAmount, grossAmount, cur.name(), fxRate);
+            invoiceDao.updateAmounts(conn, invoiceId, netTotal, vatRate, taxCode, vatAmount, grossAmount,
+                    cur, CurrencyCode.DEFAULT_EUR_HUF_RATE);
         });
     }
 
@@ -170,14 +187,41 @@ public final class InvoiceService {
                                        LocalDate dueDate,
                                        InvoiceStatus status,
                                        long userId) {
-        return createManualInvoice(direction, category, optionalInvoiceNumber, partnerName,
+        return createManualInvoice(direction, category, optionalInvoiceNumber, null, partnerName,
                 partnerTaxNumber, partnerAddress, partnerEmail, itemDescription, quantity, unit,
-                unitPrice, vatRate, CurrencyCode.EUR, issueDate, dueDate, status, userId);
+                unitPrice, vatRate, vatRate != null && vatRate.compareTo(BigDecimal.ZERO) == 0 ? "EU-0" : "HU-27",
+                "EUR", issueDate, dueDate, status, userId);
     }
 
     public Invoice createManualInvoice(InvoiceDirection direction,
                                        InvoiceCategory category,
                                        String optionalInvoiceNumber,
+                                       Long partnerId,
+                                       String partnerName,
+                                       String partnerTaxNumber,
+                                       String partnerAddress,
+                                       String partnerEmail,
+                                       String itemDescription,
+                                       BigDecimal quantity,
+                                       String unit,
+                                       BigDecimal unitPrice,
+                                       TaxType taxType,
+                                       String currencyCode,
+                                       LocalDate issueDate,
+                                       LocalDate dueDate,
+                                       InvoiceStatus status,
+                                       long userId) {
+        BigDecimal vatRate = taxType != null ? taxType.ratePercent() : DEFAULT_VAT_RATE;
+        String taxCode = taxType != null ? taxType.code() : "HU-27";
+        return createManualInvoice(direction, category, optionalInvoiceNumber, partnerId, partnerName,
+                partnerTaxNumber, partnerAddress, partnerEmail, itemDescription, quantity, unit,
+                unitPrice, vatRate, taxCode, currencyCode, issueDate, dueDate, status, userId);
+    }
+
+    public Invoice createManualInvoice(InvoiceDirection direction,
+                                       InvoiceCategory category,
+                                       String optionalInvoiceNumber,
+                                       Long partnerId,
                                        String partnerName,
                                        String partnerTaxNumber,
                                        String partnerAddress,
@@ -187,7 +231,8 @@ public final class InvoiceService {
                                        String unit,
                                        BigDecimal unitPrice,
                                        BigDecimal vatRate,
-                                       CurrencyCode currency,
+                                       String taxTypeCode,
+                                       String currencyCode,
                                        LocalDate issueDate,
                                        LocalDate dueDate,
                                        InvoiceStatus status,
@@ -201,14 +246,19 @@ public final class InvoiceService {
         if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Unit price must be >= 0.");
         }
-        CurrencyCode cur = currency != null ? currency : CurrencyCode.EUR;
-        BigDecimal fxRate = settingsDao.getEurToHufRate();
+        String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR";
+        int decimals = financeConfigDao.decimalPlacesFor(cur);
         BigDecimal effectiveVat = vatRate != null && vatRate.compareTo(BigDecimal.ZERO) >= 0
                 ? vatRate.setScale(2, RoundingMode.HALF_UP) : DEFAULT_VAT_RATE;
-        BigDecimal roundedUnit = cur.round(unitPrice);
-        BigDecimal net = cur.round(quantity.multiply(roundedUnit));
-        BigDecimal vat = cur.round(net.multiply(effectiveVat).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
-        BigDecimal gross = cur.round(net.add(vat));
+        String effectiveTaxCode = (taxTypeCode != null && !taxTypeCode.isBlank())
+                ? taxTypeCode.trim().toUpperCase()
+                : (effectiveVat.compareTo(BigDecimal.ZERO) == 0 ? "EU-0" : "HU-27");
+
+        BigDecimal roundedUnit = CurrencyDef.roundForScale(unitPrice, decimals);
+        BigDecimal net = CurrencyDef.roundForScale(quantity.multiply(roundedUnit), decimals);
+        BigDecimal vat = CurrencyDef.roundForScale(
+                net.multiply(effectiveVat).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
+        BigDecimal gross = CurrencyDef.roundForScale(net.add(vat), decimals);
 
         LocalDate effIssue = issueDate != null ? issueDate : LocalDate.now();
         LocalDate effDue = dueDate != null ? dueDate : effIssue.plusDays(14);
@@ -221,17 +271,17 @@ public final class InvoiceService {
             String invNo = (optionalInvoiceNumber != null && !optionalInvoiceNumber.isBlank())
                     ? optionalInvoiceNumber.trim()
                     : invoiceDao.generateNextInvoiceNumber(conn, direction);
-            long id = invoiceDao.insert(conn, invNo, direction, category, null, null,
+            long id = invoiceDao.insert(conn, invNo, direction, category, null, partnerId,
                     partnerName.trim(), partnerTaxNumber, partnerAddress, partnerEmail,
-                    effStatus, effIssue, effDue, paidDate, net, effectiveVat, vat, gross,
-                    cur.name(), fxRate, userId, LocalDateTime.now());
+                    effStatus, effIssue, effDue, paidDate, net, effectiveVat, effectiveTaxCode, vat, gross,
+                    cur, CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, LocalDateTime.now());
             invoiceDao.insertItem(conn, id, desc, quantity, unit != null ? unit : "db", roundedUnit, net);
             return id;
         });
 
         Invoice created = invoiceDao.findById(invoiceId).orElseThrow();
-        LOG.info("Created {} invoice {} ({} gross @ {} HUF/EUR)", direction, created.invoiceNumber(),
-                cur.format(created.grossAmount()), fxRate);
+        LOG.info("Created {} invoice {} ({} / {})", direction, created.invoiceNumber(),
+                CurrencyDef.formatAmount(created.grossAmount(), cur, decimals), effectiveTaxCode);
         return created;
     }
 
@@ -250,21 +300,64 @@ public final class InvoiceService {
         return invoiceDao.findItemsByInvoiceId(invoiceId);
     }
 
-    /** Computes consolidated P&L summary using the workspace's active reporting currency and EUR/HUF rate. */
+    /**
+     * Computes strictly separated per-currency P&L totals (HUF, EUR, USD, ...) with zero FX conversion.
+     */
     public FinancialSummary computeSummary(List<Invoice> invoices) {
-        return computeSummary(invoices, settingsDao.getReportingCurrency(), settingsDao.getEurToHufRate());
+        Map<String, MutableTotals> acc = new LinkedHashMap<>();
+
+        // Pre-seed active configured currencies in order so they appear cleanly
+        for (CurrencyDef c : financeConfigDao.findCurrencies(true)) {
+            acc.put(c.code(), new MutableTotals(c.code(), c.decimalPlaces()));
+        }
+
+        for (Invoice inv : invoices) {
+            if (inv.status() == InvoiceStatus.CANCELLED) {
+                continue;
+            }
+            String cur = inv.effectiveCurrencyCode();
+            MutableTotals bucket = acc.computeIfAbsent(cur,
+                    k -> new MutableTotals(k, financeConfigDao.decimalPlacesFor(k)));
+            BigDecimal amt = CurrencyDef.roundForScale(
+                    inv.grossAmount() != null ? inv.grossAmount() : BigDecimal.ZERO, bucket.decimals);
+            if (inv.direction() == InvoiceDirection.OUTGOING) {
+                bucket.totalIncome = bucket.totalIncome.add(amt);
+                if (inv.status() == InvoiceStatus.PAID) {
+                    bucket.paidIncome = bucket.paidIncome.add(amt);
+                }
+            } else {
+                bucket.totalExpenses = bucket.totalExpenses.add(amt);
+                if (inv.status() == InvoiceStatus.PAID) {
+                    bucket.paidExpenses = bucket.paidExpenses.add(amt);
+                }
+            }
+            if (inv.status() == InvoiceStatus.ISSUED || inv.status() == InvoiceStatus.OVERDUE) {
+                bucket.unpaidCount++;
+                bucket.unpaidAmount = bucket.unpaidAmount.add(amt);
+            }
+        }
+
+        Map<String, FinancialSummary.CurrencyTotals> result = new LinkedHashMap<>();
+        for (MutableTotals m : acc.values()) {
+            BigDecimal net = CurrencyDef.roundForScale(m.totalIncome.subtract(m.totalExpenses), m.decimals);
+            result.put(m.currency, new FinancialSummary.CurrencyTotals(
+                    m.currency,
+                    m.decimals,
+                    CurrencyDef.roundForScale(m.totalIncome, m.decimals),
+                    CurrencyDef.roundForScale(m.paidIncome, m.decimals),
+                    CurrencyDef.roundForScale(m.totalExpenses, m.decimals),
+                    CurrencyDef.roundForScale(m.paidExpenses, m.decimals),
+                    net,
+                    m.unpaidCount,
+                    CurrencyDef.roundForScale(m.unpaidAmount, m.decimals)
+            ));
+        }
+        return new FinancialSummary(result);
     }
 
-    /**
-     * Computes consolidated multi-currency P&L in {@code reportingCurrency}, converting each invoice
-     * using its recorded exchange rate (or {@code fallbackEurToHufRate}), while also returning exact
-     * native EUR and HUF breakdowns.
-     */
-    public FinancialSummary computeSummary(List<Invoice> invoices, CurrencyCode reportingCurrency, BigDecimal fallbackEurToHufRate) {
-        CurrencyCode target = reportingCurrency != null ? reportingCurrency : CurrencyCode.HUF;
-        BigDecimal defaultRate = (fallbackEurToHufRate != null && fallbackEurToHufRate.compareTo(BigDecimal.ZERO) > 0)
-                ? fallbackEurToHufRate : CurrencyCode.DEFAULT_EUR_HUF_RATE;
-
+    private static final class MutableTotals {
+        final String currency;
+        final int decimals;
         BigDecimal totalIncome = BigDecimal.ZERO;
         BigDecimal paidIncome = BigDecimal.ZERO;
         BigDecimal totalExpenses = BigDecimal.ZERO;
@@ -272,71 +365,9 @@ public final class InvoiceService {
         int unpaidCount = 0;
         BigDecimal unpaidAmount = BigDecimal.ZERO;
 
-        BigDecimal incomeEur = BigDecimal.ZERO;
-        BigDecimal incomeHuf = BigDecimal.ZERO;
-        BigDecimal expenseEur = BigDecimal.ZERO;
-        BigDecimal expenseHuf = BigDecimal.ZERO;
-        BigDecimal unpaidEur = BigDecimal.ZERO;
-        BigDecimal unpaidHuf = BigDecimal.ZERO;
-
-        for (Invoice inv : invoices) {
-            if (inv.status() == InvoiceStatus.CANCELLED) {
-                continue;
-            }
-            CurrencyCode invCur = inv.currencyCode();
-            BigDecimal nativeAmt = invCur.round(inv.grossAmount() != null ? inv.grossAmount() : BigDecimal.ZERO);
-            BigDecimal rate = inv.exchangeRate() != null && inv.exchangeRate().compareTo(BigDecimal.ZERO) > 0
-                    ? inv.exchangeRate() : defaultRate;
-            BigDecimal converted = invCur.convertTo(nativeAmt, target, rate);
-
-            if (inv.direction() == InvoiceDirection.OUTGOING) {
-                totalIncome = totalIncome.add(converted);
-                if (invCur == CurrencyCode.EUR) {
-                    incomeEur = incomeEur.add(nativeAmt);
-                } else {
-                    incomeHuf = incomeHuf.add(nativeAmt);
-                }
-                if (inv.status() == InvoiceStatus.PAID) {
-                    paidIncome = paidIncome.add(converted);
-                }
-            } else {
-                totalExpenses = totalExpenses.add(converted);
-                if (invCur == CurrencyCode.EUR) {
-                    expenseEur = expenseEur.add(nativeAmt);
-                } else {
-                    expenseHuf = expenseHuf.add(nativeAmt);
-                }
-                if (inv.status() == InvoiceStatus.PAID) {
-                    paidExpenses = paidExpenses.add(converted);
-                }
-            }
-            if (inv.status() == InvoiceStatus.ISSUED || inv.status() == InvoiceStatus.OVERDUE) {
-                unpaidCount++;
-                unpaidAmount = unpaidAmount.add(converted);
-                if (invCur == CurrencyCode.EUR) {
-                    unpaidEur = unpaidEur.add(nativeAmt);
-                } else {
-                    unpaidHuf = unpaidHuf.add(nativeAmt);
-                }
-            }
+        MutableTotals(String currency, int decimals) {
+            this.currency = currency;
+            this.decimals = decimals;
         }
-
-        BigDecimal netBalance = target.round(totalIncome.subtract(totalExpenses));
-        return new FinancialSummary(
-                target,
-                target.round(totalIncome),
-                target.round(paidIncome),
-                target.round(totalExpenses),
-                target.round(paidExpenses),
-                netBalance,
-                unpaidCount,
-                target.round(unpaidAmount),
-                CurrencyCode.EUR.round(incomeEur),
-                CurrencyCode.HUF.round(incomeHuf),
-                CurrencyCode.EUR.round(expenseEur),
-                CurrencyCode.HUF.round(expenseHuf),
-                CurrencyCode.EUR.round(unpaidEur),
-                CurrencyCode.HUF.round(unpaidHuf)
-        );
     }
 }

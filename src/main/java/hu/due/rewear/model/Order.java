@@ -9,7 +9,7 @@ public record Order(
         long customerId,
         String customerName,
         OrderStatus status,
-        CurrencyCode currency,
+        String currency,
         BigDecimal totalWeightKg,
         BigDecimal totalPrice,
         String notes,
@@ -18,12 +18,17 @@ public record Order(
         LocalDateTime createdAt,
         LocalDateTime shippedAt
 ) {
-    public CurrencyCode effectiveCurrency() {
-        return currency != null ? currency : CurrencyCode.EUR;
+    public String effectiveCurrencyCode() {
+        return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase() : "EUR";
+    }
+
+    public int currencyDecimals() {
+        return CurrencyDef.defaultDecimalsFor(effectiveCurrencyCode());
     }
 
     @Override
     public String toString() {
-        return orderNumber + " — " + customerName + " (" + effectiveCurrency().format(totalPrice) + ")";
+        return orderNumber + " — " + customerName + " ("
+                + CurrencyDef.formatAmount(totalPrice, effectiveCurrencyCode()) + ")";
     }
 }

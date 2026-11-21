@@ -104,12 +104,19 @@ public final class OrderDao {
     public long insert(Connection conn, String orderNumber, long customerId, OrderStatus status,
                        BigDecimal totalWeightKg, BigDecimal totalPrice, String notes,
                        long createdBy, LocalDateTime createdAt, LocalDateTime shippedAt) throws SQLException {
-        return insert(conn, orderNumber, customerId, status, CurrencyCode.EUR,
+        return insert(conn, orderNumber, customerId, status, "EUR",
                 totalWeightKg, totalPrice, notes, createdBy, createdAt, shippedAt);
     }
 
     public long insert(Connection conn, String orderNumber, long customerId, OrderStatus status,
                        CurrencyCode currency, BigDecimal totalWeightKg, BigDecimal totalPrice, String notes,
+                       long createdBy, LocalDateTime createdAt, LocalDateTime shippedAt) throws SQLException {
+        return insert(conn, orderNumber, customerId, status, currency != null ? currency.name() : "EUR",
+                totalWeightKg, totalPrice, notes, createdBy, createdAt, shippedAt);
+    }
+
+    public long insert(Connection conn, String orderNumber, long customerId, OrderStatus status,
+                       String currencyCode, BigDecimal totalWeightKg, BigDecimal totalPrice, String notes,
                        long createdBy, LocalDateTime createdAt, LocalDateTime shippedAt) throws SQLException {
         String sql = """
                 INSERT INTO orders (
@@ -121,7 +128,7 @@ public final class OrderDao {
             ps.setString(1, orderNumber);
             ps.setLong(2, customerId);
             ps.setString(3, status.name());
-            ps.setString(4, (currency != null ? currency : CurrencyCode.EUR).name());
+            ps.setString(4, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR");
             ps.setDouble(5, totalWeightKg.doubleValue());
             ps.setDouble(6, totalPrice.doubleValue());
             ps.setString(7, notes);
@@ -138,10 +145,10 @@ public final class OrderDao {
         }
     }
 
-    public void updateCurrency(Connection conn, long orderId, CurrencyCode currency) throws SQLException {
+    public void updateCurrency(Connection conn, long orderId, String currencyCode) throws SQLException {
         String sql = "UPDATE orders SET currency = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, (currency != null ? currency : CurrencyCode.EUR).name());
+            ps.setString(1, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR");
             ps.setLong(2, orderId);
             ps.executeUpdate();
         }
@@ -174,7 +181,7 @@ public final class OrderDao {
                 rs.getLong("customer_id"),
                 rs.getString("customer_name"),
                 OrderStatus.valueOf(rs.getString("status")),
-                CurrencyCode.parse(rs.getString("currency")),
+                rs.getString("currency") != null ? rs.getString("currency").trim().toUpperCase() : "EUR",
                 BigDecimal.valueOf(rs.getDouble("total_weight_kg")),
                 BigDecimal.valueOf(rs.getDouble("total_price")),
                 rs.getString("notes"),

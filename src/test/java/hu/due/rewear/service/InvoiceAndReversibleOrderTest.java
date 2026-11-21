@@ -129,11 +129,15 @@ class InvoiceAndReversibleOrderTest {
         assertEquals(InvoiceStatus.ISSUED, reverted.status());
         assertNull(reverted.paidDate());
 
-        // Financial summary math check
+        // Financial summary math check (separate per-currency ledgers)
         FinancialSummary summary = ctx.getInvoiceService().computeSummary(ctx.getInvoiceDao().findAll());
-        assertTrue(summary.totalIncome().compareTo(BigDecimal.ZERO) > 0);
-        assertTrue(summary.totalExpenses().compareTo(BigDecimal.ZERO) > 0);
-        assertEquals(summary.totalIncome().subtract(summary.totalExpenses()), summary.netBalance());
+        var eurTotals = summary.forCurrency("EUR", 2);
+        var hufTotals = summary.forCurrency("HUF", 0);
+        assertTrue(eurTotals.totalIncome().compareTo(BigDecimal.ZERO) > 0
+                || hufTotals.totalIncome().compareTo(BigDecimal.ZERO) > 0);
+        assertTrue(eurTotals.totalExpenses().compareTo(BigDecimal.ZERO) > 0);
+        assertEquals(eurTotals.totalIncome().subtract(eurTotals.totalExpenses()), eurTotals.netBalance());
+        assertEquals(hufTotals.totalIncome().subtract(hufTotals.totalExpenses()), hufTotals.netBalance());
 
         // Combined Delivery Note + Invoice A4 PDF export
         Order order = ctx.getOrderDao().findAll().stream()

@@ -22,6 +22,7 @@ public record Invoice(
         LocalDate paidDate,
         BigDecimal netAmount,
         BigDecimal vatRate,
+        String taxTypeCode,
         BigDecimal vatAmount,
         BigDecimal grossAmount,
         String currency,
@@ -30,12 +31,21 @@ public record Invoice(
         String createdByName,
         LocalDateTime createdAt
 ) {
-    public CurrencyCode currencyCode() {
-        return CurrencyCode.parse(currency);
+    public String effectiveCurrencyCode() {
+        return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase() : "EUR";
     }
 
-    public BigDecimal effectiveExchangeRate() {
-        return exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0
-                ? exchangeRate : CurrencyCode.DEFAULT_EUR_HUF_RATE;
+    public int currencyDecimals() {
+        return CurrencyDef.defaultDecimalsFor(effectiveCurrencyCode());
+    }
+
+    public String effectiveTaxTypeCode() {
+        if (taxTypeCode != null && !taxTypeCode.isBlank()) {
+            return taxTypeCode.trim().toUpperCase();
+        }
+        if (vatRate != null && vatRate.compareTo(BigDecimal.ZERO) == 0) {
+            return "EU-0";
+        }
+        return "HU-27";
     }
 }

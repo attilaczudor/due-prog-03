@@ -5,6 +5,7 @@ import hu.due.rewear.config.AppPreferences;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CurrencyCode;
+import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.FinancialSummary;
 import hu.due.rewear.model.GarmentType;
@@ -16,6 +17,8 @@ import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.model.PartnerType;
+import hu.due.rewear.model.TaxType;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -49,116 +52,128 @@ class MultiCurrencyPricingAndPnlTest {
     }
 
     @Test
-    void usesDualCurrencyProductPricesOnOrdersAndSupportsSwitchingOrderCurrency() throws Exception {
-        // Verify TSH product has both EUR/kg and HUF/kg configured
+    void appliesCountryBasedVatAndSupportsDynamicCurrenciesAndBuyersVsProviders() throws Exception {
+        // 1. Verify buyers vs providers separation
+        List<Customer> buyers = ctx.getCustomerDao().findBuyers(true);
+        List<Customer> suppliers = ctx.getCustomerDao().findSuppliers(true);
+        assertTrue(buyers.stream().anyMatch(c -> "HU".equals(c.effectiveCountryCode())));
+        assertTrue(buyers.stream().anyMatch(c -> "AT".equals(c.effectiveCountryCode())));
+        assertTrue(suppliers.stream().anyMatch(c -> "DE".equals(c.effectiveCountryCode())));
+        assertTrue(buyers.stream().allMatch(c -> c.effectivePartnerType().isBuyer()));
+        assertTrue(suppliers.stream().allMatch(c -> c.effectivePartnerType().isSupplier()));
+
+        // 2. Verify automatic VAT rules by country: Hungary -> 27% (HU-27), Austria -> 0% (EU-0), US -> 0% (EXPORT-0)
+        Customer huBuyer = buyers.stream().filter(c -> "HU".equals(c.effectiveCountryCode())).findFirst().orElseThrow();
+        Customer atBuyer = buyers.stream().filter(c -> "AT".equals(c.effectiveCountryCode())).findFirst().orElseThrow();
+
+        TaxType huTax = ctx.getInvoiceService().resolveDefaultTaxForCustomer(huBuyer);
+        TaxType atTax = ctx.getInvoiceService().resolveDefaultTaxForCustomer(atBuyer);
+        TaxType usTax = ctx.getFinanceConfigDao().resolveDefaultTaxTypeForCountry("US");
+
+        assertEquals("HU-27", huTax.code());
+        assertEquals(0, new BigDecimal("27").compareTo(huTax.ratePercent()));
+        assertEquals("EU-0", atTax.code());
+        assertEquals(0, BigDecimal.ZERO.compareTo(atTax.ratePercent()));
+        assertEquals("EXPORT-0", usTax.code());
+        assertEquals(0, BigDecimal.ZERO.compareTo(usTax.ratePercent()));
+
+        // 3. Add a custom currency (GBP) and a custom tax type in Invoice Settings
+        ctx.getFinanceConfigDao().insertCurrency("GBP", "British Pound", "Angol font", "£", 2);
+        assertTrue(ctx.getFinanceConfigDao().findCurrencyByCode("GBP").isPresent());
+
+        // 4. Create an Austrian EUR order -> auto-invoice gets 0% VAT (EU-0)
+        List<InventoryPackage> inStock = ctx.getPackageDao().findByFilter(
+                new hu.due.rewear.model.PackageFilter(null, PackageStatus.IN_STOCK, null, null, null, null, null));
+        InventoryPackage pkgAt = inStock.stream().filter(p -> "TSH".equals(p.garmentTypeCode())).findFirst().orElseThrow();
+        InventoryPackage pkgHu = inStock.stream().filter(p -> p.id() != pkgAt.id() && "TSH".equals(p.garmentTypeCode())).findFirst().orElseThrow();
+
         GarmentType tsh = ctx.getDictionaryDao().findGarmentTypes(true).stream()
-                .filter(g -> "TSH".equals(g.code()))
-                .findFirst().orElseThrow();
+                .filter(g -> "TSH".equals(g.code())).findFirst().orElseThrow();
         assertEquals(0, new BigDecimal("4.50").compareTo(tsh.priceEurPerKg()));
         assertEquals(0, new BigDecimal("1800").compareTo(tsh.priceHufPerKg()));
 
-        // Pick an IN_STOCK TSH package
-        InventoryPackage tshPkg = ctx.getPackageDao().findByFilter(
-                        new hu.due.rewear.model.PackageFilter(null, PackageStatus.IN_STOCK, null, null, null, null, null))
-                .stream()
-                .filter(p -> "TSH".equals(p.garmentTypeCode()))
-                .findFirst().orElseThrow();
+        Order atOrder = ctx.getOrderService().createOrder(atBuyer.id(), "EUR", null, userId);
+        atOrder = ctx.getOrderService().addPackageToOrder(atOrder.id(), pkgAt.id(), null, userId);
+        Invoice atInv = ctx.getInvoiceService().ensureInvoiceForOrder(atOrder.id(), userId);
+        assertEquals("EUR", atInv.effectiveCurrencyCode());
+        assertEquals("EU-0", atInv.effectiveTaxTypeCode());
+        assertEquals(0, BigDecimal.ZERO.compareTo(atInv.vatAmount()));
+        assertEquals(0, atInv.netAmount().compareTo(atInv.grossAmount()));
 
-        Customer cust = ctx.getCustomerDao().findAll(true).get(0);
+        // 5. Create a Hungarian HUF order -> auto-invoice gets 27% VAT (HU-27)
+        Order huOrder = ctx.getOrderService().createOrder(huBuyer.id(), "HUF", null, userId);
+        huOrder = ctx.getOrderService().addPackageToOrder(huOrder.id(), pkgHu.id(), null, userId);
+        BigDecimal expectedHuNet = CurrencyDef.roundForScale(pkgHu.weightKg().multiply(new BigDecimal("1800")), 0);
+        assertEquals(0, expectedHuNet.compareTo(huOrder.totalPrice()));
 
-        // 1. Create a HUF order and add the TSH package -> priced at 1800 HUF/kg (0 decimals)
-        Order hufOrder = ctx.getOrderService().createOrder(cust.id(), CurrencyCode.HUF, null, userId);
-        assertEquals(CurrencyCode.HUF, hufOrder.effectiveCurrency());
+        Invoice huInv = ctx.getInvoiceService().ensureInvoiceForOrder(huOrder.id(), userId);
+        assertEquals("HUF", huInv.effectiveCurrencyCode());
+        assertEquals("HU-27", huInv.effectiveTaxTypeCode());
+        assertTrue(huInv.vatAmount().compareTo(BigDecimal.ZERO) > 0);
+        assertEquals(0, huInv.netAmount().add(huInv.vatAmount()).compareTo(huInv.grossAmount()));
 
-        hufOrder = ctx.getOrderService().addPackageToOrder(hufOrder.id(), tshPkg.id(), null, userId);
-        BigDecimal expectedHufTotal = CurrencyCode.HUF.round(tshPkg.weightKg().multiply(new BigDecimal("1800")));
-        assertEquals(0, expectedHufTotal.compareTo(hufOrder.totalPrice()));
-
-        List<OrderItem> hufItems = ctx.getOrderItemDao().findByOrderId(hufOrder.id());
-        assertEquals(1, hufItems.size());
-        assertEquals(0, new BigDecimal("1800").compareTo(hufItems.get(0).pricePerKg()));
-
-        // Ensure outgoing invoice inherits HUF currency
-        Invoice hufInv = ctx.getInvoiceService().ensureInvoiceForOrder(hufOrder.id(), new BigDecimal("27"), userId);
-        assertEquals(CurrencyCode.HUF, hufInv.currencyCode());
-        assertEquals(0, expectedHufTotal.compareTo(hufInv.netAmount()));
-
-        // Export HUF Delivery Note + HUF Invoice PDF
-        Path hufPdf = tempDir.resolve("huf-docs.pdf");
+        // Export both PDFs cleanly
+        Path pdf = tempDir.resolve("at-and-hu-invoices.pdf");
         InvoicePdfExporter.exportCombined(List.of(
-                ctx.getDeliveryNotePdfExporter().createPageSource(hufOrder, cust, hufItems),
-                ctx.getInvoicePdfExporter().createPageSource(hufInv, ctx.getInvoiceService().findItems(hufInv.id()))
-        ), hufPdf);
-        assertTrue(Files.exists(hufPdf));
-        assertEquals("%PDF-", new String(Files.readAllBytes(hufPdf), 0, 5, StandardCharsets.US_ASCII));
-
-        // 2. Switch open order from HUF -> EUR -> unit price recalculates to 4.50 EUR/kg
-        Order eurOrder = ctx.getOrderService().changeOrderCurrency(hufOrder.id(), CurrencyCode.EUR);
-        assertEquals(CurrencyCode.EUR, eurOrder.effectiveCurrency());
-        BigDecimal expectedEurTotal = CurrencyCode.EUR.round(tshPkg.weightKg().multiply(new BigDecimal("4.50")));
-        assertEquals(0, expectedEurTotal.compareTo(eurOrder.totalPrice()));
-
-        // Syncing existing ISSUED invoice updates it to EUR too
-        Invoice updatedInv = ctx.getInvoiceService().ensureInvoiceForOrder(eurOrder.id(), new BigDecimal("27"), userId);
-        assertEquals(CurrencyCode.EUR, updatedInv.currencyCode());
-        assertEquals(0, expectedEurTotal.compareTo(updatedInv.netAmount()));
+                ctx.getInvoicePdfExporter().createPageSource(atInv, ctx.getInvoiceService().findItems(atInv.id())),
+                ctx.getInvoicePdfExporter().createPageSource(huInv, ctx.getInvoiceService().findItems(huInv.id()))
+        ), pdf);
+        assertTrue(Files.exists(pdf));
+        assertEquals("%PDF-", new String(Files.readAllBytes(pdf), 0, 5, StandardCharsets.US_ASCII));
     }
 
     @Test
-    void consolidatesMixedEurAndHufInvoicesAccuratelyInBothReportingCurrencies() {
-        // Set deterministic FX rate: 1 EUR = 400.00 HUF
-        ctx.getInvoiceService().updateEurToHufRate(new BigDecimal("400.00"));
+    void keepsEurHufAndUsdLedgersStrictlySeparateWithoutCrossCurrencyConversion() {
+        TaxType tax0 = ctx.getFinanceConfigDao().findTaxTypeByCode("EU-0").orElseThrow();
+        TaxType tax27 = ctx.getFinanceConfigDao().findTaxTypeByCode("HU-27").orElseThrow();
 
-        // Create 1 EUR outgoing income (+100 EUR gross) + 1 HUF outgoing income (+80 000 HUF gross)
         Invoice eurIncome = ctx.getInvoiceService().createManualInvoice(
-                InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "TEST-OUT-EUR",
-                "Export Buyer GmbH", null, null, null, "Export Lot",
-                BigDecimal.ONE, "lot", new BigDecimal("100.00"), BigDecimal.ZERO, CurrencyCode.EUR,
+                InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "SEP-OUT-EUR", null,
+                "Alpine GmbH", "ATU68219034", "Wien", "office@alpine.at",
+                "Export Lot", BigDecimal.ONE, "lot", new BigDecimal("500.00"), tax0, "EUR",
+                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.PAID, userId);
+
+        Invoice eurExpense = ctx.getInvoiceService().createManualInvoice(
+                InvoiceDirection.INCOMING, InvoiceCategory.RAW_STOCK_PURCHASE, "SEP-IN-EUR", null,
+                "EuroTex GmbH", "DE294810221", "München", "billing@eurotex.de",
+                "Import Lot", BigDecimal.ONE, "lot", new BigDecimal("200.00"), tax0, "EUR",
                 LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.PAID, userId);
 
         Invoice hufIncome = ctx.getInvoiceService().createManualInvoice(
-                InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "TEST-OUT-HUF",
-                "Hazai Vevő Kft.", null, null, null, "Belföldi szállítmány",
-                BigDecimal.ONE, "tétel", new BigDecimal("80000"), BigDecimal.ZERO, CurrencyCode.HUF,
+                InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "SEP-OUT-HUF", null,
+                "Duna Vintage Kft.", "24891234-2-07", "Dunaújváros", "marta@dunavintage.hu",
+                "Belföldi tétel", BigDecimal.ONE, "tétel", new BigDecimal("100000"), tax27, "HUF",
                 LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
 
-        // Create 1 EUR incoming expense (-50 EUR gross) + 1 HUF incoming expense (-40 000 HUF gross)
-        Invoice eurExpense = ctx.getInvoiceService().createManualInvoice(
-                InvoiceDirection.INCOMING, InvoiceCategory.RAW_STOCK_PURCHASE, "TEST-IN-EUR",
-                "Import Supplier GmbH", null, null, null, "Raw Textiles",
-                BigDecimal.ONE, "lot", new BigDecimal("50.00"), BigDecimal.ZERO, CurrencyCode.EUR,
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.PAID, userId);
-
-        Invoice hufExpense = ctx.getInvoiceService().createManualInvoice(
-                InvoiceDirection.INCOMING, InvoiceCategory.WAREHOUSE_RENT, "TEST-IN-HUF",
-                "Raktár Bérbeadó Kft.", null, null, null, "Bérleti díj",
-                BigDecimal.ONE, "hó", new BigDecimal("40000"), BigDecimal.ZERO, CurrencyCode.HUF,
+        Invoice usdIncome = ctx.getInvoiceService().createManualInvoice(
+                InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "SEP-OUT-USD", null,
+                "US Vintage LLC", "US-991822", "New York", "buy@usvintage.com",
+                "Export Pallet", BigDecimal.ONE, "pallet", new BigDecimal("750.00"), tax0, "USD",
                 LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
 
-        List<Invoice> subset = List.of(eurIncome, hufIncome, eurExpense, hufExpense);
+        // Also test creating a US partner with USD currency
+        long usPartnerId = ctx.getCustomerDao().insert("US Vintage LLC", PartnerType.CUSTOMER, "John Doe",
+                "buy@usvintage.com", "+1 555 0100", "New York", "US-991822", "US", "USD");
+        assertEquals("USD", ctx.getCustomerDao().findById(usPartnerId).orElseThrow().effectiveCurrencyCode());
 
-        // Reporting in HUF:
-        // Income = 100*400 + 80000 = 120 000 HUF
-        // Expenses = 50*400 + 40000 = 60 000 HUF
-        // Net Balance = +60 000 HUF
-        FinancialSummary inHuf = ctx.getInvoiceService().computeSummary(subset, CurrencyCode.HUF, new BigDecimal("400.00"));
-        assertEquals(CurrencyCode.HUF, inHuf.reportingCurrency());
-        assertEquals(0, new BigDecimal("120000").compareTo(inHuf.totalIncome()));
-        assertEquals(0, new BigDecimal("60000").compareTo(inHuf.totalExpenses()));
-        assertEquals(0, new BigDecimal("60000").compareTo(inHuf.netBalance()));
-        assertEquals(0, new BigDecimal("100.00").compareTo(inHuf.incomeEur()));
-        assertEquals(0, new BigDecimal("80000").compareTo(inHuf.incomeHuf()));
-        assertEquals(0, new BigDecimal("50.00").compareTo(inHuf.expenseEur()));
-        assertEquals(0, new BigDecimal("40000").compareTo(inHuf.expenseHuf()));
+        FinancialSummary summary = ctx.getInvoiceService().computeSummary(
+                List.of(eurIncome, eurExpense, hufIncome, usdIncome));
 
-        // Reporting in EUR:
-        // Income = 100 + 80000/400 = 300.00 EUR
-        // Expenses = 50 + 40000/400 = 150.00 EUR
-        // Net Balance = +150.00 EUR
-        FinancialSummary inEur = ctx.getInvoiceService().computeSummary(subset, CurrencyCode.EUR, new BigDecimal("400.00"));
-        assertEquals(CurrencyCode.EUR, inEur.reportingCurrency());
-        assertEquals(0, new BigDecimal("300.00").compareTo(inEur.totalIncome()));
-        assertEquals(0, new BigDecimal("150.00").compareTo(inEur.totalExpenses()));
-        assertEquals(0, new BigDecimal("150.00").compareTo(inEur.netBalance()));
+        // EUR bucket: +500.00 income, -200.00 expense, +300.00 net
+        var eur = summary.forCurrency("EUR", 2);
+        assertEquals(0, new BigDecimal("500.00").compareTo(eur.totalIncome()));
+        assertEquals(0, new BigDecimal("200.00").compareTo(eur.totalExpenses()));
+        assertEquals(0, new BigDecimal("300.00").compareTo(eur.netBalance()));
+
+        // HUF bucket: +127 000 gross income (100 000 + 27% VAT), 0 expense, +127 000 net
+        var huf = summary.forCurrency("HUF", 0);
+        assertEquals(0, new BigDecimal("127000").compareTo(huf.totalIncome()));
+        assertEquals(0, BigDecimal.ZERO.compareTo(huf.totalExpenses()));
+        assertEquals(0, new BigDecimal("127000").compareTo(huf.netBalance()));
+
+        // USD bucket: +750.00 income, 0 expense, +750.00 net
+        var usd = summary.forCurrency("USD", 2);
+        assertEquals(0, new BigDecimal("750.00").compareTo(usd.totalIncome()));
+        assertEquals(0, new BigDecimal("750.00").compareTo(usd.netBalance()));
     }
 }

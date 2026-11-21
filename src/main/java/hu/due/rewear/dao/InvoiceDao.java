@@ -27,7 +27,7 @@ public final class InvoiceDao {
             SELECT i.id, i.invoice_number, i.direction, i.category, i.order_id,
                    o.order_number, i.customer_id, i.partner_name, i.partner_tax_number,
                    i.partner_address, i.partner_email, i.status, i.issue_date, i.due_date,
-                   i.paid_date, i.net_amount, i.vat_rate, i.vat_amount, i.gross_amount,
+                   i.paid_date, i.net_amount, i.vat_rate, i.tax_type_code, i.vat_amount, i.gross_amount,
                    i.currency, i.exchange_rate, i.created_by, u.full_name AS created_by_name, i.created_at
             FROM invoices i
             LEFT JOIN orders o ON o.id = i.order_id
@@ -193,14 +193,43 @@ public final class InvoiceDao {
                        BigDecimal exchangeRate,
                        long createdBy,
                        LocalDateTime createdAt) throws SQLException {
+        return insert(conn, invoiceNumber, direction, category, orderId, customerId, partnerName,
+                partnerTaxNumber, partnerAddress, partnerEmail, status, issueDate, dueDate, paidDate,
+                netAmount, vatRate, vatRate.compareTo(BigDecimal.ZERO) == 0 ? "EU-0" : "HU-27",
+                vatAmount, grossAmount, currency, exchangeRate, createdBy, createdAt);
+    }
+
+    public long insert(Connection conn,
+                       String invoiceNumber,
+                       InvoiceDirection direction,
+                       InvoiceCategory category,
+                       Long orderId,
+                       Long customerId,
+                       String partnerName,
+                       String partnerTaxNumber,
+                       String partnerAddress,
+                       String partnerEmail,
+                       InvoiceStatus status,
+                       LocalDate issueDate,
+                       LocalDate dueDate,
+                       LocalDate paidDate,
+                       BigDecimal netAmount,
+                       BigDecimal vatRate,
+                       String taxTypeCode,
+                       BigDecimal vatAmount,
+                       BigDecimal grossAmount,
+                       String currency,
+                       BigDecimal exchangeRate,
+                       long createdBy,
+                       LocalDateTime createdAt) throws SQLException {
         String sql = """
                 INSERT INTO invoices (
                     invoice_number, direction, category, order_id, customer_id,
                     partner_name, partner_tax_number, partner_address, partner_email,
                     status, issue_date, due_date, paid_date,
-                    net_amount, vat_rate, vat_amount, gross_amount, currency, exchange_rate,
+                    net_amount, vat_rate, tax_type_code, vat_amount, gross_amount, currency, exchange_rate,
                     created_by, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         double rate = (exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0)
                 ? exchangeRate.doubleValue() : hu.due.rewear.model.CurrencyCode.DEFAULT_EUR_HUF_RATE.doubleValue();
@@ -220,12 +249,13 @@ public final class InvoiceDao {
             ps.setString(13, paidDate != null ? paidDate.toString() : null);
             ps.setDouble(14, netAmount.doubleValue());
             ps.setDouble(15, vatRate.doubleValue());
-            ps.setDouble(16, vatAmount.doubleValue());
-            ps.setDouble(17, grossAmount.doubleValue());
-            ps.setString(18, currency != null && !currency.isBlank() ? currency.trim().toUpperCase() : "EUR");
-            ps.setDouble(19, rate);
-            ps.setLong(20, createdBy);
-            ps.setString(21, DaoDateUtil.format(createdAt));
+            ps.setString(16, emptyToNull(taxTypeCode));
+            ps.setDouble(17, vatAmount.doubleValue());
+            ps.setDouble(18, grossAmount.doubleValue());
+            ps.setString(19, currency != null && !currency.isBlank() ? currency.trim().toUpperCase() : "EUR");
+            ps.setDouble(20, rate);
+            ps.setLong(21, createdBy);
+            ps.setString(22, DaoDateUtil.format(createdAt));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -261,18 +291,19 @@ public final class InvoiceDao {
     }
 
     public void updateAmounts(Connection conn, long invoiceId, BigDecimal netAmount,
-                              BigDecimal vatRate, BigDecimal vatAmount, BigDecimal grossAmount,
+                              BigDecimal vatRate, String taxTypeCode, BigDecimal vatAmount, BigDecimal grossAmount,
                               String currency, BigDecimal exchangeRate) throws SQLException {
-        String sql = "UPDATE invoices SET net_amount = ?, vat_rate = ?, vat_amount = ?, gross_amount = ?, currency = ?, exchange_rate = ? WHERE id = ?";
+        String sql = "UPDATE invoices SET net_amount = ?, vat_rate = ?, tax_type_code = ?, vat_amount = ?, gross_amount = ?, currency = ?, exchange_rate = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDouble(1, netAmount.doubleValue());
             ps.setDouble(2, vatRate.doubleValue());
-            ps.setDouble(3, vatAmount.doubleValue());
-            ps.setDouble(4, grossAmount.doubleValue());
-            ps.setString(5, currency != null && !currency.isBlank() ? currency.trim().toUpperCase() : "EUR");
-            ps.setDouble(6, (exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0)
+            ps.setString(3, emptyToNull(taxTypeCode));
+            ps.setDouble(4, vatAmount.doubleValue());
+            ps.setDouble(5, grossAmount.doubleValue());
+            ps.setString(6, currency != null && !currency.isBlank() ? currency.trim().toUpperCase() : "EUR");
+            ps.setDouble(7, (exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0)
                     ? exchangeRate.doubleValue() : hu.due.rewear.model.CurrencyCode.DEFAULT_EUR_HUF_RATE.doubleValue());
-            ps.setLong(7, invoiceId);
+            ps.setLong(8, invoiceId);
             ps.executeUpdate();
         }
     }
@@ -324,6 +355,7 @@ public final class InvoiceDao {
                 paidRaw != null && !paidRaw.isBlank() ? LocalDate.parse(paidRaw) : null,
                 bd(rs.getDouble("net_amount")),
                 bd(rs.getDouble("vat_rate")),
+                rs.getString("tax_type_code"),
                 bd(rs.getDouble("vat_amount")),
                 bd(rs.getDouble("gross_amount")),
                 rs.getString("currency"),
