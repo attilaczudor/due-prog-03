@@ -55,7 +55,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final ButtonGroup navGroup = new ButtonGroup();
 
     private final JPanel sidebar = new JPanel(new BorderLayout());
+    private final JPanel brandPanel = new JPanel();
+    private final JPanel brandTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+    private final JLabel brandTitle = new JLabel("REWEAR WMS");
+    private final JPanel navList = new JPanel();
     private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
+    private final JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
     private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel brandTagLabel = new JLabel("DUE-PROG-03");
 
@@ -99,10 +104,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         // Left Brutalist Sidebar
         sidebar.setPreferredSize(new Dimension(245, 0));
 
-        JPanel brandPanel = new JPanel();
         brandPanel.setLayout(new BoxLayout(brandPanel, BoxLayout.Y_AXIS));
-        JPanel brandTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-        JLabel brandTitle = new JLabel("REWEAR WMS");
         brandTitle.setFont(ThemeManager.monoFont(Font.BOLD, 16f));
         brandTop.add(brandTitle);
         brandTop.add(brandTagLabel);
@@ -110,11 +112,10 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         brandPanel.add(brandTop);
         brandPanel.add(Box.createVerticalStrut(12));
-        brandPanel.add(new JSeparator());
+        brandPanel.add(createHairlineSeparator());
         brandPanel.add(Box.createVerticalStrut(10));
         sidebar.add(brandPanel, BorderLayout.NORTH);
 
-        JPanel navList = new JPanel();
         navList.setLayout(new BoxLayout(navList, BoxLayout.Y_AXIS));
         SessionContext session = ctx.getSession();
 
@@ -125,7 +126,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         if (session.canManageLocationsAndDictionaries()) {
             navList.add(Box.createVerticalStrut(8));
-            navList.add(new JSeparator());
+            navList.add(createHairlineSeparator());
             navList.add(Box.createVerticalStrut(8));
             addNavButton(navList, VIEW_LOCATIONS, "nav.locations");
             addNavButton(navList, VIEW_DICTIONARIES, "nav.dictionaries");
@@ -136,7 +137,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
         if (session.canManageUsersAndMaintenance()) {
             navList.add(Box.createVerticalStrut(8));
-            navList.add(new JSeparator());
+            navList.add(createHairlineSeparator());
             navList.add(Box.createVerticalStrut(8));
             addNavButton(navList, VIEW_ADMIN, "nav.admin");
         }
@@ -150,7 +151,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
         topBar.add(activeViewTitleLabel, BorderLayout.WEST);
 
-        JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         quickScanButton.addActionListener(e -> navigateTo(VIEW_SCANNER));
         rightControls.add(quickScanButton);
 
@@ -190,6 +190,13 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         root.add(rightArea, BorderLayout.CENTER);
         setContentPane(root);
+    }
+
+    private static JSeparator createHairlineSeparator() {
+        JSeparator sep = new JSeparator();
+        sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        sep.setPreferredSize(new Dimension(215, 1));
+        return sep;
     }
 
     private void addNavButton(JPanel container, String viewKey, String i18nKey) {
@@ -259,9 +266,16 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private void applyBrutalistChrome() {
         sidebar.setBackground(ThemeManager.bg());
+        brandPanel.setBackground(ThemeManager.bg());
+        brandTop.setBackground(ThemeManager.bg());
+        brandTitle.setForeground(ThemeManager.fg());
+        navList.setBackground(ThemeManager.bg());
         sidebar.setBorder(BrutalistStyle.hairlineRightRule(16, 12));
 
         topBar.setBackground(ThemeManager.bg());
+        rightControls.setBackground(ThemeManager.bg());
+        activeViewTitleLabel.setForeground(ThemeManager.fg());
+        userBadgeLabel.setForeground(ThemeManager.fg());
         topBar.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 2, 0, ThemeManager.border()),
                 BorderFactory.createEmptyBorder(10, 18, 10, 18)
@@ -315,7 +329,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         setTitle(i18n.t("app.title"));
-        quickScanButton.setText("[ QR " + i18n.t("nav.scanner").toUpperCase(Locale.ROOT) + " ]");
+        quickScanButton.setText("[ " + i18n.t("nav.scanner").toUpperCase(Locale.ROOT) + " ]");
         logoutButton.setText(i18n.t("app.logout").toUpperCase(Locale.ROOT));
         updateThemeButtonText();
 

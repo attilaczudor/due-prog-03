@@ -581,6 +581,7 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
 
     @Override
     public void applyTheme() {
+        setBackground(ThemeManager.bg());
         if (formPanel != null) {
             BrutalistStyle.applyBoxCard(formPanel, 16, 18);
         }
@@ -588,6 +589,8 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
             BrutalistStyle.applyBoxCard(previewCardPanel, 18, 20);
         }
         BrutalistStyle.stylePrimaryButton(saveAndPrintBtn);
+        generatedCodeValue.setForeground(ThemeManager.fg());
         generatedCodeValue.setBorder(BrutalistStyle.boxBorder(8, 12));
+        decodedSummaryLabel.setForeground(ThemeManager.fg());
     }
 }

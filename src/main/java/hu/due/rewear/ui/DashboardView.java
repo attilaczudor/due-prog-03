@@ -287,6 +287,8 @@ public final class DashboardView extends JPanel implements NavigableView {
 
     @Override
     public void applyTheme() {
+        setBackground(ThemeManager.bg());
+        chartsGrid.setBackground(ThemeManager.bg());
         BrutalistStyle.applyBoxCard(kpiCard1, 14, 16);
         BrutalistStyle.applyBoxCard(kpiCard2, 14, 16);
         BrutalistStyle.applyBoxCard(kpiCard3, 14, 16);
@@ -295,6 +297,11 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiTitle2.setForeground(ThemeManager.muted());
         kpiTitle3.setForeground(ThemeManager.muted());
         kpiTitle4.setForeground(ThemeManager.muted());
+        kpiValue1.setForeground(ThemeManager.fg());
+        kpiValue2.setForeground(ThemeManager.fg());
+        kpiValue3.setForeground(ThemeManager.fg());
+        kpiValue4.setForeground(ThemeManager.fg());
+        recentTitleLabel.setForeground(ThemeManager.fg());
 
         BrutalistStyle.applyBoxCard(qualityChartHost, 8, 8);
         BrutalistStyle.applyBoxCard(garmentChartHost, 8, 8);

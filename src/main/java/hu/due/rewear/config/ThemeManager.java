@@ -4,11 +4,16 @@ import com.formdev.flatlaf.FlatDarkLaf;
 import com.formdev.flatlaf.FlatLaf;
 import com.formdev.flatlaf.FlatLightLaf;
 
+import javax.swing.SwingUtilities;
+import javax.swing.UIDefaults;
 import javax.swing.UIManager;
 import java.awt.Color;
 import java.awt.Font;
 import java.awt.GraphicsEnvironment;
+import java.awt.Window;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -26,7 +31,7 @@ public final class ThemeManager {
 
     // Brutalist Light Palette
     public static final Color LIGHT_BG = Color.WHITE;
-    public static final Color LIGHT_SURFACE = new Color(0xF8F8F8);
+    public static final Color LIGHT_SURFACE = new Color(0xF6F6F6);
     public static final Color LIGHT_FG = Color.BLACK;
     public static final Color LIGHT_MUTED = new Color(0x555555);
     public static final Color LIGHT_BORDER = Color.BLACK;
@@ -34,11 +39,11 @@ public final class ThemeManager {
 
     // Brutalist Dark Palette
     public static final Color DARK_BG = Color.BLACK;
-    public static final Color DARK_SURFACE = new Color(0x0D0D0D);
+    public static final Color DARK_SURFACE = new Color(0x0F0F0F);
     public static final Color DARK_FG = Color.WHITE;
-    public static final Color DARK_MUTED = new Color(0x8E8E8E);
-    public static final Color DARK_BORDER = new Color(0xD4D4D4);
-    public static final Color DARK_GRID = new Color(0x2B2B2B);
+    public static final Color DARK_MUTED = new Color(0x9A9A9A);
+    public static final Color DARK_BORDER = new Color(0xD0D0D0);
+    public static final Color DARK_GRID = new Color(0x2A2A2A);
 
     private static volatile boolean darkMode = false;
     private static final List<ThemeChangeListener> LISTENERS = new CopyOnWriteArrayList<>();
@@ -92,125 +97,137 @@ public final class ThemeManager {
     public static void applyTheme(boolean dark) {
         darkMode = dark;
 
+        String bgHex = dark ? "#000000" : "#FFFFFF";
+        String surfaceHex = dark ? "#0F0F0F" : "#F6F6F6";
+        String fgHex = dark ? "#FFFFFF" : "#000000";
+        String mutedHex = dark ? "#9A9A9A" : "#555555";
+        String borderHex = dark ? "#D0D0D0" : "#000000";
+        String gridHex = dark ? "#2A2A2A" : "#D4D4D4";
+        String hoverHex = dark ? "#1A1A1A" : "#EDEDED";
+
+        // Register FlatLaf global extra defaults BEFORE setup() so FlatLaf builds all derived colors cleanly
+        Map<String, String> extra = new HashMap<>();
+        extra.put("@background", bgHex);
+        extra.put("@foreground", fgHex);
+        extra.put("@componentBackground", bgHex);
+        extra.put("@accentColor", fgHex);
+        extra.put("@accentBaseColor", fgHex);
+        extra.put("@accentBase2Color", fgHex);
+        extra.put("@selectionBackground", fgHex);
+        extra.put("@selectionForeground", bgHex);
+        extra.put("@selectionInactiveBackground", hoverHex);
+        extra.put("@selectionInactiveForeground", fgHex);
+        extra.put("@disabledForeground", mutedHex);
+        extra.put("@disabledBackground", surfaceHex);
+        extra.put("Component.arc", "0");
+        extra.put("Button.arc", "0");
+        extra.put("TextComponent.arc", "0");
+        extra.put("CheckBox.arc", "0");
+        extra.put("ProgressBar.arc", "0");
+        extra.put("ScrollBar.thumbArc", "0");
+        extra.put("TabbedPane.tabArc", "0");
+        extra.put("Component.borderColor", borderHex);
+        extra.put("Component.focusedBorderColor", fgHex);
+        extra.put("Component.focusColor", fgHex);
+        extra.put("Component.focusWidth", "1");
+        extra.put("Component.innerFocusWidth", "0");
+        extra.put("Panel.background", bgHex);
+        extra.put("Panel.foreground", fgHex);
+        extra.put("Label.foreground", fgHex);
+        extra.put("Viewport.background", bgHex);
+        extra.put("ScrollPane.background", bgHex);
+        extra.put("ScrollPane.borderColor", borderHex);
+        extra.put("SplitPane.background", bgHex);
+        extra.put("Button.background", bgHex);
+        extra.put("Button.foreground", fgHex);
+        extra.put("Button.borderColor", borderHex);
+        extra.put("Button.focusedBorderColor", fgHex);
+        extra.put("Button.hoverBackground", hoverHex);
+        extra.put("Button.hoverBorderColor", fgHex);
+        extra.put("Button.pressedBackground", fgHex);
+        extra.put("Button.pressedForeground", bgHex);
+        extra.put("Button.default.background", fgHex);
+        extra.put("Button.default.foreground", bgHex);
+        extra.put("Button.default.borderColor", fgHex);
+        extra.put("Button.default.focusedBorderColor", fgHex);
+        extra.put("Button.default.hoverBackground", dark ? "#E0E0E0" : "#222222");
+        extra.put("ToggleButton.background", bgHex);
+        extra.put("ToggleButton.foreground", fgHex);
+        extra.put("ToggleButton.borderColor", borderHex);
+        extra.put("ToggleButton.hoverBackground", hoverHex);
+        extra.put("ToggleButton.selectedBackground", fgHex);
+        extra.put("ToggleButton.selectedForeground", bgHex);
+        extra.put("TextField.background", bgHex);
+        extra.put("TextField.foreground", fgHex);
+        extra.put("TextField.caretForeground", fgHex);
+        extra.put("PasswordField.background", bgHex);
+        extra.put("PasswordField.foreground", fgHex);
+        extra.put("PasswordField.caretForeground", fgHex);
+        extra.put("TextArea.background", bgHex);
+        extra.put("TextArea.foreground", fgHex);
+        extra.put("TextArea.caretForeground", fgHex);
+        extra.put("ComboBox.background", bgHex);
+        extra.put("ComboBox.foreground", fgHex);
+        extra.put("ComboBox.buttonBackground", bgHex);
+        extra.put("ComboBox.buttonArrowColor", fgHex);
+        extra.put("ComboBox.popupBackground", bgHex);
+        extra.put("Spinner.background", bgHex);
+        extra.put("Spinner.foreground", fgHex);
+        extra.put("List.background", bgHex);
+        extra.put("List.foreground", fgHex);
+        extra.put("Table.background", bgHex);
+        extra.put("Table.foreground", fgHex);
+        extra.put("Table.alternateRowColor", surfaceHex);
+        extra.put("Table.gridColor", gridHex);
+        extra.put("Table.selectionBackground", fgHex);
+        extra.put("Table.selectionForeground", bgHex);
+        extra.put("TableHeader.background", bgHex);
+        extra.put("TableHeader.foreground", fgHex);
+        extra.put("TableHeader.bottomSeparatorColor", borderHex);
+        extra.put("TableHeader.separatorColor", gridHex);
+        extra.put("TabbedPane.background", bgHex);
+        extra.put("TabbedPane.foreground", fgHex);
+        extra.put("TabbedPane.selectedBackground", fgHex);
+        extra.put("TabbedPane.selectedForeground", bgHex);
+        extra.put("TabbedPane.hoverColor", hoverHex);
+        extra.put("TabbedPane.underlineColor", fgHex);
+        extra.put("TabbedPane.contentAreaColor", borderHex);
+        extra.put("Separator.foreground", borderHex);
+        extra.put("OptionPane.background", bgHex);
+        extra.put("OptionPane.messageForeground", fgHex);
+        extra.put("ProgressBar.background", bgHex);
+        extra.put("ProgressBar.foreground", fgHex);
+        extra.put("ProgressBar.selectionBackground", fgHex);
+        extra.put("ProgressBar.selectionForeground", bgHex);
+        extra.put("ScrollBar.track", bgHex);
+        extra.put("ScrollBar.thumb", dark ? "#444444" : "#BDBDBD");
+
+        FlatLaf.setGlobalExtraDefaults(extra);
+
         if (dark) {
             FlatDarkLaf.setup();
         } else {
             FlatLightLaf.setup();
         }
 
-        Color bg = bg();
-        Color surface = surface();
-        Color fg = fg();
-        Color muted = muted();
-        Color border = border();
-        Color grid = grid();
-
-        // Zero border radius everywhere (sharp brutalist geometry)
-        UIManager.put("Button.arc", 0);
-        UIManager.put("Component.arc", 0);
-        UIManager.put("TextComponent.arc", 0);
-        UIManager.put("CheckBox.arc", 0);
-        UIManager.put("ProgressBar.arc", 0);
-        UIManager.put("ScrollBar.thumbArc", 0);
-        UIManager.put("TabbedPane.tabArc", 0);
-        UIManager.put("Component.focusWidth", 1);
-        UIManager.put("Component.innerFocusWidth", 0);
-        UIManager.put("Component.borderColor", border);
-        UIManager.put("Component.focusedBorderColor", fg);
-        UIManager.put("Component.disabledBorderColor", grid);
-
-        // Global monospace typography
+        // Apply monospace font & crisp table flags on LookAndFeel defaults
+        UIDefaults defaults = UIManager.getLookAndFeelDefaults();
         Font baseFont = monoFont(Font.PLAIN, 12.5f);
-        UIManager.put("defaultFont", baseFont);
+        defaults.put("defaultFont", baseFont);
+        defaults.put("Table.showHorizontalLines", true);
+        defaults.put("Table.showVerticalLines", false);
+        defaults.put("TableHeader.font", monoFont(Font.BOLD, 11.5f));
+        defaults.put("TabbedPane.showTabSeparators", true);
+        defaults.put("TabbedPane.tabSeparatorsFullHeight", true);
 
-        // Pure monochrome surfaces & inverted focus/selection
-        UIManager.put("Panel.background", bg);
-        UIManager.put("Panel.foreground", fg);
-        UIManager.put("Viewport.background", bg);
-        UIManager.put("ScrollPane.background", bg);
-        UIManager.put("ScrollPane.borderColor", border);
-        UIManager.put("SplitPane.background", bg);
-        UIManager.put("SplitPaneDivider.draggingColor", fg);
-        UIManager.put("Separator.foreground", border);
-        UIManager.put("Separator.stripeWidth", 1);
-        UIManager.put("Label.foreground", fg);
-        UIManager.put("Label.disabledForeground", muted);
-
-        // Boxed brutalist buttons & inverted toggle buttons
-        UIManager.put("Button.background", bg);
-        UIManager.put("Button.foreground", fg);
-        UIManager.put("Button.borderColor", border);
-        UIManager.put("Button.hoverBackground", surface);
-        UIManager.put("Button.hoverBorderColor", fg);
-        UIManager.put("Button.pressedBackground", fg);
-        UIManager.put("Button.pressedForeground", bg);
-        UIManager.put("Button.default.background", fg);
-        UIManager.put("Button.default.foreground", bg);
-        UIManager.put("Button.default.borderColor", fg);
-        UIManager.put("Button.default.hoverBackground", dark ? new Color(0xE2E2E2) : new Color(0x222222));
-
-        UIManager.put("ToggleButton.background", bg);
-        UIManager.put("ToggleButton.foreground", fg);
-        UIManager.put("ToggleButton.borderColor", border);
-        UIManager.put("ToggleButton.hoverBackground", surface);
-        UIManager.put("ToggleButton.selectedBackground", fg);
-        UIManager.put("ToggleButton.selectedForeground", bg);
-
-        // Text fields, combo boxes, spinners
-        UIManager.put("TextField.background", bg);
-        UIManager.put("TextField.foreground", fg);
-        UIManager.put("TextField.caretForeground", fg);
-        UIManager.put("TextField.selectionBackground", fg);
-        UIManager.put("TextField.selectionForeground", bg);
-        UIManager.put("PasswordField.background", bg);
-        UIManager.put("PasswordField.foreground", fg);
-        UIManager.put("PasswordField.caretForeground", fg);
-        UIManager.put("TextArea.background", bg);
-        UIManager.put("TextArea.foreground", fg);
-        UIManager.put("TextArea.caretForeground", fg);
-        UIManager.put("ComboBox.background", bg);
-        UIManager.put("ComboBox.foreground", fg);
-        UIManager.put("ComboBox.buttonBackground", bg);
-        UIManager.put("ComboBox.buttonArrowColor", fg);
-        UIManager.put("ComboBox.selectionBackground", fg);
-        UIManager.put("ComboBox.selectionForeground", bg);
-        UIManager.put("Spinner.background", bg);
-        UIManager.put("Spinner.foreground", fg);
-
-        // Brutalist Tabs (inverted active tab)
-        UIManager.put("TabbedPane.background", bg);
-        UIManager.put("TabbedPane.foreground", fg);
-        UIManager.put("TabbedPane.selectedBackground", fg);
-        UIManager.put("TabbedPane.selectedForeground", bg);
-        UIManager.put("TabbedPane.underlineColor", fg);
-        UIManager.put("TabbedPane.contentAreaColor", border);
-        UIManager.put("TabbedPane.showTabSeparators", true);
-        UIManager.put("TabbedPane.tabSeparatorsFullHeight", true);
-
-        // Crisp high-contrast Tables
-        UIManager.put("Table.background", bg);
-        UIManager.put("Table.foreground", fg);
-        UIManager.put("Table.alternateRowColor", surface);
-        UIManager.put("Table.gridColor", grid);
-        UIManager.put("Table.showHorizontalLines", true);
-        UIManager.put("Table.showVerticalLines", false);
-        UIManager.put("Table.selectionBackground", fg);
-        UIManager.put("Table.selectionForeground", bg);
-        UIManager.put("TableHeader.background", bg);
-        UIManager.put("TableHeader.foreground", fg);
-        UIManager.put("TableHeader.bottomSeparatorColor", border);
-        UIManager.put("TableHeader.separatorColor", grid);
-        UIManager.put("TableHeader.font", monoFont(Font.BOLD, 11.5f));
-
-        // OptionPane & Dialogs
-        UIManager.put("OptionPane.background", bg);
-        UIManager.put("OptionPane.messageForeground", fg);
-        UIManager.put("ProgressBar.background", bg);
-        UIManager.put("ProgressBar.foreground", fg);
-        UIManager.put("ProgressBar.selectionBackground", fg);
-        UIManager.put("ProgressBar.selectionForeground", bg);
-
+        // Update all open Swing windows cleanly
         FlatLaf.updateUI();
+        for (Window w : Window.getWindows()) {
+            if (w.isDisplayable()) {
+                SwingUtilities.updateComponentTreeUI(w);
+            }
+        }
+
         for (ThemeChangeListener listener : LISTENERS) {
             listener.onThemeChanged(dark);
         }

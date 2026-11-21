@@ -87,8 +87,14 @@ public final class BrutalistStyle {
         table.setFillsViewportHeight(true);
         table.setShowHorizontalLines(true);
         table.setShowVerticalLines(false);
+        table.setBackground(ThemeManager.bg());
+        table.setForeground(ThemeManager.fg());
+        table.setSelectionBackground(ThemeManager.fg());
+        table.setSelectionForeground(ThemeManager.bg());
         table.setGridColor(ThemeManager.grid());
         table.getTableHeader().setReorderingAllowed(false);
+        table.getTableHeader().setBackground(ThemeManager.bg());
+        table.getTableHeader().setForeground(ThemeManager.fg());
         table.getTableHeader().setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
     }
 
