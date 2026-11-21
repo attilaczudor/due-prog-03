@@ -53,6 +53,7 @@ nav.locations,Warehouse Locations,Raktárhelyek
 nav.dictionaries,Code Dictionaries,Kódtörzsek
 nav.customers,Customers,Ügyfelek
 nav.orders,Orders & Dispatch,Rendelések és Kiadás
+nav.invoices,Invoices & Finance,Számlák és Pénzügy
 nav.admin,Admin & Maintenance,Admin és Karbantartás
 role.SUPER_ADMIN,Super Administrator,Szuperadmin
 role.ADMIN,Administrator,Adminisztrátor
@@ -266,3 +267,75 @@ profile.perm.admin,"Users & Roles, Audit Log, DB Backup/Restore & CSV Translatio
 profile.perm.super_admin,Permanent Super Administrator authority (cannot be demoted or deactivated),Állandó Szuperadmin jogosultság (nem fokozható le és nem inaktiválható)
 sidebar.collapse,Collapse sidebar,Oldalsáv összecsukása
 sidebar.expand,Expand sidebar,Oldalsáv kinyitása
+orders.status.label,Order Status,Rendelés állapota
+orders.status.apply,Update Status,Állapot alkalmazása
+orders.status.revert_confirm,Revert this shipped order back to editable status? Allocated packages will return from SHIPPED to RESERVED.,Visszavonja a rendelés kiszállítását? A csomagok KISZÁLLÍTVA állapotból visszakerülnek FOGLALT állapotba.
+orders.documents.preview,Documents (Delivery Note & Invoice),Dokumentumok (Szállítólevél és Számla)
+docpreview.title,Document Preview — Print / Save / Email,Dokumentum előnézet — Nyomtatás / Mentés / E-mail
+docpreview.select_docs,Include documents:,Kiválasztott dokumentumok:
+docpreview.viewing,Previewing:,Előnézet:
+docpreview.send_email,Send by Email,Küldés e-mailben
+docpreview.save_pdf,Save Selected PDF,Kiválasztott PDF mentése
+docpreview.print,Print Selected,Kiválasztottak nyomtatása
+docpreview.none_selected,Please select at least one document to print, save, or email.,Kérjük jelöljön ki legalább egy dokumentumot a művelethez.
+docpreview.email.title,Send Documents by Email,Dokumentumok küldése e-mailben
+docpreview.email.to,Recipient Email,Címzett e-mail címe
+docpreview.email.subject,Subject,Tárgy
+docpreview.email.body,Message,Üzenet
+docpreview.email.attachments,Attached PDF(s) exported to:,Csatolandó PDF fájl(ok) mentve ide:
+docpreview.email.send_btn,Open Email Client & Folder,E-mail kliens és mappa megnyitása
+docpreview.email.opened,"PDF file(s) saved to {0}. Your email client and export folder have been opened.","A PDF fájl(ok) elmentve ide: {0}. Az e-mail kliens és az export mappa megnyitva."
+invoice.title,Invoices & Financial Overview,Számlák és Pénzügyi Áttekintés
+invoice.kpi.income,Total Income (Outgoing),Összes bevétel (Kimenő)
+invoice.kpi.expenses,Total Expenses (Incoming),Összes kiadás (Bejövő)
+invoice.kpi.balance,Net Balance (Income − Expenses),Nettó egyenleg (Bevétel − Kiadás)
+invoice.kpi.unpaid,Open / Unpaid Invoices,Fizetésre váró számlák
+invoice.kpi.paid_sub,"Paid: {0} EUR","Fizetve: {0} EUR"
+invoice.kpi.unpaid_sub,"{0} open invoice(s)","{0} nyitott számla"
+invoice.direction,Type,Irányszám / Típus
+invoice.direction.OUTGOING,Outgoing (Income),Kimenő (Bevétel)
+invoice.direction.INCOMING,Incoming (Expense),Bejövő (Kiadás)
+invoice.direction.short.OUTGOING,OUTGOING +,KIMENŐ +
+invoice.direction.short.INCOMING,INCOMING −,BEJÖVŐ −
+invoice.number,Invoice No.,Számlaszám
+invoice.partner,Partner / Vendor,Partner / Szállító
+invoice.category,Category,Kategória
+invoice.category.WHOLESALE_SALES,Wholesale Sales,Nagykereskedelmi értékesítés
+invoice.category.OTHER_INCOME,Other Income,Egyéb bevétel
+invoice.category.RAW_STOCK_PURCHASE,Unsorted Stock Purchase,Ruha / bála beszerzés
+invoice.category.TRANSPORT_LOGISTICS,Transport & Logistics,Szállítás és logisztika
+invoice.category.WAREHOUSE_RENT,Warehouse Rent,Raktárbérlet
+invoice.category.UTILITIES,Utilities & Energy,Rezsi és közmű
+invoice.category.PACKAGING_SUPPLIES,Packaging & Labels,Csomagolóanyag és címke
+invoice.category.OTHER_EXPENSE,Other Expense,Egyéb kiadás
+status.invoice.DRAFT,Draft,Piszkozat
+status.invoice.ISSUED,Issued,Kiállítva
+status.invoice.PAID,Paid,Fizetve
+status.invoice.OVERDUE,Overdue,Lejárt
+status.invoice.CANCELLED,Cancelled,Sztornózva
+invoice.issue_date,Issue Date,Kiállítás dátuma
+invoice.due_date,Due Date,Fizetési határidő
+invoice.net_amount,Net Amount,Nettó összeg
+invoice.vat,VAT,ÁFA
+invoice.gross_amount,Gross Total,Bruttó végösszeg
+invoice.new_outgoing,New Outgoing Invoice,Új kimenő számla
+invoice.new_incoming,New Incoming Expense,Új bejövő számla (Kiadás)
+invoice.from_order,From Order (Optional),Rendelésből (opcionális)
+invoice.manual_entry,(Manual Entry),(Kézi rögzítés)
+invoice.preview_btn,Preview / Print / Email,Előnézet / Nyomtatás / E-mail
+invoice.status_update,Update Status,Állapot mentése
+invoice.item.description,Description,Megnevezés
+invoice.item.qty,Qty,Menny.
+invoice.item.unit,Unit,Egység
+invoice.item.unit_price,Unit Price,Egységár
+invoice.item.line_net,Line Net,Nettó érték
+invoice.pdf.title,Invoice,Számla
+invoice.pdf.seller,Seller / Issuer,Eladó / Kiállító
+invoice.pdf.buyer,Buyer / Bill To,Vevő
+invoice.pdf.issued_by,Issued By,Kiállította
+invoice.pdf.received_by,Received By,Átvette
+invoice.number_optional,Invoice No. (auto if blank),Számlaszám (üresen automatikus)
+invoice.tax_number,Tax Number,Adószám
+invoice.address,Address,Cím
+invoice.email,Email,E-mail
+invoice.vat_rate,VAT Rate (%),ÁFA kulcs (%)

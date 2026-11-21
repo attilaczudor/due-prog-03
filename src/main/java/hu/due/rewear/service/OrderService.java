@@ -22,7 +22,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Coordinates B2B customer order lifecycle and atomic stock reservation/dispatch transitions.
+ * Coordinates B2B customer order lifecycle and atomic, reversible stock reservation/dispatch transitions.
  */
 public final class OrderService {
 
@@ -116,17 +116,81 @@ public final class OrderService {
         return orderDao.findById(orderId).orElseThrow();
     }
 
+    /**
+     * Atomically transitions an order between any linear lifecycle status (DRAFT, PACKING, SHIPPED, CANCELLED),
+     * including reversing SHIPPED -> PACKING/DRAFT (re-reserving packages) and restoring CANCELLED -> DRAFT/PACKING
+     * when all allocated packages are still IN_STOCK.
+     */
+    public Order changeOrderStatus(long orderId, OrderStatus targetStatus, long userId) {
+        Order order = orderDao.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        OrderStatus current = order.status();
+        if (current == targetStatus) {
+            return order;
+        }
+
+        List<OrderItem> items = orderItemDao.findByOrderId(orderId);
+        if ((targetStatus == OrderStatus.PACKING || targetStatus == OrderStatus.SHIPPED) && items.isEmpty()) {
+            throw new IllegalStateException("Cannot transition an empty order to " + targetStatus);
+        }
+
+        // If restoring from CANCELLED, verify all allocated packages are still available IN_STOCK
+        if (current == OrderStatus.CANCELLED) {
+            for (OrderItem item : items) {
+                InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                if (pkg.status() != PackageStatus.IN_STOCK) {
+                    throw new IllegalStateException("Cannot restore order: package " + pkg.qrCode()
+                            + " is currently " + pkg.status());
+                }
+            }
+        }
+
+        LocalDateTime now = LocalDateTime.now();
+        db.runInTransaction(conn -> {
+            if (targetStatus == OrderStatus.SHIPPED) {
+                for (OrderItem item : items) {
+                    InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                    packageDao.updateStatus(conn, pkg.id(), PackageStatus.SHIPPED, now);
+                    movementDao.insert(conn, pkg.id(), MovementType.SHIP, pkg.locationId(), null,
+                            userId, "Shipped on " + order.orderNumber(), now);
+                }
+                orderDao.updateStatus(conn, orderId, OrderStatus.SHIPPED, now);
+            } else if (targetStatus == OrderStatus.CANCELLED) {
+                for (OrderItem item : items) {
+                    InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                    packageDao.updateStatus(conn, pkg.id(), PackageStatus.IN_STOCK, now);
+                    movementDao.insert(conn, pkg.id(), MovementType.RELEASE, pkg.locationId(), pkg.locationId(),
+                            userId, "Order " + order.orderNumber() + " cancelled", now);
+                }
+                orderDao.updateStatus(conn, orderId, OrderStatus.CANCELLED, null);
+            } else {
+                // Target is DRAFT or PACKING
+                if (current == OrderStatus.SHIPPED || current == OrderStatus.CANCELLED) {
+                    String reason = current == OrderStatus.SHIPPED
+                            ? "Shipment reverted on " + order.orderNumber()
+                            : "Order " + order.orderNumber() + " restored";
+                    for (OrderItem item : items) {
+                        InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                        packageDao.updateStatus(conn, pkg.id(), PackageStatus.RESERVED, now);
+                        movementDao.insert(conn, pkg.id(), MovementType.RESERVE, pkg.locationId(), pkg.locationId(),
+                                userId, reason, now);
+                    }
+                }
+                orderDao.updateStatus(conn, orderId, targetStatus, null);
+            }
+        });
+
+        LOG.info("Order {} status changed {} -> {} by userId={}", order.orderNumber(), current, targetStatus, userId);
+        return orderDao.findById(orderId).orElseThrow();
+    }
+
     public Order startPacking(long orderId) {
         Order order = orderDao.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
         if (order.status() != OrderStatus.DRAFT) {
             throw new IllegalStateException("Only DRAFT orders can transition to PACKING.");
         }
-        if (orderItemDao.findByOrderId(orderId).isEmpty()) {
-            throw new IllegalStateException("Cannot start packing an empty order.");
-        }
-        db.runInTransaction(conn -> orderDao.updateStatus(conn, orderId, OrderStatus.PACKING, null));
-        return orderDao.findById(orderId).orElseThrow();
+        return changeOrderStatus(orderId, OrderStatus.PACKING, order.createdBy());
     }
 
     public Order shipOrder(long orderId, long userId) {
@@ -135,24 +199,7 @@ public final class OrderService {
         if (order.status() != OrderStatus.DRAFT && order.status() != OrderStatus.PACKING) {
             throw new IllegalStateException("Cannot ship order in status: " + order.status());
         }
-        List<OrderItem> items = orderItemDao.findByOrderId(orderId);
-        if (items.isEmpty()) {
-            throw new IllegalStateException("Cannot ship an empty order.");
-        }
-        LocalDateTime now = LocalDateTime.now();
-
-        db.runInTransaction(conn -> {
-            for (OrderItem item : items) {
-                InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
-                packageDao.updateStatus(conn, pkg.id(), PackageStatus.SHIPPED, now);
-                movementDao.insert(conn, pkg.id(), MovementType.SHIP, pkg.locationId(), null,
-                        userId, "Shipped on " + order.orderNumber(), now);
-            }
-            orderDao.updateStatus(conn, orderId, OrderStatus.SHIPPED, now);
-        });
-
-        LOG.info("Shipped order {} ({} packages) by userId={}", order.orderNumber(), items.size(), userId);
-        return orderDao.findById(orderId).orElseThrow();
+        return changeOrderStatus(orderId, OrderStatus.SHIPPED, userId);
     }
 
     public Order cancelOrder(long orderId, long userId) {
@@ -161,21 +208,7 @@ public final class OrderService {
         if (order.status() != OrderStatus.DRAFT && order.status() != OrderStatus.PACKING) {
             throw new IllegalStateException("Cannot cancel order in status: " + order.status());
         }
-        List<OrderItem> items = orderItemDao.findByOrderId(orderId);
-        LocalDateTime now = LocalDateTime.now();
-
-        db.runInTransaction(conn -> {
-            for (OrderItem item : items) {
-                InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
-                packageDao.updateStatus(conn, pkg.id(), PackageStatus.IN_STOCK, now);
-                movementDao.insert(conn, pkg.id(), MovementType.RELEASE, pkg.locationId(), pkg.locationId(),
-                        userId, "Order " + order.orderNumber() + " cancelled", now);
-            }
-            orderDao.updateStatus(conn, orderId, OrderStatus.CANCELLED, null);
-        });
-
-        LOG.info("Cancelled order {} and released {} packages", order.orderNumber(), items.size());
-        return orderDao.findById(orderId).orElseThrow();
+        return changeOrderStatus(orderId, OrderStatus.CANCELLED, userId);
     }
 
     private void recalculateTotals(Connection conn, long orderId) throws SQLException {
@@ -189,8 +222,12 @@ public final class OrderService {
         try (var ps = conn.prepareStatement(sql)) {
             ps.setLong(1, orderId);
             try (var rs = ps.executeQuery()) {
-                BigDecimal totalW = rs.next() ? BigDecimal.valueOf(rs.getDouble("total_w")) : BigDecimal.ZERO;
-                BigDecimal totalP = BigDecimal.valueOf(rs.getDouble("total_p")).setScale(2, RoundingMode.HALF_UP);
+                BigDecimal totalW = BigDecimal.ZERO;
+                BigDecimal totalP = BigDecimal.ZERO;
+                if (rs.next()) {
+                    totalW = BigDecimal.valueOf(rs.getDouble("total_w"));
+                    totalP = BigDecimal.valueOf(rs.getDouble("total_p")).setScale(2, RoundingMode.HALF_UP);
+                }
                 orderDao.updateTotals(conn, orderId, totalW, totalP);
             }
         }

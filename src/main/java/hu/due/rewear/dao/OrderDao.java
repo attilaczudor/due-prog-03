@@ -140,7 +140,7 @@ public final class OrderDao {
     }
 
     public void updateStatus(Connection conn, long orderId, OrderStatus status, LocalDateTime shippedAt) throws SQLException {
-        String sql = "UPDATE orders SET status = ?, shipped_at = COALESCE(?, shipped_at) WHERE id = ?";
+        String sql = "UPDATE orders SET status = ?, shipped_at = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setString(2, DaoDateUtil.format(shippedAt));

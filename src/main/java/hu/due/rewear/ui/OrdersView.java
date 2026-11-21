@@ -5,11 +5,15 @@ import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.InventoryPackage;
+import hu.due.rewear.model.Invoice;
+import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageFilter;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.service.DocumentPageSource;
+import hu.due.rewear.service.InvoiceService;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -78,13 +82,20 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final DefaultTableModel itemsModel = nonEditableModel();
     private final JTable itemsTable = new JTable(itemsModel);
 
-    private final JButton startPackingBtn = new JButton();
-    private final JButton shipOrderBtn = new JButton();
-    private final JButton cancelOrderBtn = new JButton();
-    private final JButton exportPdfBtn = new JButton();
+    private final JLabel statusSelectLabel = new JLabel();
+    private final JComboBox<StatusStepOption> statusDropdown = new JComboBox<>();
+    private final JButton applyStatusBtn = new JButton();
+    private final JButton previewDocsBtn = new JButton();
 
     private List<Order> orders = List.of();
     private List<OrderItem> currentItems = List.of();
+
+    private record StatusStepOption(OrderStatus status, String label) {
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
 
     public OrdersView(AppContext ctx) {
         this.ctx = ctx;
@@ -149,10 +160,10 @@ public final class OrdersView extends JPanel implements NavigableView {
         rightPanel.add(itemsContainer, BorderLayout.CENTER);
 
         JPanel lifecycleBar = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
-        lifecycleBar.add(startPackingBtn);
-        lifecycleBar.add(shipOrderBtn);
-        lifecycleBar.add(cancelOrderBtn);
-        lifecycleBar.add(exportPdfBtn);
+        lifecycleBar.add(statusSelectLabel);
+        lifecycleBar.add(statusDropdown);
+        lifecycleBar.add(applyStatusBtn);
+        lifecycleBar.add(previewDocsBtn);
         rightPanel.add(lifecycleBar, BorderLayout.SOUTH);
 
         JSplitPane split = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, new JScrollPane(ordersTable), rightPanel);
@@ -176,10 +187,8 @@ public final class OrdersView extends JPanel implements NavigableView {
         pickStockBtn.addActionListener(e -> handlePickFromStock());
         removeItemBtn.addActionListener(e -> handleRemoveItem());
 
-        startPackingBtn.addActionListener(e -> handleStartPacking());
-        shipOrderBtn.addActionListener(e -> handleShipOrder());
-        cancelOrderBtn.addActionListener(e -> handleCancelOrder());
-        exportPdfBtn.addActionListener(e -> handleExportDeliveryNote());
+        applyStatusBtn.addActionListener(e -> handleApplyStatus());
+        previewDocsBtn.addActionListener(e -> handlePreviewDocuments());
     }
 
     private Order getSelectedOrder() {
@@ -299,45 +308,39 @@ public final class OrdersView extends JPanel implements NavigableView {
         }
     }
 
-    private void handleStartPacking() {
+    private void handleApplyStatus() {
         Order order = getSelectedOrder();
-        if (order == null) return;
-        try {
-            ctx.getOrderService().startPacking(order.id());
-            refreshDataSelecting(order.id());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), ctx.getI18n().t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void handleShipOrder() {
-        Order order = getSelectedOrder();
-        if (order == null) return;
-        try {
-            ctx.getOrderService().shipOrder(order.id(), ctx.getSession().requireCurrentUser().id());
-            refreshDataSelecting(order.id());
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), ctx.getI18n().t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    private void handleCancelOrder() {
-        Order order = getSelectedOrder();
-        if (order == null) return;
-        I18nManager i18n = ctx.getI18n();
-        if (JOptionPane.showConfirmDialog(this, i18n.t("orders.cancel_order") + " (" + order.orderNumber() + ")?",
-                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+        if (order == null || !(statusDropdown.getSelectedItem() instanceof StatusStepOption opt)) {
             return;
         }
+        OrderStatus target = opt.status();
+        if (target == order.status()) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        if (order.status() == OrderStatus.SHIPPED && target != OrderStatus.SHIPPED) {
+            if (JOptionPane.showConfirmDialog(this, i18n.t("orders.status.revert_confirm"),
+                    i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                syncStatusDropdown(order.status());
+                return;
+            }
+        } else if (target == OrderStatus.CANCELLED) {
+            if (JOptionPane.showConfirmDialog(this, i18n.t("orders.cancel_order") + " (" + order.orderNumber() + ")?",
+                    i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+                syncStatusDropdown(order.status());
+                return;
+            }
+        }
         try {
-            ctx.getOrderService().cancelOrder(order.id(), ctx.getSession().requireCurrentUser().id());
+            ctx.getOrderService().changeOrderStatus(order.id(), target, ctx.getSession().requireCurrentUser().id());
             refreshDataSelecting(order.id());
         } catch (Exception ex) {
+            syncStatusDropdown(order.status());
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private void handleExportDeliveryNote() {
+    private void handlePreviewDocuments() {
         Order order = getSelectedOrder();
         I18nManager i18n = ctx.getI18n();
         if (order == null) {
@@ -345,25 +348,36 @@ public final class OrdersView extends JPanel implements NavigableView {
                     i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
             return;
         }
-        JFileChooser chooser = new JFileChooser();
-        chooser.setDialogTitle(i18n.t("orders.export_delivery_note"));
-        chooser.setFileFilter(new FileNameExtensionFilter("PDF Documents (*.pdf)", "pdf"));
-        chooser.setSelectedFile(new File("delivery-note-" + order.orderNumber() + ".pdf"));
-        if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) {
-            return;
-        }
-        File file = chooser.getSelectedFile();
-        Path target = file.getName().toLowerCase().endsWith(".pdf")
-                ? file.toPath()
-                : Path.of(file.getAbsolutePath() + ".pdf");
         try {
             Customer customer = ctx.getCustomerDao().findById(order.customerId()).orElse(null);
             List<OrderItem> items = ctx.getOrderItemDao().findByOrderId(order.id());
-            ctx.getDeliveryNotePdfExporter().export(order, customer, items, target);
-            JOptionPane.showMessageDialog(this, i18n.t("print.exported", target.toAbsolutePath()),
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+
+            Invoice inv = ctx.getInvoiceService().ensureInvoiceForOrder(
+                    order.id(), InvoiceService.DEFAULT_VAT_RATE, ctx.getSession().requireCurrentUser().id());
+            List<InvoiceItem> invItems = ctx.getInvoiceService().findItems(inv.id());
+
+            DocumentPageSource deliveryNoteDoc = ctx.getDeliveryNotePdfExporter().createPageSource(order, customer, items);
+            DocumentPageSource invoiceDoc = ctx.getInvoicePdfExporter().createPageSource(inv, invItems);
+
+            java.awt.Window owner = javax.swing.SwingUtilities.getWindowAncestor(this);
+            DocumentPreviewDialog.showDocuments(
+                    owner,
+                    ctx,
+                    List.of(deliveryNoteDoc, invoiceDoc),
+                    customer != null ? customer.email() : "",
+                    order.orderNumber() + " — " + i18n.t("orders.documents.preview")
+            );
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void syncStatusDropdown(OrderStatus status) {
+        for (int i = 0; i < statusDropdown.getItemCount(); i++) {
+            if (statusDropdown.getItemAt(i).status() == status) {
+                statusDropdown.setSelectedIndex(i);
+                break;
+            }
         }
     }
 
@@ -378,13 +392,14 @@ public final class OrdersView extends JPanel implements NavigableView {
             orderHeaderTitle.setText("—");
             orderStatusTag.setText(" ");
             orderMetaLabel.setText(" ");
-            setEditButtonsEnabled(false, false, false, false);
+            setEditButtonsEnabled(false, false);
             return;
         }
 
         orderHeaderTitle.setText(order.orderNumber() + " // " + order.customerName());
         orderStatusTag.setText(i18n.t("status.order." + order.status().name()).toUpperCase());
         BrutalistStyle.styleBoxedTag(orderStatusTag, order.status() == OrderStatus.SHIPPED || order.status() == OrderStatus.PACKING);
+        syncStatusDropdown(order.status());
 
         orderMetaLabel.setText(
                 i18n.t("orders.total_weight") + ": " + stripZeros(order.totalWeightKg()) + " kg   |   "
@@ -404,20 +419,17 @@ public final class OrdersView extends JPanel implements NavigableView {
         }
 
         boolean editable = order.status() == OrderStatus.DRAFT || order.status() == OrderStatus.PACKING;
-        boolean canPack = order.status() == OrderStatus.DRAFT && !currentItems.isEmpty();
-        boolean canShip = editable && !currentItems.isEmpty();
-        setEditButtonsEnabled(editable, canPack, canShip, true);
+        setEditButtonsEnabled(editable, true);
     }
 
-    private void setEditButtonsEnabled(boolean editable, boolean canPack, boolean canShip, boolean canPdf) {
+    private void setEditButtonsEnabled(boolean editable, boolean hasOrder) {
         scanQrField.setEnabled(editable);
         scanAddBtn.setEnabled(editable);
         pickStockBtn.setEnabled(editable);
         removeItemBtn.setEnabled(editable);
-        startPackingBtn.setEnabled(canPack);
-        shipOrderBtn.setEnabled(canShip);
-        cancelOrderBtn.setEnabled(editable);
-        exportPdfBtn.setEnabled(canPdf);
+        statusDropdown.setEnabled(hasOrder);
+        applyStatusBtn.setEnabled(hasOrder);
+        previewDocsBtn.setEnabled(hasOrder);
     }
 
     private void refreshDataSelecting(long orderId) {
@@ -451,7 +463,8 @@ public final class OrdersView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(detailHeaderPanel, 12, 14);
         BrutalistStyle.applyBoxCard(scanBarPanel, 8, 10);
         BrutalistStyle.stylePrimaryButton(newOrderBtn);
-        BrutalistStyle.stylePrimaryButton(shipOrderBtn);
+        BrutalistStyle.styleSecondaryButton(applyStatusBtn);
+        BrutalistStyle.stylePrimaryButton(previewDocsBtn);
         BrutalistStyle.styleTable(ordersTable);
         BrutalistStyle.styleTable(itemsTable);
     }
@@ -512,10 +525,14 @@ public final class OrdersView extends JPanel implements NavigableView {
         pickStockBtn.setText(i18n.t("orders.add_from_stock").toUpperCase());
         removeItemBtn.setText(i18n.t("orders.remove_item").toUpperCase());
         itemsTitleLabel.setText(i18n.t("orders.items_title").toUpperCase());
-        startPackingBtn.setText(i18n.t("orders.start_packing").toUpperCase());
-        shipOrderBtn.setText(i18n.t("orders.mark_shipped").toUpperCase());
-        cancelOrderBtn.setText(i18n.t("orders.cancel_order").toUpperCase());
-        exportPdfBtn.setText(i18n.t("orders.export_delivery_note").toUpperCase());
+        statusSelectLabel.setText(i18n.t("orders.status.label").toUpperCase() + ":");
+        statusDropdown.removeAllItems();
+        statusDropdown.addItem(new StatusStepOption(OrderStatus.DRAFT, "1. " + i18n.t("status.order.DRAFT").toUpperCase()));
+        statusDropdown.addItem(new StatusStepOption(OrderStatus.PACKING, "2. " + i18n.t("status.order.PACKING").toUpperCase()));
+        statusDropdown.addItem(new StatusStepOption(OrderStatus.SHIPPED, "3. " + i18n.t("status.order.SHIPPED").toUpperCase()));
+        statusDropdown.addItem(new StatusStepOption(OrderStatus.CANCELLED, "4. " + i18n.t("status.order.CANCELLED").toUpperCase()));
+        applyStatusBtn.setText(i18n.t("orders.status.apply").toUpperCase());
+        previewDocsBtn.setText(i18n.t("orders.documents.preview").toUpperCase());
 
         ordersModel.setColumnIdentifiers(new Object[]{
                 i18n.t("orders.order_number").toUpperCase(),

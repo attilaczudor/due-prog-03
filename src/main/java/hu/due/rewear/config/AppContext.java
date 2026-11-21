@@ -3,6 +3,7 @@ package hu.due.rewear.config;
 import hu.due.rewear.dao.CustomerDao;
 import hu.due.rewear.dao.DictionaryDao;
 import hu.due.rewear.dao.InventoryPackageDao;
+import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
 import hu.due.rewear.dao.RoleDao;
@@ -15,6 +16,8 @@ import hu.due.rewear.service.BackupService;
 import hu.due.rewear.service.CsvExportService;
 import hu.due.rewear.service.DeliveryNotePdfExporter;
 import hu.due.rewear.service.InventoryService;
+import hu.due.rewear.service.InvoicePdfExporter;
+import hu.due.rewear.service.InvoiceService;
 import hu.due.rewear.service.LabelPdfExporter;
 import hu.due.rewear.service.OrderService;
 import hu.due.rewear.service.ProductCodeService;
@@ -51,16 +54,19 @@ public final class AppContext {
     private final CustomerDao customerDao;
     private final OrderDao orderDao;
     private final OrderItemDao orderItemDao;
+    private final InvoiceDao invoiceDao;
 
     private final AuthService authService;
     private final QrCodeService qrCodeService;
     private final InventoryService inventoryService;
     private final OrderService orderService;
+    private final InvoiceService invoiceService;
     private final ScannerService scannerService;
     private final TicketLabelPainter ticketLabelPainter;
     private final LabelPdfExporter labelPdfExporter;
     private final CsvExportService csvExportService;
     private final DeliveryNotePdfExporter deliveryNotePdfExporter;
+    private final InvoicePdfExporter invoicePdfExporter;
     private final BackupService backupService;
 
     public AppContext() {
@@ -86,16 +92,19 @@ public final class AppContext {
         this.customerDao = new CustomerDao(databaseManager);
         this.orderDao = new OrderDao(databaseManager);
         this.orderItemDao = new OrderItemDao(databaseManager);
+        this.invoiceDao = new InvoiceDao(databaseManager);
 
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
         this.inventoryService = new InventoryService(databaseManager, packageDao, movementDao, productCodeService);
         this.orderService = new OrderService(databaseManager, orderDao, orderItemDao, packageDao, movementDao);
+        this.invoiceService = new InvoiceService(databaseManager, invoiceDao, orderDao, orderItemDao, customerDao);
         this.scannerService = new ScannerService(productCodeService, qrCodeService, packageDao, movementDao);
         this.ticketLabelPainter = new TicketLabelPainter(qrCodeService, i18n);
         this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
         this.csvExportService = new CsvExportService(i18n);
         this.deliveryNotePdfExporter = new DeliveryNotePdfExporter(i18n, qrCodeService);
+        this.invoicePdfExporter = new InvoicePdfExporter(i18n, qrCodeService);
         this.backupService = new BackupService(databaseManager);
 
         initLocalizationFromPreferences();
@@ -175,6 +184,10 @@ public final class AppContext {
         return orderItemDao;
     }
 
+    public InvoiceDao getInvoiceDao() {
+        return invoiceDao;
+    }
+
     public AuthService getAuthService() {
         return authService;
     }
@@ -189,6 +202,10 @@ public final class AppContext {
 
     public OrderService getOrderService() {
         return orderService;
+    }
+
+    public InvoiceService getInvoiceService() {
+        return invoiceService;
     }
 
     public ScannerService getScannerService() {
@@ -209,6 +226,10 @@ public final class AppContext {
 
     public DeliveryNotePdfExporter getDeliveryNotePdfExporter() {
         return deliveryNotePdfExporter;
+    }
+
+    public InvoicePdfExporter getInvoicePdfExporter() {
+        return invoicePdfExporter;
     }
 
     public BackupService getBackupService() {

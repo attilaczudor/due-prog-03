@@ -46,6 +46,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public static final String VIEW_DICTIONARIES = "dictionaries";
     public static final String VIEW_CUSTOMERS = "customers";
     public static final String VIEW_ORDERS = "orders";
+    public static final String VIEW_INVOICES = "invoices";
     public static final String VIEW_ADMIN = "admin";
 
     private static final int SIDEBAR_EXPANDED_WIDTH = 276;
@@ -226,6 +227,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         if (session.canManageOrders()) {
             addNavButton(navList, VIEW_CUSTOMERS, "nav.customers");
             addNavButton(navList, VIEW_ORDERS, "nav.orders");
+            addNavButton(navList, VIEW_INVOICES, "nav.invoices");
         }
         if (session.canManageUsersAndMaintenance()) {
             navList.add(Box.createVerticalStrut(7));
@@ -371,6 +373,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerView(new DictionariesView(ctx));
         registerView(new CustomersView(ctx));
         registerView(new OrdersView(ctx));
+        registerView(new InvoicesView(ctx));
         registerView(new AdminView(ctx));
     }
 

@@ -3,13 +3,20 @@ package hu.due.rewear.config;
 import hu.due.rewear.dao.CustomerDao;
 import hu.due.rewear.dao.DictionaryDao;
 import hu.due.rewear.dao.InventoryPackageDao;
+import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
 import hu.due.rewear.dao.RoleDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
+import hu.due.rewear.model.Customer;
+import hu.due.rewear.model.InvoiceCategory;
+import hu.due.rewear.model.InvoiceDirection;
+import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.MovementType;
+import hu.due.rewear.model.Order;
+import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.RoleCode;
@@ -19,10 +26,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -42,6 +52,7 @@ public final class DemoDataSeeder {
     private final CustomerDao customerDao;
     private final OrderDao orderDao;
     private final OrderItemDao orderItemDao;
+    private final InvoiceDao invoiceDao;
     private final ProductCodeService codeService;
 
     public DemoDataSeeder(DatabaseManager db) {
@@ -55,18 +66,104 @@ public final class DemoDataSeeder {
         this.customerDao = new CustomerDao(db);
         this.orderDao = new OrderDao(db);
         this.orderItemDao = new OrderItemDao(db);
+        this.invoiceDao = new InvoiceDao(db);
         this.codeService = new ProductCodeService();
     }
 
     public void seedIfEmpty() {
-        if (userDao.count() > 0) {
-            LOG.debug("Database already populated; skipping demo data seed.");
+        if (userDao.count() == 0) {
+            LOG.info("Seeding initial ReWear WMS demo data...");
+            db.runInTransaction(this::seedAll);
+            LOG.info("Demo data seeded successfully.");
+        } else {
+            LOG.debug("Database already populated; skipping core demo data seed.");
+        }
+        seedStarterInvoicesIfEmpty();
+    }
+
+    private void seedStarterInvoicesIfEmpty() {
+        if (invoiceDao.count() > 0 || userDao.count() == 0) {
             return;
         }
+        long creatorId = userDao.findByUsername("superadmin")
+                .or(() -> userDao.findByUsername("admin"))
+                .map(hu.due.rewear.model.User::id)
+                .orElse(1L);
+        List<Order> orders = orderDao.findAll();
+        BigDecimal vat27 = new BigDecimal("27.00");
+        LocalDate today = LocalDate.now();
+        LocalDateTime now = LocalDateTime.now();
 
-        LOG.info("Seeding initial ReWear WMS demo data...");
-        db.runInTransaction(this::seedAll);
-        LOG.info("Demo data seeded successfully.");
+        db.runInTransaction(conn -> {
+            // Outgoing invoices linked to shipped/active demo orders
+            int outSeq = 1;
+            for (Order ord : orders) {
+                if (ord.status() == OrderStatus.SHIPPED || ord.status() == OrderStatus.PACKING) {
+                    List<OrderItem> items = orderItemDao.findByOrderId(ord.id());
+                    if (items.isEmpty()) continue;
+                    Customer cust = customerDao.findById(ord.customerId()).orElse(null);
+                    BigDecimal net = ord.totalPrice().setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal vat = net.multiply(vat27).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+                    BigDecimal gross = net.add(vat).setScale(2, RoundingMode.HALF_UP);
+                    boolean paid = ord.status() == OrderStatus.SHIPPED && outSeq == 1;
+                    String invNo = String.format("INV-OUT-%d-%04d", today.getYear(), outSeq++);
+                    long invId = invoiceDao.insert(conn, invNo, InvoiceDirection.OUTGOING,
+                            InvoiceCategory.WHOLESALE_SALES, ord.id(), ord.customerId(),
+                            cust != null ? cust.name() : ord.customerName(),
+                            cust != null ? cust.taxNumber() : null,
+                            cust != null ? cust.address() : null,
+                            cust != null ? cust.email() : null,
+                            paid ? InvoiceStatus.PAID : InvoiceStatus.ISSUED,
+                            today.minusDays(paid ? 5 : 1),
+                            today.plusDays(paid ? 9 : 13),
+                            paid ? today.minusDays(3) : null,
+                            net, vat27, vat, gross, "EUR", creatorId, now.minusDays(paid ? 5 : 1));
+                    for (OrderItem oi : items) {
+                        String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
+                        invoiceDao.insertItem(conn, invId, desc, oi.weightKg(), "kg", oi.pricePerKg(), oi.lineTotal());
+                    }
+                }
+            }
+
+            // Realistic Incoming (Expense) Invoices for warehouse P&L
+            seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0001", InvoiceCategory.RAW_STOCK_PURCHASE,
+                    "EuroTex Import GmbH", "DE-294810221", "80331 München, Industriestr. 14",
+                    "billing@eurotex-import.de", "Unsorted European Textile Lot (400 kg)",
+                    new BigDecimal("400"), "kg", new BigDecimal("0.95"), BigDecimal.ZERO,
+                    today.minusDays(8), today.plusDays(6), InvoiceStatus.PAID, today.minusDays(6), creatorId, now);
+
+            seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0002", InvoiceCategory.WAREHOUSE_RENT,
+                    "Duna Ipari Park Kft.", "HU-14820911-2-07", "2400 Dunaújváros, Papírgyári út 12.",
+                    "penzugy@dunaiparipark.hu", "Warehouse Hall B Monthly Lease",
+                    BigDecimal.ONE, "hó", new BigDecimal("250.00"), vat27,
+                    today.minusDays(6), today.plusDays(8), InvoiceStatus.PAID, today.minusDays(5), creatorId, now);
+
+            seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0003", InvoiceCategory.UTILITIES,
+                    "MVM Next Energiakereskedelmi Zrt.", "HU-26713111-2-44", "1081 Budapest, II. János Pál pápa tér 20.",
+                    "szamlazas@mvm.hu", "Warehouse Electricity & Heating",
+                    BigDecimal.ONE, "hó", new BigDecimal("85.00"), vat27,
+                    today.minusDays(2), today.plusDays(12), InvoiceStatus.ISSUED, null, creatorId, now);
+
+            seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0004", InvoiceCategory.PACKAGING_SUPPLIES,
+                    "ZebraLabel Pack Kft.", "HU-25104439-2-13", "2040 Budaörs, Gyár u. 2.",
+                    "orders@zebralabel.hu", "Thermal Sticker Rolls 100x150 & 100x100 + Bale Straps",
+                    new BigDecimal("12"), "db", new BigDecimal("4.00"), vat27,
+                    today.minusDays(4), today.plusDays(10), InvoiceStatus.PAID, today.minusDays(3), creatorId, now);
+        });
+        LOG.info("Seeded starter outgoing & incoming demo invoices.");
+    }
+
+    private void seedIncomingExpense(Connection conn, String invNo, InvoiceCategory cat,
+                                     String partner, String tax, String addr, String email,
+                                     String desc, BigDecimal qty, String unit, BigDecimal unitPrice,
+                                     BigDecimal vatRate, LocalDate issue, LocalDate due,
+                                     InvoiceStatus status, LocalDate paid, long creatorId, LocalDateTime now) throws SQLException {
+        BigDecimal net = qty.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal vat = net.multiply(vatRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
+        BigDecimal gross = net.add(vat).setScale(2, RoundingMode.HALF_UP);
+        long id = invoiceDao.insert(conn, invNo, InvoiceDirection.INCOMING, cat, null, null,
+                partner, tax, addr, email, status, issue, due, paid, net, vatRate, vat, gross, "EUR", creatorId, now);
+        invoiceDao.insertItem(conn, id, desc, qty, unit, unitPrice, net);
     }
 
     private void seedAll(Connection conn) throws SQLException {

@@ -159,12 +159,56 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- 13. Invoices (Outgoing Revenue & Incoming Expenses)
+CREATE TABLE IF NOT EXISTS invoices (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_number TEXT NOT NULL UNIQUE,
+    direction TEXT NOT NULL CHECK (direction IN ('OUTGOING', 'INCOMING')),
+    category TEXT NOT NULL,
+    order_id INTEGER,
+    customer_id INTEGER,
+    partner_name TEXT NOT NULL,
+    partner_tax_number TEXT,
+    partner_address TEXT,
+    partner_email TEXT,
+    status TEXT NOT NULL DEFAULT 'ISSUED'
+        CHECK (status IN ('DRAFT', 'ISSUED', 'PAID', 'OVERDUE', 'CANCELLED')),
+    issue_date TEXT NOT NULL,
+    due_date TEXT NOT NULL,
+    paid_date TEXT,
+    net_amount REAL NOT NULL DEFAULT 0 CHECK (net_amount >= 0),
+    vat_rate REAL NOT NULL DEFAULT 27 CHECK (vat_rate >= 0),
+    vat_amount REAL NOT NULL DEFAULT 0 CHECK (vat_amount >= 0),
+    gross_amount REAL NOT NULL DEFAULT 0 CHECK (gross_amount >= 0),
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    created_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
+    FOREIGN KEY (customer_id) REFERENCES customers(id) ON DELETE SET NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- 14. Invoice Line Items
+CREATE TABLE IF NOT EXISTS invoice_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    description TEXT NOT NULL,
+    quantity REAL NOT NULL CHECK (quantity > 0),
+    unit TEXT NOT NULL DEFAULT 'kg',
+    unit_price REAL NOT NULL CHECK (unit_price >= 0),
+    line_net REAL NOT NULL CHECK (line_net >= 0),
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+);
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_packages_qr_code ON inventory_packages(qr_code);
 CREATE INDEX IF NOT EXISTS idx_packages_status ON inventory_packages(status);
 CREATE INDEX IF NOT EXISTS idx_packages_location ON inventory_packages(location_id);
 CREATE INDEX IF NOT EXISTS idx_packages_created_at ON inventory_packages(created_at);
 CREATE INDEX IF NOT EXISTS idx_movements_package ON stock_movements(package_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_direction ON invoices(direction);
+CREATE INDEX IF NOT EXISTS idx_invoices_order ON invoices(order_id);
+CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_movements_created_at ON stock_movements(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);

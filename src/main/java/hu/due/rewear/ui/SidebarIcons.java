@@ -39,6 +39,7 @@ public final class SidebarIcons {
             case MainFrame.VIEW_DICTIONARIES -> makeIcon(size, SidebarIcons::paintDictionaries);
             case MainFrame.VIEW_CUSTOMERS -> makeIcon(size, SidebarIcons::paintCustomers);
             case MainFrame.VIEW_ORDERS -> makeIcon(size, SidebarIcons::paintOrders);
+            case MainFrame.VIEW_INVOICES -> makeIcon(size, SidebarIcons::paintInvoices);
             case MainFrame.VIEW_ADMIN -> makeIcon(size, SidebarIcons::paintAdmin);
             default -> makeIcon(size, SidebarIcons::paintDashboard);
         };
@@ -188,6 +189,14 @@ public final class SidebarIcons {
         g.draw(cab);
         g.draw(new Ellipse2D.Double(5, 16.5, 3.5, 3.5));
         g.draw(new Ellipse2D.Double(16, 16.5, 3.5, 3.5));
+    }
+
+    // Invoice / financial document icon
+    private static void paintInvoices(Graphics2D g) {
+        g.draw(new Rectangle2D.Double(4.5, 3, 15, 18));
+        g.draw(new Line2D.Double(8, 8, 16, 8));
+        g.draw(new Line2D.Double(8, 12, 16, 12));
+        g.draw(new Line2D.Double(8, 16, 13, 16));
     }
 
     // Admin shield icon

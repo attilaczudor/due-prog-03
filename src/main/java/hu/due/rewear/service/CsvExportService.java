@@ -3,6 +3,7 @@ package hu.due.rewear.service;
 import hu.due.rewear.i18n.CsvTranslationLoader;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
+import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.StockMovement;
 
 import java.io.BufferedWriter;
@@ -80,6 +81,38 @@ public final class CsvExportService {
                         m.toLocationCode() != null ? m.toLocationCode() : "",
                         m.userFullName() + " (" + m.username() + ")",
                         m.note() != null ? m.note() : ""
+                ));
+            }
+        }
+    }
+
+    public void exportInvoices(List<Invoice> invoices, Path targetPath) throws IOException {
+        if (targetPath.getParent() != null) {
+            Files.createDirectories(targetPath.getParent());
+        }
+        try (BufferedWriter w = Files.newBufferedWriter(targetPath, StandardCharsets.UTF_8)) {
+            w.write('\uFEFF');
+            writeRow(w, List.of(
+                    "Invoice Number", "Direction", "Category", "Order Ref", "Partner",
+                    "Tax Number", "Status", "Issue Date", "Due Date", "Paid Date",
+                    "Net (EUR)", "VAT %", "VAT (EUR)", "Gross (EUR)"
+            ));
+            for (Invoice inv : invoices) {
+                writeRow(w, List.of(
+                        inv.invoiceNumber(),
+                        i18n.t("invoice.direction." + inv.direction().name()),
+                        i18n.t("invoice.category." + inv.category().name()),
+                        inv.orderNumber() != null ? inv.orderNumber() : "",
+                        inv.partnerName(),
+                        inv.partnerTaxNumber() != null ? inv.partnerTaxNumber() : "",
+                        i18n.t("status.invoice." + inv.status().name()),
+                        inv.issueDate().toString(),
+                        inv.dueDate().toString(),
+                        inv.paidDate() != null ? inv.paidDate().toString() : "",
+                        inv.netAmount().toPlainString(),
+                        inv.vatRate().toPlainString(),
+                        inv.vatAmount().toPlainString(),
+                        inv.grossAmount().toPlainString()
                 ));
             }
         }

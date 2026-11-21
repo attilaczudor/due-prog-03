@@ -46,6 +46,44 @@ public final class DeliveryNotePdfExporter {
         this.qrService = qrService;
     }
 
+    public DocumentPageSource createPageSource(Order order, Customer customer, List<OrderItem> items) {
+        List<OrderItem> safeItems = items == null ? List.of() : List.copyOf(items);
+        int totalPages = computePageCount(safeItems.size());
+
+        return new DocumentPageSource() {
+            @Override
+            public String getDocumentId() {
+                return "delivery-note-" + order.orderNumber();
+            }
+
+            @Override
+            public String getDisplayTitle() {
+                return i18n.t("orders.delivery_note.title") + " — " + order.orderNumber();
+            }
+
+            @Override
+            public String getDefaultFileName() {
+                return "delivery-note-" + order.orderNumber() + ".pdf";
+            }
+
+            @Override
+            public int getPageCount() {
+                return totalPages;
+            }
+
+            @Override
+            public void paintPage(Graphics2D g, int pageIndex, float pageWidthPt, float pageHeightPt) {
+                int startIdx = pageIndex == 0 ? 0 : ROWS_PER_FIRST_PAGE + (pageIndex - 1) * ROWS_PER_NEXT_PAGE;
+                int maxRows = pageIndex == 0 ? ROWS_PER_FIRST_PAGE : ROWS_PER_NEXT_PAGE;
+                int endIdx = Math.min(safeItems.size(), startIdx + maxRows);
+                List<OrderItem> slice = startIdx < endIdx ? safeItems.subList(startIdx, endIdx) : List.of();
+                boolean isLast = (pageIndex == totalPages - 1);
+                DeliveryNotePdfExporter.this.paintPage(g, pageWidthPt, pageHeightPt, order, customer,
+                        slice, startIdx, pageIndex + 1, totalPages, isLast);
+            }
+        };
+    }
+
     public void export(Order order, Customer customer, List<OrderItem> items, Path targetPdf) throws IOException {
         if (order == null) {
             throw new IllegalArgumentException("Order is required");
