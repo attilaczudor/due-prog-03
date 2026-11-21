@@ -37,7 +37,9 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final AppContext ctx;
     private final Runnable onLoginSuccess;
 
+    private final JPanel outer = new JPanel(new BorderLayout(0, 12));
     private final JPanel cardPanel = new JPanel(new BorderLayout(0, 12));
+    private final JPanel footer = new JPanel();
     private final JLabel logoLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel loginHeadingLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel usernameLabel = new JLabel();
@@ -77,11 +79,11 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     }
 
     private void buildUi() {
-        JPanel outer = new JPanel(new BorderLayout(0, 12));
-        outer.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
+        outer.setBorder(BorderFactory.createEmptyBorder(16, 26, 18, 26));
 
         // Top controls: language + theme
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        topBar.setOpaque(false);
         topBar.add(langLabel);
         langCombo.addActionListener(e -> {
             if (!updatingControls && langCombo.getSelectedItem() instanceof String code) {
@@ -100,8 +102,9 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         topBar.add(themeToggleButton);
         outer.add(topBar, BorderLayout.NORTH);
 
-        // Center brutalist boxed card
+        // Center borderless login content
         JPanel center = new JPanel();
+        center.setOpaque(false);
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
         logoLabel.setAlignmentX(CENTER_ALIGNMENT);
@@ -115,6 +118,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         center.add(Box.createVerticalStrut(14));
 
         JPanel form = new JPanel(new GridBagLayout());
+        form.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(6, 4, 6, 4);
         gbc.fill = GridBagConstraints.HORIZONTAL;
@@ -154,17 +158,17 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         cardPanel.add(center, BorderLayout.CENTER);
         outer.add(cardPanel, BorderLayout.CENTER);
 
-        // Bottom quick-fill panel ("Login as:" + equal-sized role buttons)
-        JPanel footer = new JPanel();
+        // Bottom quick-fill panel (crisp horizontal rule above "Login as:" + equal-sized role buttons)
         footer.setLayout(new BoxLayout(footer, BoxLayout.Y_AXIS));
-        footer.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+        footer.setOpaque(false);
 
         loginAsLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
         loginAsLabel.setAlignmentX(CENTER_ALIGNMENT);
         footer.add(loginAsLabel);
-        footer.add(Box.createVerticalStrut(6));
+        footer.add(Box.createVerticalStrut(8));
 
         JPanel quickFillPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        quickFillPanel.setOpaque(false);
         Consumer<String[]> fill = creds -> {
             usernameField.setText(creds[0]);
             passwordField.setText(creds[1]);
@@ -186,10 +190,17 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     }
 
     private void applyBrutalistStyling() {
-        BrutalistStyle.applyBoxCard(cardPanel, 18, 22);
+        outer.setBackground(ThemeManager.bg());
+        cardPanel.setBackground(ThemeManager.bg());
+        cardPanel.setBorder(BorderFactory.createEmptyBorder(6, 16, 10, 16));
+        footer.setBorder(BrutalistStyle.hairlineTopRule(12, 0));
         logoLabel.setIcon(LogoAssets.logoIcon(108, ThemeManager.isDarkMode()));
         loginHeadingLabel.setForeground(ThemeManager.fg());
+        usernameLabel.setForeground(ThemeManager.fg());
+        passwordLabel.setForeground(ThemeManager.fg());
+        langLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
+        BrutalistStyle.styleSecondaryButton(themeToggleButton);
         BrutalistStyle.styleSecondaryButton(adminBtn);
         BrutalistStyle.styleSecondaryButton(managerBtn);
         BrutalistStyle.styleSecondaryButton(operatorBtn);
