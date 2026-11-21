@@ -103,21 +103,43 @@ public final class AuthService {
     }
 
     public User updateOwnProfile(long userId, String fullName, String email, String phone, byte[] avatarPng) {
-        return updateOwnProfile(userId, fullName, email, phone, avatarPng, null);
+        return updateOwnProfile(userId, null, fullName, email, phone, avatarPng, null);
     }
 
     public User updateOwnProfile(long userId, String fullName, String email, String phone,
+                                 byte[] avatarPng, Long newRoleId) {
+        return updateOwnProfile(userId, null, fullName, email, phone, avatarPng, newRoleId);
+    }
+
+    public User updateOwnProfile(long userId, String newHandle, String fullName, String email, String phone,
                                  byte[] avatarPng, Long newRoleId) {
         if (fullName == null || fullName.isBlank()) {
             throw new IllegalArgumentException("Full name is required.");
         }
         User existing = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+
+        String normalizedHandle = null;
+        if (newHandle != null) {
+            String cleaned = newHandle.trim();
+            if (cleaned.startsWith("@")) {
+                cleaned = cleaned.substring(1).trim();
+            }
+            if (!cleaned.matches("[A-Za-z0-9._-]{3,32}")) {
+                throw new IllegalArgumentException("INVALID_HANDLE");
+            }
+            Optional<User> clash = userDao.findByUsername(cleaned);
+            if (clash.isPresent() && clash.get().id() != userId) {
+                throw new IllegalArgumentException("HANDLE_TAKEN");
+            }
+            normalizedHandle = cleaned;
+        }
+
         // Super Administrator role is strictly immutable and cannot be changed in settings
         Long effectiveRoleId = (existing.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN)
                 ? null
                 : (newRoleId != null && session.isAdmin() ? newRoleId : null);
-        userDao.updateAccountSettings(userId, fullName.trim(), email, phone, avatarPng, effectiveRoleId);
+        userDao.updateAccountSettings(userId, normalizedHandle, fullName.trim(), email, phone, avatarPng, effectiveRoleId);
         User updated = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("Updated user not found: " + userId));
         session.updateCurrentUser(updated);

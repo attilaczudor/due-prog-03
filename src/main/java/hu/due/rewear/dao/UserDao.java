@@ -123,30 +123,43 @@ public final class UserDao {
     }
 
     public void updateAccountSettings(long userId, String fullName, String email, String phone, byte[] avatarPng) {
-        updateAccountSettings(userId, fullName, email, phone, avatarPng, null);
+        updateAccountSettings(userId, null, fullName, email, phone, avatarPng, null);
     }
 
     public void updateAccountSettings(long userId, String fullName, String email, String phone,
                                       byte[] avatarPng, Long roleId) {
-        String sql = roleId != null
-                ? "UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ?, role_id = ? WHERE id = ?"
-                : "UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ? WHERE id = ?";
+        updateAccountSettings(userId, null, fullName, email, phone, avatarPng, roleId);
+    }
+
+    public void updateAccountSettings(long userId, String username, String fullName, String email, String phone,
+                                      byte[] avatarPng, Long roleId) {
+        StringBuilder sql = new StringBuilder("UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ?");
+        if (username != null && !username.isBlank()) {
+            sql.append(", username = ?");
+        }
+        if (roleId != null) {
+            sql.append(", role_id = ?");
+        }
+        sql.append(" WHERE id = ?");
+
         try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, fullName.trim());
-            ps.setString(2, email == null || email.isBlank() ? null : email.trim());
-            ps.setString(3, phone == null || phone.isBlank() ? null : phone.trim());
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            int idx = 1;
+            ps.setString(idx++, fullName.trim());
+            ps.setString(idx++, email == null || email.isBlank() ? null : email.trim());
+            ps.setString(idx++, phone == null || phone.isBlank() ? null : phone.trim());
             if (avatarPng != null && avatarPng.length > 0) {
-                ps.setBytes(4, avatarPng);
+                ps.setBytes(idx++, avatarPng);
             } else {
-                ps.setNull(4, java.sql.Types.BLOB);
+                ps.setNull(idx++, java.sql.Types.BLOB);
+            }
+            if (username != null && !username.isBlank()) {
+                ps.setString(idx++, username.trim());
             }
             if (roleId != null) {
-                ps.setLong(5, roleId);
-                ps.setLong(6, userId);
-            } else {
-                ps.setLong(5, userId);
+                ps.setLong(idx++, roleId);
             }
+            ps.setLong(idx, userId);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException("Failed to update user account settings: " + userId, e);

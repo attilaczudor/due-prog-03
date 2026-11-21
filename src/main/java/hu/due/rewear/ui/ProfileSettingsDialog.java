@@ -21,6 +21,8 @@ import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -60,9 +62,11 @@ public final class ProfileSettingsDialog extends JDialog
     private final JButton uploadPhotoBtn = new JButton();
     private final JButton removePhotoBtn = new JButton();
 
+    private final JLabel handleLbl = new JLabel();
     private final JLabel fullNameLbl = new JLabel();
     private final JLabel emailLbl = new JLabel();
     private final JLabel phoneLbl = new JLabel();
+    private final JTextField handleField = new JTextField(24);
     private final JTextField fullNameField = new JTextField(24);
     private final JTextField emailField = new JTextField(24);
     private final JTextField phoneField = new JTextField(24);
@@ -193,6 +197,19 @@ public final class ProfileSettingsDialog extends JDialog
 
         // Profile Details Card
         detailsCard.setAlignmentX(LEFT_ALIGNMENT);
+        handleField.setText(user.username() != null ? user.username() : "");
+        handleField.getDocument().addDocumentListener(new DocumentListener() {
+            private void sync() {
+                String txt = handleField.getText().trim();
+                if (txt.startsWith("@")) {
+                    txt = txt.substring(1).trim();
+                }
+                usernameLabel.setText("@" + (txt.isEmpty() ? user.username() : txt));
+            }
+            @Override public void insertUpdate(DocumentEvent e) { sync(); }
+            @Override public void removeUpdate(DocumentEvent e) { sync(); }
+            @Override public void changedUpdate(DocumentEvent e) { sync(); }
+        });
         fullNameField.setText(user.fullName() != null ? user.fullName() : "");
         emailField.setText(user.email() != null ? user.email() : "");
         phoneField.setText(user.phone() != null ? user.phone() : "");
@@ -200,9 +217,10 @@ public final class ProfileSettingsDialog extends JDialog
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(5, 4, 5, 8);
         gbc.anchor = GridBagConstraints.WEST;
-        addFormRow(detailsCard, gbc, 0, fullNameLbl, fullNameField);
-        addFormRow(detailsCard, gbc, 1, emailLbl, emailField);
-        addFormRow(detailsCard, gbc, 2, phoneLbl, phoneField);
+        addFormRow(detailsCard, gbc, 0, handleLbl, handleField);
+        addFormRow(detailsCard, gbc, 1, fullNameLbl, fullNameField);
+        addFormRow(detailsCard, gbc, 2, emailLbl, emailField);
+        addFormRow(detailsCard, gbc, 3, phoneLbl, phoneField);
         stack.add(detailsCard);
         stack.add(Box.createVerticalStrut(10));
 
@@ -442,6 +460,7 @@ public final class ProfileSettingsDialog extends JDialog
         uploadPhotoBtn.setText(i18n.t("profile.avatar.upload"));
         removePhotoBtn.setText(i18n.t("profile.avatar.remove"));
 
+        handleLbl.setText(i18n.t("profile.handle") + ":");
         fullNameLbl.setText(i18n.t("profile.fullname") + ":");
         emailLbl.setText(i18n.t("profile.email") + ":");
         phoneLbl.setText(i18n.t("profile.phone") + ":");
@@ -495,7 +514,7 @@ public final class ProfileSettingsDialog extends JDialog
         for (JLabel title : List.of(appearanceTitleLbl, roleTitleLbl, pwTitleLbl, roleHintLbl)) {
             title.setForeground(ThemeManager.muted());
         }
-        for (JLabel lbl : List.of(fullNameLbl, emailLbl, phoneLbl, languageLbl, themeLbl,
+        for (JLabel lbl : List.of(handleLbl, fullNameLbl, emailLbl, phoneLbl, languageLbl, themeLbl,
                 roleSelectLbl, permsHeaderLbl, currentPwLbl, newPwLbl, confirmPwLbl)) {
             lbl.setForeground(ThemeManager.fg());
         }
@@ -602,6 +621,7 @@ public final class ProfileSettingsDialog extends JDialog
 
             ctx.getAuthService().updateOwnProfile(
                     user.id(),
+                    handleField.getText().trim(),
                     fullName,
                     emailField.getText().trim(),
                     phoneField.getText().trim(),
@@ -615,6 +635,14 @@ public final class ProfileSettingsDialog extends JDialog
             JOptionPane.showMessageDialog(this, i18n.t("profile.saved"),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
             dispose();
+        } catch (IllegalArgumentException ex) {
+            String msg = switch (ex.getMessage()) {
+                case "INVALID_HANDLE" -> i18n.t("profile.error.handle_invalid");
+                case "HANDLE_TAKEN" -> i18n.t("profile.error.handle_taken");
+                default -> ex.getMessage();
+            };
+            JOptionPane.showMessageDialog(this, msg,
+                    i18n.t("common.error"), JOptionPane.WARNING_MESSAGE);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);

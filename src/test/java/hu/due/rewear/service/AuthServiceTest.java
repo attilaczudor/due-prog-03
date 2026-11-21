@@ -125,7 +125,7 @@ class AuthServiceTest {
         assertEquals(fakePng.length, updated.avatarPng().length);
         assertEquals("attila@rewear.hu", session.requireCurrentUser().email());
 
-        // Verify separate Admin account has its own non-SuperAdmin identity
+        // Verify separate Admin account has its own non-SuperAdmin identity and can change handle safely
         authService.logout();
         AuthService.AuthResult adminLogin = authService.login("admin", "admin123".toCharArray());
         assertTrue(adminLogin.isSuccess());
@@ -133,5 +133,17 @@ class AuthServiceTest {
         assertEquals("Szabó Gábor", adminLogin.user().displayName());
         assertFalse(session.isSuperAdmin());
         assertTrue(session.isAdmin());
+
+        var renamedAdmin = authService.updateOwnProfile(
+                adminLogin.user().id(),
+                "@gabor.szabo",
+                "Szabó Gábor",
+                "gabor@rewear.hu",
+                null,
+                null,
+                null
+        );
+        assertEquals("gabor.szabo", renamedAdmin.username());
+        assertEquals("gabor.szabo", session.requireCurrentUser().username());
     }
 }
