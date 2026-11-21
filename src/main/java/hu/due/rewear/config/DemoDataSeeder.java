@@ -73,13 +73,16 @@ public final class DemoDataSeeder {
         LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
 
         // 1. Roles
+        long superAdminRoleId = roleDao.insert(conn, RoleCode.SUPER_ADMIN, "Super Administrator");
         long adminRoleId = roleDao.insert(conn, RoleCode.ADMIN, "Administrator");
         long managerRoleId = roleDao.insert(conn, RoleCode.MANAGER, "Warehouse Manager");
         long operatorRoleId = roleDao.insert(conn, RoleCode.OPERATOR, "Sorting Operator");
 
         // 2. Demo Users (BCrypt)
+        userDao.insert(conn, "superadmin", BCrypt.hashpw("superadmin123", BCrypt.gensalt(10)),
+                "Czudor Attila", superAdminRoleId, true, now.minusDays(15));
         long adminId = userDao.insert(conn, "admin", BCrypt.hashpw("admin123", BCrypt.gensalt(10)),
-                "Attila Czudor (Admin)", adminRoleId, true, now.minusDays(14));
+                "Szabó Gábor", adminRoleId, true, now.minusDays(14));
         long managerId = userDao.insert(conn, "manager", BCrypt.hashpw("manager123", BCrypt.gensalt(10)),
                 "Kovács Eszter", managerRoleId, true, now.minusDays(12));
         long operatorId = userDao.insert(conn, "operator", BCrypt.hashpw("operator123", BCrypt.gensalt(10)),

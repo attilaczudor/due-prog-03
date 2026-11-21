@@ -97,26 +97,41 @@ class AuthServiceTest {
     }
 
     @Test
-    void updatesOwnProfileAndComputesInitials() {
-        AuthService.AuthResult login = authService.login("admin", "admin123".toCharArray());
-        assertTrue(login.isSuccess());
-        assertEquals("AC", login.user().initials());
-        assertEquals("Attila Czudor", login.user().displayName());
+    void updatesOwnProfileAndProtectsSuperAdminRoleImmutability() {
+        AuthService.AuthResult superLogin = authService.login("superadmin", "superadmin123".toCharArray());
+        assertTrue(superLogin.isSuccess());
+        assertEquals(RoleCode.SUPER_ADMIN, superLogin.user().roleCode());
+        assertEquals("CA", superLogin.user().initials());
+        assertEquals("Czudor Attila", superLogin.user().displayName());
+        assertTrue(session.isSuperAdmin());
+        assertTrue(session.isAdmin());
 
+        long operatorRoleId = roleDao.findByCode(RoleCode.OPERATOR).orElseThrow().id();
         byte[] fakePng = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A};
+        // Attempt to change Super Admin role to Operator must be ignored (always stays SUPER_ADMIN)
         var updated = authService.updateOwnProfile(
-                login.user().id(),
+                superLogin.user().id(),
                 "Czudor Attila",
                 "attila@rewear.hu",
                 "+36 30 555 0199",
-                fakePng
+                fakePng,
+                operatorRoleId
         );
 
+        assertEquals(RoleCode.SUPER_ADMIN, updated.roleCode());
         assertEquals("Czudor Attila", updated.fullName());
-        assertEquals("CA", updated.initials());
         assertEquals("attila@rewear.hu", updated.email());
         assertEquals("+36 30 555 0199", updated.phone());
         assertEquals(fakePng.length, updated.avatarPng().length);
         assertEquals("attila@rewear.hu", session.requireCurrentUser().email());
+
+        // Verify separate Admin account has its own non-SuperAdmin identity
+        authService.logout();
+        AuthService.AuthResult adminLogin = authService.login("admin", "admin123".toCharArray());
+        assertTrue(adminLogin.isSuccess());
+        assertEquals(RoleCode.ADMIN, adminLogin.user().roleCode());
+        assertEquals("Szabó Gábor", adminLogin.user().displayName());
+        assertFalse(session.isSuperAdmin());
+        assertTrue(session.isAdmin());
     }
 }

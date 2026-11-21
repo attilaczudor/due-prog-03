@@ -49,6 +49,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final JLabel errorLabel = new JLabel(" ", SwingConstants.CENTER);
     private final JButton loginButton = new JButton();
     private final JLabel loginAsLabel = new JLabel("", SwingConstants.CENTER);
+    private final JButton superAdminBtn = new JButton("SUPERADMIN");
     private final JButton adminBtn = new JButton("ADMIN");
     private final JButton managerBtn = new JButton("MANAGER");
     private final JButton operatorBtn = new JButton("OPERATOR");
@@ -72,7 +73,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
         pack();
-        setMinimumSize(new Dimension(480, 460));
+        setMinimumSize(new Dimension(560, 460));
         setLocationRelativeTo(null);
     }
 
@@ -163,10 +164,12 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
             passwordField.setText(creds[1]);
             errorLabel.setText(" ");
         };
+        superAdminBtn.addActionListener(e -> fill.accept(new String[]{"superadmin", "superadmin123"}));
         adminBtn.addActionListener(e -> fill.accept(new String[]{"admin", "admin123"}));
         managerBtn.addActionListener(e -> fill.accept(new String[]{"manager", "manager123"}));
         operatorBtn.addActionListener(e -> fill.accept(new String[]{"operator", "operator123"}));
 
+        quickFillPanel.add(superAdminBtn);
         quickFillPanel.add(adminBtn);
         quickFillPanel.add(managerBtn);
         quickFillPanel.add(operatorBtn);
@@ -188,10 +191,11 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         usernameLabel.setForeground(ThemeManager.fg());
         passwordLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
+        BrutalistStyle.styleSecondaryButton(superAdminBtn);
         BrutalistStyle.styleSecondaryButton(adminBtn);
         BrutalistStyle.styleSecondaryButton(managerBtn);
         BrutalistStyle.styleSecondaryButton(operatorBtn);
-        BrutalistStyle.matchButtonSizes(adminBtn, managerBtn, operatorBtn);
+        BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn);
         loginAsLabel.setForeground(ThemeManager.muted());
     }
 

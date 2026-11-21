@@ -85,6 +85,7 @@ public final class ProfileSettingsDialog extends JDialog
     private final JLabel permCatalogLbl = new JLabel();
     private final JLabel permOrdersLbl = new JLabel();
     private final JLabel permAdminLbl = new JLabel();
+    private final JLabel permSuperAdminLbl = new JLabel();
 
     // Password controls
     private final JLabel pwTitleLbl = new JLabel();
@@ -251,11 +252,13 @@ public final class ProfileSettingsDialog extends JDialog
 
         roleGbc.gridwidth = 1;
         roleGbc.insets = new Insets(5, 4, 5, 8);
-        roleCombo.setEnabled(ctx.getSession().isAdmin());
+        boolean isSuperAdmin = user.roleCode() == RoleCode.SUPER_ADMIN;
+        boolean canEditRole = ctx.getSession().isAdmin() && !isSuperAdmin;
+        roleCombo.setEnabled(canEditRole);
         roleCombo.addActionListener(e -> updateRolePermissionsDisplay());
         addFormRow(roleCard, roleGbc, 1, roleSelectLbl, roleCombo);
 
-        if (!ctx.getSession().isAdmin()) {
+        if (!canEditRole) {
             roleGbc.gridx = 0;
             roleGbc.gridy = 2;
             roleGbc.gridwidth = 2;
@@ -268,7 +271,7 @@ public final class ProfileSettingsDialog extends JDialog
         permsBox.setLayout(new BoxLayout(permsBox, BoxLayout.Y_AXIS));
         permsHeaderLbl.setFont(ThemeManager.monoFont(Font.BOLD, 11f));
         permsHeaderLbl.setAlignmentX(LEFT_ALIGNMENT);
-        for (JLabel pLbl : List.of(permCoreLbl, permCatalogLbl, permOrdersLbl, permAdminLbl)) {
+        for (JLabel pLbl : List.of(permCoreLbl, permCatalogLbl, permOrdersLbl, permAdminLbl, permSuperAdminLbl)) {
             pLbl.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
             pLbl.setAlignmentX(LEFT_ALIGNMENT);
         }
@@ -281,6 +284,8 @@ public final class ProfileSettingsDialog extends JDialog
         permsBox.add(permOrdersLbl);
         permsBox.add(Box.createVerticalStrut(3));
         permsBox.add(permAdminLbl);
+        permsBox.add(Box.createVerticalStrut(3));
+        permsBox.add(permSuperAdminLbl);
 
         roleGbc.gridx = 0;
         roleGbc.gridy = 3;
@@ -382,9 +387,14 @@ public final class ProfileSettingsDialog extends JDialog
         updatingCombos = true;
         try {
             I18nManager i18n = ctx.getI18n();
+            boolean userIsSuperAdmin = ctx.getSession().isSuperAdmin();
             roleCombo.removeAllItems();
             RoleOption toSelect = null;
             for (Role role : allRoles) {
+                // Non-SuperAdmins cannot assign themselves SUPER_ADMIN
+                if (role.code() == RoleCode.SUPER_ADMIN && !userIsSuperAdmin) {
+                    continue;
+                }
                 RoleOption opt = new RoleOption(role, i18n.t("role." + role.code().name()));
                 roleCombo.addItem(opt);
                 if (role.id() == selectedRoleId) {
@@ -406,14 +416,16 @@ public final class ProfileSettingsDialog extends JDialog
         if (roleCombo.getSelectedItem() instanceof RoleOption opt) {
             code = opt.role().code();
         }
-        boolean canCatalog = code == RoleCode.ADMIN || code == RoleCode.MANAGER;
-        boolean canOrders = code == RoleCode.ADMIN || code == RoleCode.MANAGER;
-        boolean canAdmin = code == RoleCode.ADMIN;
+        boolean isSuper = code == RoleCode.SUPER_ADMIN;
+        boolean canCatalog = isSuper || code == RoleCode.ADMIN || code == RoleCode.MANAGER;
+        boolean canOrders = isSuper || code == RoleCode.ADMIN || code == RoleCode.MANAGER;
+        boolean canAdmin = isSuper || code == RoleCode.ADMIN;
 
         setPermLine(permCoreLbl, true, i18n.t("profile.perm.core"));
         setPermLine(permCatalogLbl, canCatalog, i18n.t("profile.perm.catalog"));
         setPermLine(permOrdersLbl, canOrders, i18n.t("profile.perm.orders"));
         setPermLine(permAdminLbl, canAdmin, i18n.t("profile.perm.admin"));
+        setPermLine(permSuperAdminLbl, isSuper, i18n.t("profile.perm.super_admin"));
     }
 
     private void setPermLine(JLabel label, boolean allowed, String text) {
@@ -442,7 +454,9 @@ public final class ProfileSettingsDialog extends JDialog
 
         roleTitleLbl.setText(i18n.t("profile.role.section").toUpperCase(Locale.ROOT));
         roleSelectLbl.setText(i18n.t("profile.role.label") + ":");
-        roleHintLbl.setText(i18n.t("profile.role.admin_only"));
+        roleHintLbl.setText(user.roleCode() == RoleCode.SUPER_ADMIN
+                ? i18n.t("profile.role.super_admin_locked")
+                : i18n.t("profile.role.admin_only"));
         permsHeaderLbl.setText(i18n.t("profile.role.permissions"));
 
         long selectedRoleId = (roleCombo.getSelectedItem() instanceof RoleOption opt)
@@ -571,7 +585,8 @@ public final class ProfileSettingsDialog extends JDialog
 
         User user = ctx.getSession().requireCurrentUser();
         Long newRoleId = null;
-        if (ctx.getSession().isAdmin() && roleCombo.getSelectedItem() instanceof RoleOption opt) {
+        if (ctx.getSession().isAdmin() && user.roleCode() != RoleCode.SUPER_ADMIN
+                && roleCombo.getSelectedItem() instanceof RoleOption opt) {
             newRoleId = opt.role().id();
         }
 

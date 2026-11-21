@@ -111,7 +111,12 @@ public final class AuthService {
         if (fullName == null || fullName.isBlank()) {
             throw new IllegalArgumentException("Full name is required.");
         }
-        Long effectiveRoleId = (newRoleId != null && session.isAdmin()) ? newRoleId : null;
+        User existing = userDao.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+        // Super Administrator role is strictly immutable and cannot be changed in settings
+        Long effectiveRoleId = (existing.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN)
+                ? null
+                : (newRoleId != null && session.isAdmin() ? newRoleId : null);
         userDao.updateAccountSettings(userId, fullName.trim(), email, phone, avatarPng, effectiveRoleId);
         User updated = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("Updated user not found: " + userId));

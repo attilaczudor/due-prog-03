@@ -54,6 +54,7 @@ nav.dictionaries,Code Dictionaries,Kódtörzsek
 nav.customers,Customers,Ügyfelek
 nav.orders,Orders & Dispatch,Rendelések és Kiadás
 nav.admin,Admin & Maintenance,Admin és Karbantartás
+role.SUPER_ADMIN,Super Administrator,Szuperadmin
 role.ADMIN,Administrator,Adminisztrátor
 role.MANAGER,Warehouse Manager,Raktárvezető
 role.OPERATOR,Sorting Operator,Válogató operátor
@@ -251,9 +252,11 @@ profile.role.section,Role & Permissions,Szerepkör és jogosultságok
 profile.role.label,Account Role,Fiók szerepköre
 profile.role.permissions,Capabilities for selected role:,A kiválasztott szerepkör jogosultságai:
 profile.role.admin_only,Only Administrators can change account roles.,A szerepkör módosításához Adminisztrátor jogosultság szükséges.
+profile.role.super_admin_locked,Super Administrator role is permanent and cannot be changed.,A Szuperadmin szerepkör állandó és nem módosítható.
 profile.perm.core,"Dashboard, Package Intake & QR Printing, QR Scanner, Inventory","Áttekintés, Csomagfelvétel és QR nyomtatás, QR Szkenner, Készlet"
 profile.perm.catalog,Warehouse Locations & Code Dictionaries Management,Raktárhelyek és kódtörzsek kezelése
 profile.perm.orders,"Customers, Orders, Live QR Packing & PDF Delivery Notes","Ügyfelek, rendelések, élő QR összekészítés és PDF szállítólevél"
 profile.perm.admin,"Users & Roles, Audit Log, DB Backup/Restore & CSV Translations","Felhasználók, napló, adatbázis mentés/visszaállítás és CSV fordítások"
+profile.perm.super_admin,Permanent Super Administrator authority (cannot be demoted or deactivated),Állandó Szuperadmin jogosultság (nem fokozható le és nem inaktiválható)
 sidebar.collapse,Collapse sidebar,Oldalsáv összecsukása
 sidebar.expand,Expand sidebar,Oldalsáv kinyitása

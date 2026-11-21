@@ -199,7 +199,9 @@ public final class AdminView extends JPanel implements NavigableView {
 
     private void openCreateUserDialog() {
         I18nManager i18n = ctx.getI18n();
-        List<Role> roles = ctx.getRoleDao().findAll();
+        List<Role> roles = ctx.getRoleDao().findAll().stream()
+                .filter(r -> r.code() != hu.due.rewear.model.RoleCode.SUPER_ADMIN)
+                .toList();
         JTextField userF = new JTextField(18);
         JTextField nameF = new JTextField(18);
         JPasswordField pwF = new JPasswordField(18);
@@ -233,7 +235,10 @@ public final class AdminView extends JPanel implements NavigableView {
         User u = getSelectedUser();
         if (u == null) return;
         I18nManager i18n = ctx.getI18n();
-        List<Role> roles = ctx.getRoleDao().findAll();
+        boolean targetIsSuperAdmin = u.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN;
+        List<Role> roles = ctx.getRoleDao().findAll().stream()
+                .filter(role -> targetIsSuperAdmin || role.code() != hu.due.rewear.model.RoleCode.SUPER_ADMIN)
+                .toList();
 
         JTextField nameF = new JTextField(u.fullName(), 18);
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
@@ -244,6 +249,10 @@ public final class AdminView extends JPanel implements NavigableView {
             }
         }
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), u.active());
+        if (targetIsSuperAdmin) {
+            roleCombo.setEnabled(false);
+            activeBox.setEnabled(false);
+        }
 
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();

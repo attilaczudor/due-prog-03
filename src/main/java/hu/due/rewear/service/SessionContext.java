@@ -45,12 +45,16 @@ public final class SessionContext {
         return currentUser != null && currentUser.roleCode() == roleCode;
     }
 
+    public synchronized boolean isSuperAdmin() {
+        return hasRole(RoleCode.SUPER_ADMIN);
+    }
+
     public synchronized boolean isAdmin() {
-        return hasRole(RoleCode.ADMIN);
+        return hasRole(RoleCode.SUPER_ADMIN) || hasRole(RoleCode.ADMIN);
     }
 
     public synchronized boolean isManagerOrAdmin() {
-        return hasRole(RoleCode.ADMIN) || hasRole(RoleCode.MANAGER);
+        return isAdmin() || hasRole(RoleCode.MANAGER);
     }
 
     public boolean canManageOrders() {
