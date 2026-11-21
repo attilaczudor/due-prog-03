@@ -63,11 +63,13 @@ public final class ProfileSettingsDialog extends JDialog
     private final JButton removePhotoBtn = new JButton();
 
     private final JLabel handleLbl = new JLabel();
-    private final JLabel fullNameLbl = new JLabel();
+    private final JLabel lastNameLbl = new JLabel();
+    private final JLabel firstNameLbl = new JLabel();
     private final JLabel emailLbl = new JLabel();
     private final JLabel phoneLbl = new JLabel();
     private final JTextField handleField = new JTextField(24);
-    private final JTextField fullNameField = new JTextField(24);
+    private final JTextField lastNameField = new JTextField(24);
+    private final JTextField firstNameField = new JTextField(24);
     private final JTextField emailField = new JTextField(24);
     private final JTextField phoneField = new JTextField(24);
 
@@ -210,7 +212,15 @@ public final class ProfileSettingsDialog extends JDialog
             @Override public void removeUpdate(DocumentEvent e) { sync(); }
             @Override public void changedUpdate(DocumentEvent e) { sync(); }
         });
-        fullNameField.setText(user.fullName() != null ? user.fullName() : "");
+        lastNameField.setText(user.safeLastName());
+        firstNameField.setText(user.safeFirstName());
+        DocumentListener nameSync = new DocumentListener() {
+            @Override public void insertUpdate(DocumentEvent e) { refreshAvatarPreview(); }
+            @Override public void removeUpdate(DocumentEvent e) { refreshAvatarPreview(); }
+            @Override public void changedUpdate(DocumentEvent e) { refreshAvatarPreview(); }
+        };
+        lastNameField.getDocument().addDocumentListener(nameSync);
+        firstNameField.getDocument().addDocumentListener(nameSync);
         emailField.setText(user.email() != null ? user.email() : "");
         phoneField.setText(user.phone() != null ? user.phone() : "");
 
@@ -218,9 +228,10 @@ public final class ProfileSettingsDialog extends JDialog
         gbc.insets = new Insets(5, 4, 5, 8);
         gbc.anchor = GridBagConstraints.WEST;
         addFormRow(detailsCard, gbc, 0, handleLbl, handleField);
-        addFormRow(detailsCard, gbc, 1, fullNameLbl, fullNameField);
-        addFormRow(detailsCard, gbc, 2, emailLbl, emailField);
-        addFormRow(detailsCard, gbc, 3, phoneLbl, phoneField);
+        addFormRow(detailsCard, gbc, 1, lastNameLbl, lastNameField);
+        addFormRow(detailsCard, gbc, 2, firstNameLbl, firstNameField);
+        addFormRow(detailsCard, gbc, 3, emailLbl, emailField);
+        addFormRow(detailsCard, gbc, 4, phoneLbl, phoneField);
         stack.add(detailsCard);
         stack.add(Box.createVerticalStrut(10));
 
@@ -461,7 +472,8 @@ public final class ProfileSettingsDialog extends JDialog
         removePhotoBtn.setText(i18n.t("profile.avatar.remove"));
 
         handleLbl.setText(i18n.t("profile.handle") + ":");
-        fullNameLbl.setText(i18n.t("profile.fullname") + ":");
+        lastNameLbl.setText(i18n.t("profile.last_name") + ":");
+        firstNameLbl.setText(i18n.t("profile.first_name") + ":");
         emailLbl.setText(i18n.t("profile.email") + ":");
         phoneLbl.setText(i18n.t("profile.phone") + ":");
 
@@ -514,7 +526,7 @@ public final class ProfileSettingsDialog extends JDialog
         for (JLabel title : List.of(appearanceTitleLbl, roleTitleLbl, pwTitleLbl, roleHintLbl)) {
             title.setForeground(ThemeManager.muted());
         }
-        for (JLabel lbl : List.of(handleLbl, fullNameLbl, emailLbl, phoneLbl, languageLbl, themeLbl,
+        for (JLabel lbl : List.of(handleLbl, lastNameLbl, firstNameLbl, emailLbl, phoneLbl, languageLbl, themeLbl,
                 roleSelectLbl, permsHeaderLbl, currentPwLbl, newPwLbl, confirmPwLbl)) {
             lbl.setForeground(ThemeManager.fg());
         }
@@ -566,9 +578,13 @@ public final class ProfileSettingsDialog extends JDialog
 
     private void refreshAvatarPreview() {
         User current = ctx.getSession().requireCurrentUser();
-        String namePreview = fullNameField.getText().trim();
+        String ln = lastNameField.getText().trim();
+        String fn = firstNameField.getText().trim();
+        String full = (ln + " " + fn).trim();
         User temp = new User(current.id(), current.username(), current.passwordHash(),
-                namePreview.isEmpty() ? current.fullName() : namePreview,
+                full.isEmpty() ? current.fullName() : full,
+                ln.isEmpty() ? current.safeLastName() : ln,
+                fn.isEmpty() ? current.safeFirstName() : fn,
                 emailField.getText(), phoneField.getText(), pendingAvatarPng,
                 current.roleId(), current.roleCode(), current.roleName(), current.active(), current.createdAt());
         avatarPreview.setUserAppearance(temp.initials(), pendingAvatarPng);
@@ -577,9 +593,10 @@ public final class ProfileSettingsDialog extends JDialog
 
     private void saveProfile() {
         I18nManager i18n = ctx.getI18n();
-        String fullName = fullNameField.getText().trim();
-        if (fullName.isEmpty()) {
-            JOptionPane.showMessageDialog(this, i18n.t("profile.error.fullname"),
+        String lastName = lastNameField.getText().trim();
+        String firstName = firstNameField.getText().trim();
+        if (lastName.isEmpty() || firstName.isEmpty()) {
+            JOptionPane.showMessageDialog(this, i18n.t("profile.error.name_required"),
                     i18n.t("common.error"), JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -622,7 +639,8 @@ public final class ProfileSettingsDialog extends JDialog
             ctx.getAuthService().updateOwnProfile(
                     user.id(),
                     handleField.getText().trim(),
-                    fullName,
+                    lastName,
+                    firstName,
                     emailField.getText().trim(),
                     phoneField.getText().trim(),
                     pendingAvatarPng,
@@ -637,6 +655,7 @@ public final class ProfileSettingsDialog extends JDialog
             dispose();
         } catch (IllegalArgumentException ex) {
             String msg = switch (ex.getMessage()) {
+                case "NAME_REQUIRED" -> i18n.t("profile.error.name_required");
                 case "INVALID_HANDLE" -> i18n.t("profile.error.handle_invalid");
                 case "HANDLE_TAKEN" -> i18n.t("profile.error.handle_taken");
                 default -> ex.getMessage();

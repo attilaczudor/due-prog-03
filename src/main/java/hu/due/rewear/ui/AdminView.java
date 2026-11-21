@@ -203,7 +203,8 @@ public final class AdminView extends JPanel implements NavigableView {
                 .filter(r -> r.code() != hu.due.rewear.model.RoleCode.SUPER_ADMIN)
                 .toList();
         JTextField userF = new JTextField(18);
-        JTextField nameF = new JTextField(18);
+        JTextField lastNameF = new JTextField(18);
+        JTextField firstNameF = new JTextField(18);
         JPasswordField pwF = new JPasswordField(18);
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
 
@@ -213,7 +214,8 @@ public final class AdminView extends JPanel implements NavigableView {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
         addField(form, gbc, r++, i18n.t("login.username") + " *", userF);
-        addField(form, gbc, r++, i18n.t("admin.user.full_name") + " *", nameF);
+        addField(form, gbc, r++, i18n.t("profile.last_name") + " *", lastNameF);
+        addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
         addField(form, gbc, r++, i18n.t("login.password") + " *", pwF);
         addField(form, gbc, r, i18n.t("admin.user.role") + " *", roleCombo);
 
@@ -223,8 +225,9 @@ public final class AdminView extends JPanel implements NavigableView {
         }
         Role role = (Role) roleCombo.getSelectedItem();
         if (role == null) return;
+        String combinedName = (lastNameF.getText().trim() + " " + firstNameF.getText().trim()).trim();
         try {
-            ctx.getAuthService().createUser(userF.getText(), new String(pwF.getPassword()), nameF.getText(), role.id(), true);
+            ctx.getAuthService().createUser(userF.getText(), new String(pwF.getPassword()), combinedName, role.id(), true);
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -240,7 +243,8 @@ public final class AdminView extends JPanel implements NavigableView {
                 .filter(role -> targetIsSuperAdmin || role.code() != hu.due.rewear.model.RoleCode.SUPER_ADMIN)
                 .toList();
 
-        JTextField nameF = new JTextField(u.fullName(), 18);
+        JTextField lastNameF = new JTextField(u.safeLastName(), 18);
+        JTextField firstNameF = new JTextField(u.safeFirstName(), 18);
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
         for (Role role : roles) {
             if (role.id() == u.roleId()) {
@@ -259,7 +263,8 @@ public final class AdminView extends JPanel implements NavigableView {
         gbc.insets = new Insets(4, 4, 4, 4);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
-        addField(form, gbc, r++, i18n.t("admin.user.full_name") + " *", nameF);
+        addField(form, gbc, r++, i18n.t("profile.last_name") + " *", lastNameF);
+        addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
         addField(form, gbc, r++, i18n.t("admin.user.role") + " *", roleCombo);
         gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
 
@@ -276,7 +281,7 @@ public final class AdminView extends JPanel implements NavigableView {
         Role role = (Role) roleCombo.getSelectedItem();
         if (role == null) return;
         try {
-            ctx.getUserDao().updateProfile(u.id(), nameF.getText(), role.id(), activeBox.isSelected());
+            ctx.getUserDao().updateProfile(u.id(), lastNameF.getText(), firstNameF.getText(), role.id(), activeBox.isSelected());
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);

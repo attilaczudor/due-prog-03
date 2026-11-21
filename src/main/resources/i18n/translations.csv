@@ -231,6 +231,8 @@ profile.settings.tooltip,Profile & Account Settings,Profil és fiókbeállítás
 profile.avatar.upload,Upload Photo,Kép feltöltése
 profile.avatar.remove,Remove Photo,Kép törlése
 profile.handle,Handle (@username),Handle (@felhasználónév)
+profile.last_name,Last Name,Vezetéknév
+profile.first_name,First Name,Keresztnév
 profile.fullname,Full Name,Teljes név
 profile.email,Email Address,E-mail cím
 profile.phone,Phone / Contact,Telefon / Elérhetőség
@@ -240,6 +242,7 @@ profile.password.new,New Password,Új jelszó
 profile.password.confirm,Confirm New Password,Új jelszó megerősítése
 profile.saved,Profile settings saved successfully.,A profilbeállítások sikeresen elmentve.
 profile.error.fullname,Full name cannot be empty.,A teljes név nem lehet üres.
+profile.error.name_required,Both last name and first name are required.,A vezetéknév és a keresztnév megadása is kötelező.
 profile.error.handle_invalid,"Handle must be 3–32 characters (letters, digits, '.', '_', '-').","A handle 3–32 karakter legyen (betűk, számok, '.', '_', '-')."
 profile.error.handle_taken,This handle is already in use by another account.,Ez a handle már foglalt egy másik fiók által.
 profile.error.password_mismatch,New passwords do not match.,Az új jelszavak nem egyeznek.

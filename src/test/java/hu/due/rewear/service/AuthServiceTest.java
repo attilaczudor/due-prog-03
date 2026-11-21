@@ -111,7 +111,9 @@ class AuthServiceTest {
         // Attempt to change Super Admin role to Operator must be ignored (always stays SUPER_ADMIN)
         var updated = authService.updateOwnProfile(
                 superLogin.user().id(),
-                "Czudor Attila",
+                "superadmin",
+                "Czudor",
+                "Attila",
                 "attila@rewear.hu",
                 "+36 30 555 0199",
                 fakePng,
@@ -119,6 +121,8 @@ class AuthServiceTest {
         );
 
         assertEquals(RoleCode.SUPER_ADMIN, updated.roleCode());
+        assertEquals("Czudor", updated.safeLastName());
+        assertEquals("Attila", updated.safeFirstName());
         assertEquals("Czudor Attila", updated.fullName());
         assertEquals("attila@rewear.hu", updated.email());
         assertEquals("+36 30 555 0199", updated.phone());
@@ -130,6 +134,8 @@ class AuthServiceTest {
         AuthService.AuthResult adminLogin = authService.login("admin", "admin123".toCharArray());
         assertTrue(adminLogin.isSuccess());
         assertEquals(RoleCode.ADMIN, adminLogin.user().roleCode());
+        assertEquals("Szabó", adminLogin.user().safeLastName());
+        assertEquals("Gábor", adminLogin.user().safeFirstName());
         assertEquals("Szabó Gábor", adminLogin.user().displayName());
         assertFalse(session.isSuperAdmin());
         assertTrue(session.isAdmin());
@@ -137,7 +143,8 @@ class AuthServiceTest {
         var renamedAdmin = authService.updateOwnProfile(
                 adminLogin.user().id(),
                 "@gabor.szabo",
-                "Szabó Gábor",
+                "Szabó",
+                "Gábor",
                 "gabor@rewear.hu",
                 null,
                 null,

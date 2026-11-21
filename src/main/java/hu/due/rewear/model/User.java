@@ -10,6 +10,8 @@ public record User(
         String username,
         String passwordHash,
         String fullName,
+        String lastName,
+        String firstName,
         String email,
         String phone,
         byte[] avatarPng,
@@ -20,20 +22,21 @@ public record User(
         LocalDateTime createdAt
 ) {
     /**
-     * Computes a crisp 1-2 character uppercase monogram from the user's full name
-     * (ignoring parenthetical suffixes such as "(Admin)"), falling back to username.
+     * Computes a crisp 1-2 character uppercase monogram from lastName + firstName,
+     * falling back to fullName or username.
      */
     public String initials() {
-        String source = (fullName != null && !fullName.isBlank()) ? fullName : username;
+        String ln = safeLastName();
+        String fn = safeFirstName();
+        if (!ln.isEmpty() && !fn.isEmpty()) {
+            return (ln.substring(0, 1) + fn.substring(0, 1)).toUpperCase(Locale.ROOT);
+        }
+        String source = !displayName().isBlank() ? displayName() : username;
         if (source == null || source.isBlank()) {
             return "?";
         }
-        String cleaned = source.replaceAll("\\([^)]*\\)", " ").trim();
-        if (cleaned.isEmpty()) {
-            cleaned = source.trim();
-        }
         List<String> words = new ArrayList<>();
-        for (String part : cleaned.split("\\s+")) {
+        for (String part : source.trim().split("\\s+")) {
             if (!part.isBlank()) {
                 words.add(part);
             }
@@ -45,17 +48,48 @@ public record User(
             String w = words.get(0);
             return w.substring(0, Math.min(2, w.length())).toUpperCase(Locale.ROOT);
         }
-        String first = words.get(0).substring(0, 1);
-        String last = words.get(words.size() - 1).substring(0, 1);
-        return (first + last).toUpperCase(Locale.ROOT);
+        return (words.get(0).substring(0, 1) + words.get(words.size() - 1).substring(0, 1)).toUpperCase(Locale.ROOT);
     }
 
-    /** Display name without redundant trailing role tag like "(Admin)". */
-    public String displayName() {
-        if (fullName == null || fullName.isBlank()) {
-            return username != null ? username : "";
+    public String safeLastName() {
+        if (lastName != null && !lastName.isBlank()) {
+            return lastName.trim();
         }
-        String stripped = fullName.replaceAll("\\s*\\([^)]*\\)\\s*$", "").trim();
-        return stripped.isEmpty() ? fullName.trim() : stripped;
+        String clean = stripRoleSuffix(fullName);
+        if (clean.isEmpty()) {
+            return "";
+        }
+        String[] parts = clean.split("\\s+", 2);
+        return parts[0];
+    }
+
+    public String safeFirstName() {
+        if (firstName != null && !firstName.isBlank()) {
+            return firstName.trim();
+        }
+        String clean = stripRoleSuffix(fullName);
+        if (clean.isEmpty()) {
+            return "";
+        }
+        String[] parts = clean.split("\\s+", 2);
+        return parts.length > 1 ? parts[1] : "";
+    }
+
+    /** Clean display name without any parenthetical role tag. */
+    public String displayName() {
+        String ln = safeLastName();
+        String fn = safeFirstName();
+        if (!ln.isEmpty() || !fn.isEmpty()) {
+            return (ln + " " + fn).trim();
+        }
+        String clean = stripRoleSuffix(fullName);
+        return !clean.isEmpty() ? clean : (username != null ? username : "");
+    }
+
+    private static String stripRoleSuffix(String text) {
+        if (text == null) {
+            return "";
+        }
+        return text.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
     }
 }

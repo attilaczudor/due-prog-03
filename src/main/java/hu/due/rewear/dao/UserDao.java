@@ -17,7 +17,8 @@ import java.util.Optional;
 public final class UserDao {
 
     private static final String BASE_SELECT = """
-            SELECT u.id, u.username, u.password_hash, u.full_name, u.email, u.phone, u.avatar_png,
+            SELECT u.id, u.username, u.password_hash, u.full_name, u.last_name, u.first_name,
+                   u.email, u.phone, u.avatar_png,
                    u.role_id, r.code AS role_code, r.name AS role_name, u.active, u.created_at
             FROM users u
             JOIN roles r ON r.id = u.role_id
@@ -87,17 +88,23 @@ public final class UserDao {
 
     public long insert(Connection conn, String username, String passwordHash, String fullName,
                        long roleId, boolean active, LocalDateTime createdAt) throws SQLException {
+        String clean = fullName.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
+        String[] parts = clean.split("\\s+", 2);
+        String ln = parts.length > 0 ? parts[0] : "";
+        String fn = parts.length > 1 ? parts[1] : "";
         String sql = """
-                INSERT INTO users (username, password_hash, full_name, role_id, active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?)
+                INSERT INTO users (username, password_hash, full_name, last_name, first_name, role_id, active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, username.trim());
             ps.setString(2, passwordHash);
-            ps.setString(3, fullName.trim());
-            ps.setLong(4, roleId);
-            ps.setInt(5, active ? 1 : 0);
-            ps.setString(6, DaoDateUtil.format(createdAt));
+            ps.setString(3, clean);
+            ps.setString(4, ln);
+            ps.setString(5, fn);
+            ps.setLong(6, roleId);
+            ps.setInt(7, active ? 1 : 0);
+            ps.setString(8, DaoDateUtil.format(createdAt));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -109,13 +116,26 @@ public final class UserDao {
     }
 
     public void updateProfile(long userId, String fullName, long roleId, boolean active) {
-        String sql = "UPDATE users SET full_name = ?, role_id = ?, active = ? WHERE id = ?";
+        String clean = fullName.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
+        String[] parts = clean.split("\\s+", 2);
+        String ln = parts.length > 0 ? parts[0] : "";
+        String fn = parts.length > 1 ? parts[1] : "";
+        updateProfile(userId, ln, fn, roleId, active);
+    }
+
+    public void updateProfile(long userId, String lastName, String firstName, long roleId, boolean active) {
+        String ln = lastName == null ? "" : lastName.trim();
+        String fn = firstName == null ? "" : firstName.trim();
+        String full = (ln + " " + fn).trim();
+        String sql = "UPDATE users SET full_name = ?, last_name = ?, first_name = ?, role_id = ?, active = ? WHERE id = ?";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, fullName.trim());
-            ps.setLong(2, roleId);
-            ps.setInt(3, active ? 1 : 0);
-            ps.setLong(4, userId);
+            ps.setString(1, full);
+            ps.setString(2, ln);
+            ps.setString(3, fn);
+            ps.setLong(4, roleId);
+            ps.setInt(5, active ? 1 : 0);
+            ps.setLong(6, userId);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException("Failed to update user profile: " + userId, e);
@@ -123,17 +143,18 @@ public final class UserDao {
     }
 
     public void updateAccountSettings(long userId, String fullName, String email, String phone, byte[] avatarPng) {
-        updateAccountSettings(userId, null, fullName, email, phone, avatarPng, null);
+        String clean = fullName.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
+        String[] parts = clean.split("\\s+", 2);
+        updateAccountSettings(userId, null, parts[0], parts.length > 1 ? parts[1] : "", email, phone, avatarPng, null);
     }
 
-    public void updateAccountSettings(long userId, String fullName, String email, String phone,
-                                      byte[] avatarPng, Long roleId) {
-        updateAccountSettings(userId, null, fullName, email, phone, avatarPng, roleId);
-    }
-
-    public void updateAccountSettings(long userId, String username, String fullName, String email, String phone,
-                                      byte[] avatarPng, Long roleId) {
-        StringBuilder sql = new StringBuilder("UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ?");
+    public void updateAccountSettings(long userId, String username, String lastName, String firstName,
+                                      String email, String phone, byte[] avatarPng, Long roleId) {
+        String ln = lastName == null ? "" : lastName.trim();
+        String fn = firstName == null ? "" : firstName.trim();
+        String full = (ln + " " + fn).trim();
+        StringBuilder sql = new StringBuilder(
+                "UPDATE users SET full_name = ?, last_name = ?, first_name = ?, email = ?, phone = ?, avatar_png = ?");
         if (username != null && !username.isBlank()) {
             sql.append(", username = ?");
         }
@@ -145,7 +166,9 @@ public final class UserDao {
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql.toString())) {
             int idx = 1;
-            ps.setString(idx++, fullName.trim());
+            ps.setString(idx++, full);
+            ps.setString(idx++, ln);
+            ps.setString(idx++, fn);
             ps.setString(idx++, email == null || email.isBlank() ? null : email.trim());
             ps.setString(idx++, phone == null || phone.isBlank() ? null : phone.trim());
             if (avatarPng != null && avatarPng.length > 0) {
@@ -184,6 +207,8 @@ public final class UserDao {
                 rs.getString("username"),
                 rs.getString("password_hash"),
                 rs.getString("full_name"),
+                rs.getString("last_name"),
+                rs.getString("first_name"),
                 rs.getString("email"),
                 rs.getString("phone"),
                 rs.getBytes("avatar_png"),

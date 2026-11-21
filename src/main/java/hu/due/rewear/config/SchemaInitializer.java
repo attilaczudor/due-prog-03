@@ -90,19 +90,21 @@ public final class SchemaInitializer {
             String hash = BCrypt.hashpw("superadmin123", BCrypt.gensalt(10));
             String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now());
             try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO users (username, password_hash, full_name, role_id, active, created_at) VALUES (?, ?, ?, ?, 1, ?)")) {
+                    "INSERT INTO users (username, password_hash, full_name, last_name, first_name, role_id, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)")) {
                 ps.setString(1, "superadmin");
                 ps.setString(2, hash);
                 ps.setString(3, "Czudor Attila");
-                ps.setLong(4, superAdminRoleId);
-                ps.setString(5, created);
+                ps.setString(4, "Czudor");
+                ps.setString(5, "Attila");
+                ps.setLong(6, superAdminRoleId);
+                ps.setString(7, created);
                 ps.executeUpdate();
             }
         }
 
         // 3. Reassign legacy 'admin' display name away from Attila Czudor so Czudor Attila is exclusively Super Admin
         try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE users SET full_name = 'Szabó Gábor' WHERE lower(username) = 'admin' AND (full_name LIKE '%Attila Czudor%' OR full_name LIKE '%Czudor Attila%')")) {
+                "UPDATE users SET full_name = 'Szabó Gábor', last_name = 'Szabó', first_name = 'Gábor' WHERE lower(username) = 'admin' AND (full_name LIKE '%Attila Czudor%' OR full_name LIKE '%Czudor Attila%')")) {
             ps.executeUpdate();
         }
     }
@@ -116,6 +118,12 @@ public final class SchemaInitializer {
             }
         }
         try (Statement stmt = conn.createStatement()) {
+            if (!existing.contains("last_name")) {
+                stmt.execute("ALTER TABLE users ADD COLUMN last_name TEXT");
+            }
+            if (!existing.contains("first_name")) {
+                stmt.execute("ALTER TABLE users ADD COLUMN first_name TEXT");
+            }
             if (!existing.contains("email")) {
                 stmt.execute("ALTER TABLE users ADD COLUMN email TEXT");
             }
@@ -124,6 +132,39 @@ public final class SchemaInitializer {
             }
             if (!existing.contains("avatar_png")) {
                 stmt.execute("ALTER TABLE users ADD COLUMN avatar_png BLOB");
+            }
+        }
+        backfillSplitUserNames(conn);
+    }
+
+    private void backfillSplitUserNames(Connection conn) throws SQLException {
+        try (PreparedStatement sel = conn.prepareStatement("SELECT id, full_name, last_name, first_name FROM users");
+             ResultSet rs = sel.executeQuery();
+             PreparedStatement upd = conn.prepareStatement("UPDATE users SET full_name = ?, last_name = ?, first_name = ? WHERE id = ?")) {
+            while (rs.next()) {
+                long id = rs.getLong("id");
+                String rawFull = rs.getString("full_name");
+                String last = rs.getString("last_name");
+                String first = rs.getString("first_name");
+
+                String cleanFull = rawFull == null ? "" : rawFull.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
+                boolean needsRoleStrip = rawFull != null && !rawFull.equals(cleanFull);
+                if ((last == null || last.isBlank()) && (first == null || first.isBlank())) {
+                    String[] parts = cleanFull.split("\\s+", 2);
+                    last = parts.length > 0 ? parts[0] : "";
+                    first = parts.length > 1 ? parts[1] : "";
+                    upd.setString(1, cleanFull);
+                    upd.setString(2, last);
+                    upd.setString(3, first);
+                    upd.setLong(4, id);
+                    upd.executeUpdate();
+                } else if (needsRoleStrip) {
+                    upd.setString(1, cleanFull);
+                    upd.setString(2, last);
+                    upd.setString(3, first);
+                    upd.setLong(4, id);
+                    upd.executeUpdate();
+                }
             }
         }
     }

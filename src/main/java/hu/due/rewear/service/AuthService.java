@@ -102,19 +102,12 @@ public final class AuthService {
         LOG.info("Administrator reset password for userId={}", userId);
     }
 
-    public User updateOwnProfile(long userId, String fullName, String email, String phone, byte[] avatarPng) {
-        return updateOwnProfile(userId, null, fullName, email, phone, avatarPng, null);
-    }
-
-    public User updateOwnProfile(long userId, String fullName, String email, String phone,
-                                 byte[] avatarPng, Long newRoleId) {
-        return updateOwnProfile(userId, null, fullName, email, phone, avatarPng, newRoleId);
-    }
-
-    public User updateOwnProfile(long userId, String newHandle, String fullName, String email, String phone,
-                                 byte[] avatarPng, Long newRoleId) {
-        if (fullName == null || fullName.isBlank()) {
-            throw new IllegalArgumentException("Full name is required.");
+    public User updateOwnProfile(long userId, String newHandle, String lastName, String firstName,
+                                 String email, String phone, byte[] avatarPng, Long newRoleId) {
+        String ln = lastName == null ? "" : lastName.trim();
+        String fn = firstName == null ? "" : firstName.trim();
+        if (ln.isEmpty() || fn.isEmpty()) {
+            throw new IllegalArgumentException("NAME_REQUIRED");
         }
         User existing = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
@@ -139,7 +132,7 @@ public final class AuthService {
         Long effectiveRoleId = (existing.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN)
                 ? null
                 : (newRoleId != null && session.isAdmin() ? newRoleId : null);
-        userDao.updateAccountSettings(userId, normalizedHandle, fullName.trim(), email, phone, avatarPng, effectiveRoleId);
+        userDao.updateAccountSettings(userId, normalizedHandle, ln, fn, email, phone, avatarPng, effectiveRoleId);
         User updated = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("Updated user not found: " + userId));
         session.updateCurrentUser(updated);

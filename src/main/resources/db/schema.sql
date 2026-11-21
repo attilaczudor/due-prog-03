@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS users (
     username TEXT NOT NULL UNIQUE,
     password_hash TEXT NOT NULL,
     full_name TEXT NOT NULL,
+    last_name TEXT,
+    first_name TEXT,
     email TEXT,
     phone TEXT,
     avatar_png BLOB,
