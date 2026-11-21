@@ -264,13 +264,16 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 btn.setText("");
                 btn.setHorizontalAlignment(SwingConstants.CENTER);
                 btn.setIconTextGap(0);
-                btn.setPreferredSize(new Dimension(46, 36));
-                btn.setMaximumSize(new Dimension(46, 36));
+                Dimension sq = new Dimension(42, 42);
+                btn.setPreferredSize(sq);
+                btn.setMinimumSize(sq);
+                btn.setMaximumSize(sq);
             } else {
                 btn.setText(fullLabel.toUpperCase(Locale.ROOT));
                 btn.setHorizontalAlignment(SwingConstants.LEFT);
                 btn.setIconTextGap(10);
                 btn.setPreferredSize(new Dimension(248, 36));
+                btn.setMinimumSize(new Dimension(120, 36));
                 btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
             }
         }
@@ -278,6 +281,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         // Rebuild bottom profile footer for Expanded vs. Collapsed layout
         profileHost.removeAll();
         if (sidebarCollapsed) {
+            Dimension collapsedSq = new Dimension(42, 42);
+            for (JButton b : new JButton[]{settingsButton, collapseButton}) {
+                b.setPreferredSize(collapsedSq);
+                b.setMinimumSize(collapsedSq);
+                b.setMaximumSize(collapsedSq);
+            }
             collapseButton.setIcon(SidebarIcons.arrowRight(16));
             collapseButton.setToolTipText(i18n.t("sidebar.expand"));
 
@@ -296,6 +305,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             col.add(collapseButton);
             profileHost.add(col, BorderLayout.CENTER);
         } else {
+            Dimension expandedSq = new Dimension(34, 34);
+            for (JButton b : new JButton[]{settingsButton, collapseButton}) {
+                b.setPreferredSize(expandedSq);
+                b.setMinimumSize(expandedSq);
+                b.setMaximumSize(expandedSq);
+            }
             collapseButton.setIcon(SidebarIcons.arrowLeft(16));
             collapseButton.setToolTipText(i18n.t("sidebar.collapse"));
 
