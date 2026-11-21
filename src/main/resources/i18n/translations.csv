@@ -143,6 +143,9 @@ scanner.action.add_to_order,Add to Open Order,Hozzáadás nyitott rendeléshez
 inventory.title,Warehouse Inventory,Raktári Készlet
 inventory.batch_print,Batch Print Preview (A4 4-up),Csoportos nyomtatási előnézet (A4 4-es)
 inventory.view_details,Details & History,Részletek és előzmények
+inventory.discard,Discard Package,Selejtezés
+inventory.discard.confirm,"Mark package {0} as DISCARDED?","Biztosan selejtezi a(z) {0} csomagot?"
+inventory.select_one,Please select a package from the table first.,Kérjük előbb válasszon ki egy csomagot a táblázatból.
 inventory.summary,"Showing {0} package(s) — Total: {1} kg","Megjelenítve: {0} csomag — Összesen: {1} kg"
 locations.title,Warehouse Locations,Raktárhelyek
 locations.zone,Zone,Zóna
@@ -150,6 +153,10 @@ locations.aisle,Aisle,Sor
 locations.shelf,Shelf,Polc
 locations.capacity,Capacity (kg),Kapacitás (kg)
 locations.used,Used (kg),Foglalt (kg)
+locations.occupancy,Occupancy,Telítettség
+locations.packages_here,Packages Stored at Selected Location,A kiválasztott raktárhelyen tárolt csomagok
+locations.add_title,Add Warehouse Location,Új raktárhely hozzáadása
+locations.edit_title,Edit Warehouse Location,Raktárhely szerkesztése
 dictionaries.title,Product & Package Code Dictionaries,Termék- és Csomagkód Törzsadatok
 dictionaries.tab.targets,Target Groups,Célcsoportok
 dictionaries.tab.garments,Product / Garment Types,Termék / Ruhatípusok
@@ -159,6 +166,8 @@ dictionaries.default_price,Default Price / kg,Alapár / kg
 dictionaries.tare_weight,Tare Weight (kg),Tára súly (kg)
 dictionaries.max_weight,Max Weight (kg),Max súly (kg)
 dictionaries.code_hint,Uppercase letters/digits only (1-8 chars, no hyphens),Csak nagybetű és szám (1-8 karakter, kötőjel nélkül)
+dictionaries.in_use,"Cannot delete ''{0}'' because existing packages reference it. Deactivate it instead.","A(z) ''{0}'' elem nem törölhető, mert meglévő csomagok hivatkoznak rá. Használja az Inaktiválás funkciót."
+dictionaries.delete_confirm,"Delete code ''{0}'' permanently?","Véglegesen törli a(z) ''{0}'' kódot?"
 customers.title,B2B Customers,B2B Ügyfelek
 customers.company,Company Name,Cégnév
 customers.contact,Contact Person,Kapcsolattartó

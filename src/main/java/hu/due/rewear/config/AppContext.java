@@ -11,6 +11,7 @@ import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.service.AuthService;
+import hu.due.rewear.service.CsvExportService;
 import hu.due.rewear.service.InventoryService;
 import hu.due.rewear.service.LabelPdfExporter;
 import hu.due.rewear.service.OrderService;
@@ -56,6 +57,7 @@ public final class AppContext {
     private final ScannerService scannerService;
     private final TicketLabelPainter ticketLabelPainter;
     private final LabelPdfExporter labelPdfExporter;
+    private final CsvExportService csvExportService;
 
     public AppContext() {
         this(new DatabaseManager(), new AppPreferences(), I18nManager.getInstance());
@@ -88,6 +90,7 @@ public final class AppContext {
         this.scannerService = new ScannerService(productCodeService, qrCodeService, packageDao, movementDao);
         this.ticketLabelPainter = new TicketLabelPainter(qrCodeService, i18n);
         this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
+        this.csvExportService = new CsvExportService(i18n);
 
         initLocalizationFromPreferences();
     }
@@ -192,5 +195,9 @@ public final class AppContext {
 
     public LabelPdfExporter getLabelPdfExporter() {
         return labelPdfExporter;
+    }
+
+    public CsvExportService getCsvExportService() {
+        return csvExportService;
     }
 }

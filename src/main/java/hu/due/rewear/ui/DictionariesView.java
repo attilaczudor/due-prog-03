@@ -1,0 +1,498 @@
+package hu.due.rewear.ui;
+
+import hu.due.rewear.config.AppContext;
+import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.GarmentType;
+import hu.due.rewear.model.PackageType;
+import hu.due.rewear.model.QualityGrade;
+import hu.due.rewear.model.TargetGroup;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JCheckBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.table.DefaultTableModel;
+import java.awt.BorderLayout;
+import java.awt.FlowLayout;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
+import java.math.BigDecimal;
+import java.util.List;
+
+/**
+ * Tabbed administration screen for all four QR code segment dictionaries:
+ * Target Groups, Product/Garment Types, Quality Grades, and Package Types.
+ * Enforces QR code naming conventions and prevents deleting codes referenced by existing packages.
+ */
+public final class DictionariesView extends JPanel implements NavigableView {
+
+    private final AppContext ctx;
+
+    private final JTabbedPane tabs = new JTabbedPane();
+
+    private final JButton addBtn = new JButton();
+    private final JButton editBtn = new JButton();
+    private final JButton toggleActiveBtn = new JButton();
+    private final JButton deleteBtn = new JButton();
+    private final JButton refreshBtn = new JButton();
+
+    private final DefaultTableModel targetModel = nonEditableModel();
+    private final DefaultTableModel garmentModel = nonEditableModel();
+    private final DefaultTableModel qualityModel = nonEditableModel();
+    private final DefaultTableModel packageModel = nonEditableModel();
+
+    private final JTable targetTable = createTable(targetModel);
+    private final JTable garmentTable = createTable(garmentModel);
+    private final JTable qualityTable = createTable(qualityModel);
+    private final JTable packageTable = createTable(packageModel);
+
+    private List<TargetGroup> targets = List.of();
+    private List<GarmentType> garments = List.of();
+    private List<QualityGrade> qualities = List.of();
+    private List<PackageType> packages = List.of();
+
+    public DictionariesView(AppContext ctx) {
+        this.ctx = ctx;
+
+        setLayout(new BorderLayout(0, 10));
+        setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
+
+        buildUi();
+        wireEvents();
+        applyTranslations();
+        refreshData();
+    }
+
+    private static DefaultTableModel nonEditableModel() {
+        return new DefaultTableModel() {
+            @Override public boolean isCellEditable(int r, int c) { return false; }
+        };
+    }
+
+    private static JTable createTable(DefaultTableModel model) {
+        JTable t = new JTable(model);
+        t.setRowHeight(26);
+        t.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        t.setFillsViewportHeight(true);
+        return t;
+    }
+
+    private void buildUi() {
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        toolbar.add(addBtn);
+        toolbar.add(editBtn);
+        toolbar.add(toggleActiveBtn);
+        toolbar.add(deleteBtn);
+        toolbar.add(refreshBtn);
+        add(toolbar, BorderLayout.NORTH);
+
+        tabs.addTab("", new JScrollPane(targetTable));
+        tabs.addTab("", new JScrollPane(garmentTable));
+        tabs.addTab("", new JScrollPane(qualityTable));
+        tabs.addTab("", new JScrollPane(packageTable));
+        add(tabs, BorderLayout.CENTER);
+    }
+
+    private void wireEvents() {
+        addBtn.addActionListener(e -> handleAdd());
+        editBtn.addActionListener(e -> handleEdit());
+        toggleActiveBtn.addActionListener(e -> handleToggleActive());
+        deleteBtn.addActionListener(e -> handleDelete());
+        refreshBtn.addActionListener(e -> refreshData());
+    }
+
+    private void handleAdd() {
+        switch (tabs.getSelectedIndex()) {
+            case 0 -> openTargetDialog(null);
+            case 1 -> openGarmentDialog(null);
+            case 2 -> openQualityDialog(null);
+            case 3 -> openPackageTypeDialog(null);
+            default -> {}
+        }
+    }
+
+    private void handleEdit() {
+        switch (tabs.getSelectedIndex()) {
+            case 0 -> {
+                int r = targetTable.getSelectedRow();
+                if (r >= 0 && r < targets.size()) openTargetDialog(targets.get(r));
+            }
+            case 1 -> {
+                int r = garmentTable.getSelectedRow();
+                if (r >= 0 && r < garments.size()) openGarmentDialog(garments.get(r));
+            }
+            case 2 -> {
+                int r = qualityTable.getSelectedRow();
+                if (r >= 0 && r < qualities.size()) openQualityDialog(qualities.get(r));
+            }
+            case 3 -> {
+                int r = packageTable.getSelectedRow();
+                if (r >= 0 && r < packages.size()) openPackageTypeDialog(packages.get(r));
+            }
+            default -> {}
+        }
+    }
+
+    private void handleToggleActive() {
+        switch (tabs.getSelectedIndex()) {
+            case 0 -> {
+                int r = targetTable.getSelectedRow();
+                if (r >= 0 && r < targets.size()) {
+                    TargetGroup g = targets.get(r);
+                    ctx.getDictionaryDao().updateTargetGroup(g.id(), g.code(), g.nameEn(), g.nameHu(), !g.active());
+                    refreshData();
+                }
+            }
+            case 1 -> {
+                int r = garmentTable.getSelectedRow();
+                if (r >= 0 && r < garments.size()) {
+                    GarmentType g = garments.get(r);
+                    ctx.getDictionaryDao().updateGarmentType(g.id(), g.code(), g.nameEn(), g.nameHu(), !g.active());
+                    refreshData();
+                }
+            }
+            case 2 -> {
+                int r = qualityTable.getSelectedRow();
+                if (r >= 0 && r < qualities.size()) {
+                    QualityGrade q = qualities.get(r);
+                    ctx.getDictionaryDao().updateQualityGrade(q.id(), q.code(), q.nameEn(), q.nameHu(), q.defaultPricePerKg(), !q.active());
+                    refreshData();
+                }
+            }
+            case 3 -> {
+                int r = packageTable.getSelectedRow();
+                if (r >= 0 && r < packages.size()) {
+                    PackageType p = packages.get(r);
+                    ctx.getDictionaryDao().updatePackageType(p.id(), p.code(), p.nameEn(), p.nameHu(), p.tareWeightKg(), p.maxWeightKg(), !p.active());
+                    refreshData();
+                }
+            }
+            default -> {}
+        }
+    }
+
+    private void handleDelete() {
+        I18nManager i18n = ctx.getI18n();
+        switch (tabs.getSelectedIndex()) {
+            case 0 -> {
+                int r = targetTable.getSelectedRow();
+                if (r < 0 || r >= targets.size()) return;
+                TargetGroup g = targets.get(r);
+                if (ctx.getDictionaryDao().isTargetGroupReferenced(g.id())) {
+                    JOptionPane.showMessageDialog(this, i18n.t("dictionaries.in_use", g.code()),
+                            i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                if (confirmDelete(g.code())) {
+                    ctx.getDictionaryDao().deleteTargetGroup(g.id());
+                    refreshData();
+                }
+            }
+            case 1 -> {
+                int r = garmentTable.getSelectedRow();
+                if (r < 0 || r >= garments.size()) return;
+                GarmentType g = garments.get(r);
+                if (ctx.getDictionaryDao().isGarmentTypeReferenced(g.id())) {
+                    JOptionPane.showMessageDialog(this, i18n.t("dictionaries.in_use", g.code()),
+                            i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                if (confirmDelete(g.code())) {
+                    ctx.getDictionaryDao().deleteGarmentType(g.id());
+                    refreshData();
+                }
+            }
+            case 2 -> {
+                int r = qualityTable.getSelectedRow();
+                if (r < 0 || r >= qualities.size()) return;
+                QualityGrade q = qualities.get(r);
+                if (ctx.getDictionaryDao().isQualityGradeReferenced(q.id())) {
+                    JOptionPane.showMessageDialog(this, i18n.t("dictionaries.in_use", q.code()),
+                            i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                if (confirmDelete(q.code())) {
+                    ctx.getDictionaryDao().deleteQualityGrade(q.id());
+                    refreshData();
+                }
+            }
+            case 3 -> {
+                int r = packageTable.getSelectedRow();
+                if (r < 0 || r >= packages.size()) return;
+                PackageType p = packages.get(r);
+                if (ctx.getDictionaryDao().isPackageTypeReferenced(p.id())) {
+                    JOptionPane.showMessageDialog(this, i18n.t("dictionaries.in_use", p.code()),
+                            i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+                    return;
+                }
+                if (confirmDelete(p.code())) {
+                    ctx.getDictionaryDao().deletePackageType(p.id());
+                    refreshData();
+                }
+            }
+            default -> {}
+        }
+    }
+
+    private boolean confirmDelete(String code) {
+        I18nManager i18n = ctx.getI18n();
+        return JOptionPane.showConfirmDialog(this, i18n.t("dictionaries.delete_confirm", code),
+                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION;
+    }
+
+    private void openTargetDialog(TargetGroup existing) {
+        I18nManager i18n = ctx.getI18n();
+        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
+        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 20);
+        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 20);
+        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JPanel form = buildBaseForm(codeF, enF, huF, existing != null ? activeBox : null);
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("dictionaries.tab.targets"),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            String code = validateCode(codeF.getText());
+            if (existing == null) {
+                ctx.getDictionaryDao().insertTargetGroup(code, requireText(enF), requireText(huF));
+            } else {
+                ctx.getDictionaryDao().updateTargetGroup(existing.id(), code, requireText(enF), requireText(huF), activeBox.isSelected());
+            }
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void openGarmentDialog(GarmentType existing) {
+        I18nManager i18n = ctx.getI18n();
+        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
+        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 20);
+        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 20);
+        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JPanel form = buildBaseForm(codeF, enF, huF, existing != null ? activeBox : null);
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("dictionaries.tab.garments"),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            String code = validateCode(codeF.getText());
+            if (existing == null) {
+                ctx.getDictionaryDao().insertGarmentType(code, requireText(enF), requireText(huF));
+            } else {
+                ctx.getDictionaryDao().updateGarmentType(existing.id(), code, requireText(enF), requireText(huF), activeBox.isSelected());
+            }
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void openQualityDialog(QualityGrade existing) {
+        I18nManager i18n = ctx.getI18n();
+        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
+        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 20);
+        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 20);
+        JTextField priceF = new JTextField(existing != null ? existing.defaultPricePerKg().toPlainString() : "5.00", 12);
+        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JPanel form = buildBaseForm(codeF, enF, huF, null);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0; gbc.gridy = 4; form.add(new JLabel(i18n.t("dictionaries.default_price")), gbc);
+        gbc.gridx = 1; form.add(priceF, gbc);
+        if (existing != null) {
+            gbc.gridx = 1; gbc.gridy = 5; form.add(activeBox, gbc);
+        }
+
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("dictionaries.tab.qualities"),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            String code = validateCode(codeF.getText());
+            BigDecimal price = new BigDecimal(priceF.getText().trim().replace(',', '.'));
+            if (price.compareTo(BigDecimal.ZERO) < 0) throw new IllegalArgumentException("Price must be >= 0");
+            if (existing == null) {
+                ctx.getDictionaryDao().insertQualityGrade(code, requireText(enF), requireText(huF), price);
+            } else {
+                ctx.getDictionaryDao().updateQualityGrade(existing.id(), code, requireText(enF), requireText(huF), price, activeBox.isSelected());
+            }
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void openPackageTypeDialog(PackageType existing) {
+        I18nManager i18n = ctx.getI18n();
+        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
+        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 20);
+        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 20);
+        JTextField tareF = new JTextField(existing != null ? existing.tareWeightKg().toPlainString() : "0.50", 12);
+        JTextField maxF = new JTextField(existing != null ? existing.maxWeightKg().toPlainString() : "50", 12);
+        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JPanel form = buildBaseForm(codeF, enF, huF, null);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0; gbc.gridy = 4; form.add(new JLabel(i18n.t("dictionaries.tare_weight")), gbc);
+        gbc.gridx = 1; form.add(tareF, gbc);
+        gbc.gridx = 0; gbc.gridy = 5; form.add(new JLabel(i18n.t("dictionaries.max_weight")), gbc);
+        gbc.gridx = 1; form.add(maxF, gbc);
+        if (existing != null) {
+            gbc.gridx = 1; gbc.gridy = 6; form.add(activeBox, gbc);
+        }
+
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("dictionaries.tab.packages"),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        try {
+            String code = validateCode(codeF.getText());
+            BigDecimal tare = new BigDecimal(tareF.getText().trim().replace(',', '.'));
+            BigDecimal maxW = new BigDecimal(maxF.getText().trim().replace(',', '.'));
+            if (tare.compareTo(BigDecimal.ZERO) < 0 || maxW.compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Invalid package weights");
+            }
+            if (existing == null) {
+                ctx.getDictionaryDao().insertPackageType(code, requireText(enF), requireText(huF), tare, maxW);
+            } else {
+                ctx.getDictionaryDao().updatePackageType(existing.id(), code, requireText(enF), requireText(huF), tare, maxW, activeBox.isSelected());
+            }
+            refreshData();
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private JPanel buildBaseForm(JTextField codeF, JTextField enF, JTextField huF, JCheckBox activeBox) {
+        I18nManager i18n = ctx.getI18n();
+        JPanel form = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+
+        gbc.gridx = 0; gbc.gridy = 0; form.add(new JLabel(i18n.t("common.code") + " *"), gbc);
+        gbc.gridx = 1; form.add(codeF, gbc);
+        gbc.gridx = 1; gbc.gridy = 1;
+        JLabel hint = new JLabel(i18n.t("dictionaries.code_hint"));
+        hint.setFont(hint.getFont().deriveFont(11f));
+        form.add(hint, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 2; form.add(new JLabel(i18n.t("common.name.en") + " *"), gbc);
+        gbc.gridx = 1; form.add(enF, gbc);
+
+        gbc.gridx = 0; gbc.gridy = 3; form.add(new JLabel(i18n.t("common.name.hu") + " *"), gbc);
+        gbc.gridx = 1; form.add(huF, gbc);
+
+        if (activeBox != null) {
+            gbc.gridx = 1; gbc.gridy = 4; form.add(activeBox, gbc);
+        }
+        return form;
+    }
+
+    private String validateCode(String raw) {
+        String code = ctx.getProductCodeService().normalizeCodeSegment(raw);
+        if (!ctx.getProductCodeService().isValidCodeSegment(code)) {
+            throw new IllegalArgumentException(ctx.getI18n().t("dictionaries.code_hint"));
+        }
+        return code;
+    }
+
+    private static String requireText(JTextField field) {
+        String text = field.getText().trim();
+        if (text.isEmpty()) {
+            throw new IllegalArgumentException("English and Hungarian names are required.");
+        }
+        return text;
+    }
+
+    @Override
+    public String getViewKey() {
+        return MainFrame.VIEW_DICTIONARIES;
+    }
+
+    @Override
+    public String getTitleI18nKey() {
+        return "dictionaries.title";
+    }
+
+    @Override
+    public JComponent getComponent() {
+        return this;
+    }
+
+    @Override
+    public void refreshData() {
+        I18nManager i18n = ctx.getI18n();
+        String yes = i18n.t("common.yes");
+        String no = i18n.t("common.no");
+
+        targets = ctx.getDictionaryDao().findTargetGroups(false);
+        targetModel.setRowCount(0);
+        for (TargetGroup g : targets) {
+            targetModel.addRow(new Object[]{g.code(), g.nameEn(), g.nameHu(), g.active() ? yes : no});
+        }
+
+        garments = ctx.getDictionaryDao().findGarmentTypes(false);
+        garmentModel.setRowCount(0);
+        for (GarmentType g : garments) {
+            garmentModel.addRow(new Object[]{g.code(), g.nameEn(), g.nameHu(), g.active() ? yes : no});
+        }
+
+        qualities = ctx.getDictionaryDao().findQualityGrades(false);
+        qualityModel.setRowCount(0);
+        for (QualityGrade q : qualities) {
+            qualityModel.addRow(new Object[]{q.code(), q.nameEn(), q.nameHu(), q.defaultPricePerKg(), q.active() ? yes : no});
+        }
+
+        packages = ctx.getDictionaryDao().findPackageTypes(false);
+        packageModel.setRowCount(0);
+        for (PackageType p : packages) {
+            packageModel.addRow(new Object[]{p.code(), p.nameEn(), p.nameHu(), p.tareWeightKg(), p.maxWeightKg(), p.active() ? yes : no});
+        }
+    }
+
+    @Override
+    public void applyTranslations() {
+        I18nManager i18n = ctx.getI18n();
+        addBtn.setText(i18n.t("common.add"));
+        editBtn.setText(i18n.t("common.edit"));
+        toggleActiveBtn.setText(i18n.t("common.activate") + " / " + i18n.t("common.deactivate"));
+        deleteBtn.setText(i18n.t("common.delete"));
+        refreshBtn.setText(i18n.t("common.refresh"));
+
+        tabs.setTitleAt(0, i18n.t("dictionaries.tab.targets"));
+        tabs.setTitleAt(1, i18n.t("dictionaries.tab.garments"));
+        tabs.setTitleAt(2, i18n.t("dictionaries.tab.qualities"));
+        tabs.setTitleAt(3, i18n.t("dictionaries.tab.packages"));
+
+        Object[] baseCols = new Object[]{i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"), i18n.t("common.status")};
+        targetModel.setColumnIdentifiers(baseCols);
+        garmentModel.setColumnIdentifiers(baseCols);
+        qualityModel.setColumnIdentifiers(new Object[]{
+                i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"),
+                i18n.t("dictionaries.default_price"), i18n.t("common.status")
+        });
+        packageModel.setColumnIdentifiers(new Object[]{
+                i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"),
+                i18n.t("dictionaries.tare_weight"), i18n.t("dictionaries.max_weight"), i18n.t("common.status")
+        });
+
+        refreshData();
+    }
+}
