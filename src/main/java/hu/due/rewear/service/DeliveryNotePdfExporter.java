@@ -9,6 +9,7 @@ import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
+import hu.due.rewear.ui.LogoAssets;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -126,18 +127,24 @@ public final class DeliveryNotePdfExporter {
         float contentW = pageW - 2 * margin;
         float y = margin;
 
-        // Top Brutalist Header Bar
+        // Top Brutalist Header Bar with crisp ReWear logo
         g.setColor(Color.BLACK);
-        g.fillRect(Math.round(margin), Math.round(y), Math.round(contentW), 34);
+        g.fillRect(Math.round(margin), Math.round(y), Math.round(contentW), 40);
+        BufferedImage logoWhite = LogoAssets.logoImage(true);
+        float titleStartX = margin + 10;
+        if (logoWhite != null) {
+            g.drawImage(logoWhite, Math.round(margin + 6), Math.round(y + 4), 32, 32, null);
+            titleStartX = margin + 46;
+        }
         g.setColor(Color.WHITE);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
-        g.drawString("REWEAR WMS  //  " + i18n.t("orders.delivery_note.title"), margin + 10, y + 21);
+        g.drawString(i18n.t("orders.delivery_note.title"), titleStartX, y + 25);
 
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 11));
         String ordTag = order.orderNumber();
         int ordW = g.getFontMetrics().stringWidth(ordTag);
-        g.drawString(ordTag, margin + contentW - ordW - 10, y + 21);
-        y += 44;
+        g.drawString(ordTag, margin + contentW - ordW - 10, y + 25);
+        y += 50;
 
         if (pageNum == 1) {
             // Two-column Metadata + Order QR Box

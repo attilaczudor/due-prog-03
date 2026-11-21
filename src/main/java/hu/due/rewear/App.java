@@ -3,6 +3,7 @@ package hu.due.rewear;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.ui.LoginFrame;
+import hu.due.rewear.ui.LogoAssets;
 import hu.due.rewear.ui.MainFrame;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,6 +26,7 @@ public final class App {
         try {
             AppContext context = new AppContext();
             SwingUtilities.invokeLater(() -> {
+                LogoAssets.applyDockIcon();
                 ThemeManager.applyTheme(context.getPreferences().isDarkTheme());
                 showLogin(context);
             });

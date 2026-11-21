@@ -38,7 +38,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final Runnable onLoginSuccess;
 
     private final JPanel cardPanel = new JPanel(new BorderLayout(0, 12));
-    private final JLabel brandLabel = new JLabel("REWEAR WMS", SwingConstants.CENTER);
+    private final JLabel logoLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel versionTagLabel = new JLabel("DUE-PROG-03", SwingConstants.CENTER);
     private final JLabel subtitleLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel usernameLabel = new JLabel();
@@ -61,6 +61,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setResizable(false);
+        LogoAssets.applyWindowIcon(this);
         buildUi();
         populateLanguages();
         applyTranslations();
@@ -69,7 +70,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
         pack();
-        setMinimumSize(new Dimension(500, 440));
+        setMinimumSize(new Dimension(500, 500));
         setLocationRelativeTo(null);
     }
 
@@ -101,20 +102,18 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         JPanel center = new JPanel();
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
-        JPanel brandRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
-        brandLabel.setFont(ThemeManager.monoFont(Font.BOLD, 24f));
-        brandRow.add(brandLabel);
-        brandRow.add(versionTagLabel);
-        brandRow.setAlignmentX(CENTER_ALIGNMENT);
-
+        logoLabel.setAlignmentX(CENTER_ALIGNMENT);
+        versionTagLabel.setAlignmentX(CENTER_ALIGNMENT);
         subtitleLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
         subtitleLabel.setAlignmentX(CENTER_ALIGNMENT);
 
         center.add(Box.createVerticalStrut(4));
-        center.add(brandRow);
+        center.add(logoLabel);
+        center.add(Box.createVerticalStrut(10));
+        center.add(versionTagLabel);
         center.add(Box.createVerticalStrut(6));
         center.add(subtitleLabel);
-        center.add(Box.createVerticalStrut(20));
+        center.add(Box.createVerticalStrut(16));
 
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -192,6 +191,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
 
     private void applyBrutalistStyling() {
         BrutalistStyle.applyBoxCard(cardPanel, 18, 22);
+        logoLabel.setIcon(LogoAssets.logoIcon(108, ThemeManager.isDarkMode()));
         BrutalistStyle.styleBoxedTag(versionTagLabel, false);
         BrutalistStyle.stylePrimaryButton(loginButton);
         subtitleLabel.setForeground(ThemeManager.muted());

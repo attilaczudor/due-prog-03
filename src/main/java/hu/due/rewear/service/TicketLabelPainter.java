@@ -2,6 +2,7 @@ package hu.due.rewear.service;
 
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
+import hu.due.rewear.ui.LogoAssets;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -51,31 +52,49 @@ public final class TicketLabelPainter {
             g.setStroke(new BasicStroke(Math.max(1.2f, (float) (width * 0.006))));
             g.draw(new Rectangle2D.Double(pad * 0.5, pad * 0.5, width - pad, height - pad));
 
-            // Header Banner
-            double headerH = height * 0.105;
+            // Swiss Brutalist Header Band: Crisp ReWear Logo on left + Inverted Location Badge on right
+            double headerH = height * 0.145;
             double cursorY = pad * 0.5;
-            g.setColor(new Color(0x1E293B));
-            g.fill(new Rectangle2D.Double(pad * 0.5, cursorY, width - pad, headerH));
+            double headerBottomY = cursorY + headerH;
 
-            g.setColor(Color.WHITE);
-            Font brandFont = new Font(Font.SANS_SERIF, Font.BOLD, Math.max(9, (int) (headerH * 0.48)));
-            g.setFont(brandFont);
-            FontMetrics fmBrand = g.getFontMetrics();
-            g.drawString("REWEAR WMS", (float) (innerX + pad * 0.35),
-                    (float) (cursorY + (headerH + fmBrand.getAscent() - fmBrand.getDescent()) / 2.0));
+            BufferedImage logo = LogoAssets.logoImage(false);
+            if (logo != null) {
+                double logoSize = headerH * 0.84;
+                double logoX = innerX + pad * 0.25;
+                double logoY = cursorY + (headerH - logoSize) / 2.0;
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_BICUBIC);
+                g.drawImage(logo, (int) Math.round(logoX), (int) Math.round(logoY),
+                        (int) Math.round(logoSize), (int) Math.round(logoSize), null);
+                g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+            }
 
+            // Inverted black location badge on the right of the header
             String locBadge = "LOC: " + pkg.locationCode();
-            Font locFont = new Font(Font.MONOSPACED, Font.BOLD, Math.max(8, (int) (headerH * 0.42)));
+            Font locFont = new Font(Font.MONOSPACED, Font.BOLD, Math.max(8, (int) (headerH * 0.30)));
             g.setFont(locFont);
             FontMetrics fmLoc = g.getFontMetrics();
-            int locW = fmLoc.stringWidth(locBadge);
-            g.drawString(locBadge, (float) (width - innerX - locW - pad * 0.35),
-                    (float) (cursorY + (headerH + fmLoc.getAscent() - fmLoc.getDescent()) / 2.0));
+            double badgePadX = pad * 0.55;
+            double badgeW = fmLoc.stringWidth(locBadge) + 2 * badgePadX;
+            double badgeH = fmLoc.getHeight() + pad * 0.45;
+            double badgeX = width - innerX - badgeW - pad * 0.2;
+            double badgeY = cursorY + (headerH - badgeH) / 2.0;
 
-            cursorY += headerH + pad * 0.55;
+            g.setColor(Color.BLACK);
+            g.fill(new Rectangle2D.Double(badgeX, badgeY, badgeW, badgeH));
+            g.setColor(Color.WHITE);
+            g.drawString(locBadge, (float) (badgeX + badgePadX),
+                    (float) (badgeY + (badgeH + fmLoc.getAscent() - fmLoc.getDescent()) / 2.0));
+
+            // Heavy 2pt bottom border under sticker header
+            g.setColor(Color.BLACK);
+            g.setStroke(new BasicStroke(Math.max(1.5f, (float) (width * 0.007))));
+            g.drawLine((int) Math.round(pad * 0.5), (int) Math.round(headerBottomY),
+                    (int) Math.round(width - pad * 0.5), (int) Math.round(headerBottomY));
+
+            cursorY = headerBottomY + pad * 0.5;
 
             // QR Code centered
-            double qrSize = Math.min(innerW * 0.62, height * 0.36);
+            double qrSize = Math.min(innerW * 0.60, height * 0.33);
             BufferedImage qrImg = qrService.generateQrImage(pkg.qrCode(), Math.max(240, (int) (qrSize * 3)));
             double qrX = (width - qrSize) / 2.0;
             g.drawImage(qrImg, (int) Math.round(qrX), (int) Math.round(cursorY),

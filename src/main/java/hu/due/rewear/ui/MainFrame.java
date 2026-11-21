@@ -56,8 +56,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private final JPanel sidebar = new JPanel(new BorderLayout());
     private final JPanel brandPanel = new JPanel();
-    private final JPanel brandTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
-    private final JLabel brandTitle = new JLabel("REWEAR WMS");
+    private final JPanel brandTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+    private final JLabel brandLogoLabel = new JLabel();
     private final JPanel navList = new JPanel();
     private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
     private final JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
@@ -83,6 +83,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setMinimumSize(new Dimension(1200, 750));
         setPreferredSize(new Dimension(1360, 840));
+        LogoAssets.applyWindowIcon(this);
 
         buildUi();
         registerDefaultViews();
@@ -105,8 +106,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         sidebar.setPreferredSize(new Dimension(245, 0));
 
         brandPanel.setLayout(new BoxLayout(brandPanel, BoxLayout.Y_AXIS));
-        brandTitle.setFont(ThemeManager.monoFont(Font.BOLD, 16f));
-        brandTop.add(brandTitle);
+        brandTop.add(brandLogoLabel);
         brandTop.add(brandTagLabel);
         brandTop.setAlignmentX(LEFT_ALIGNMENT);
 
@@ -268,7 +268,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         sidebar.setBackground(ThemeManager.bg());
         brandPanel.setBackground(ThemeManager.bg());
         brandTop.setBackground(ThemeManager.bg());
-        brandTitle.setForeground(ThemeManager.fg());
+        brandLogoLabel.setIcon(LogoAssets.logoIcon(48, ThemeManager.isDarkMode()));
         navList.setBackground(ThemeManager.bg());
         sidebar.setBorder(BrutalistStyle.hairlineRightRule(16, 12));
 
