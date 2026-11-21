@@ -432,9 +432,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         String selBg = dark ? "#FFFFFF" : "#000000";
         String selFg = dark ? "#000000" : "#FFFFFF";
         String selHover = dark ? "#DCDCDC" : "#2A2A2A";
+        String selPress = dark ? "#BDBDBD" : "#424242";
         String unselBg = dark ? "#000000" : "#FFFFFF";
         String unselFg = dark ? "#FFFFFF" : "#000000";
-        String unselHover = dark ? "#1C1C1C" : "#EDEDED";
+        String unselHover = dark ? "#1C1C1C" : "#EAEAEA";
+        String unselPress = dark ? "#333333" : "#CFCFCF";
 
         for (Map.Entry<String, JToggleButton> entry : navButtons.entrySet()) {
             JToggleButton btn = entry.getValue();
@@ -449,22 +451,32 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 btn.putClientProperty(FlatClientProperties.STYLE,
                         "background:" + selBg + "; foreground:" + selFg
                                 + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + selHover + "; hoverForeground:" + selFg);
+                                + "; hoverBackground:" + selHover
+                                + "; pressedBackground:" + selPress
+                                + "; focusedBackground:" + selBg);
             } else {
                 btn.setBackground(ThemeManager.bg());
                 btn.setForeground(ThemeManager.fg());
                 btn.putClientProperty(FlatClientProperties.STYLE,
                         "background:" + unselBg + "; foreground:" + unselFg
                                 + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + unselHover + "; hoverForeground:" + unselFg);
+                                + "; hoverBackground:" + unselHover
+                                + "; pressedBackground:" + unselPress
+                                + "; focusedBackground:" + unselBg);
             }
         }
     }
 
     private void applyBrutalistChrome() {
+        boolean dark = ThemeManager.isDarkMode();
+        String footBg = dark ? "#000000" : "#FFFFFF";
+        String footFg = dark ? "#FFFFFF" : "#000000";
+        String footHover = dark ? "#1C1C1C" : "#EAEAEA";
+        String footPress = dark ? "#333333" : "#CFCFCF";
+
         sidebar.setBackground(ThemeManager.bg());
         brandPanel.setBackground(ThemeManager.bg());
-        brandLogoLabel.setIcon(LogoAssets.logoIcon(sidebarCollapsed ? 42 : 52, ThemeManager.isDarkMode()));
+        brandLogoLabel.setIcon(LogoAssets.logoIcon(sidebarCollapsed ? 42 : 52, dark));
         navList.setBackground(ThemeManager.bg());
         sidebarFooter.setBackground(ThemeManager.bg());
         sidebar.setBorder(BrutalistStyle.hairlineRightRule(14, sidebarCollapsed ? 10 : 12));
@@ -474,6 +486,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         for (JButton footerBtn : new JButton[]{settingsButton, collapseButton}) {
             footerBtn.setBackground(ThemeManager.bg());
             footerBtn.setForeground(ThemeManager.fg());
+            footerBtn.putClientProperty(FlatClientProperties.STYLE,
+                    "background:" + footBg + "; foreground:" + footFg
+                            + "; hoverBackground:" + footHover
+                            + "; pressedBackground:" + footPress
+                            + "; focusedBackground:" + footBg);
             footerBtn.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
         }
         avatarBadge.repaint();

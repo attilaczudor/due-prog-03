@@ -62,7 +62,7 @@ public final class BrutalistStyle {
         String bgHex = dark ? "#FFFFFF" : "#000000";
         String fgHex = dark ? "#000000" : "#FFFFFF";
         String hoverHex = dark ? "#DCDCDC" : "#2A2A2A";
-        String pressHex = dark ? "#C4C4C4" : "#404040";
+        String pressHex = dark ? "#BDBDBD" : "#424242";
 
         button.setBackground(ThemeManager.fg());
         button.setForeground(ThemeManager.bg());
@@ -71,11 +71,8 @@ public final class BrutalistStyle {
                 "background:" + bgHex
                         + "; foreground:" + fgHex
                         + "; hoverBackground:" + hoverHex
-                        + "; hoverForeground:" + fgHex
                         + "; pressedBackground:" + pressHex
-                        + "; pressedForeground:" + fgHex
-                        + "; focusedBackground:" + bgHex
-                        + "; focusedForeground:" + fgHex);
+                        + "; focusedBackground:" + bgHex);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.fg(), 1),
                 BorderFactory.createEmptyBorder(5, 14, 5, 14)
@@ -87,9 +84,8 @@ public final class BrutalistStyle {
         boolean dark = ThemeManager.isDarkMode();
         String bgHex = dark ? "#000000" : "#FFFFFF";
         String fgHex = dark ? "#FFFFFF" : "#000000";
-        String hoverHex = dark ? "#1C1C1C" : "#EDEDED";
-        String pressBgHex = dark ? "#FFFFFF" : "#000000";
-        String pressFgHex = dark ? "#000000" : "#FFFFFF";
+        String hoverHex = dark ? "#1C1C1C" : "#EAEAEA";
+        String pressHex = dark ? "#333333" : "#CFCFCF";
 
         button.setBackground(ThemeManager.bg());
         button.setForeground(ThemeManager.fg());
@@ -98,11 +94,8 @@ public final class BrutalistStyle {
                 "background:" + bgHex
                         + "; foreground:" + fgHex
                         + "; hoverBackground:" + hoverHex
-                        + "; hoverForeground:" + fgHex
-                        + "; pressedBackground:" + pressBgHex
-                        + "; pressedForeground:" + pressFgHex
-                        + "; focusedBackground:" + bgHex
-                        + "; focusedForeground:" + fgHex);
+                        + "; pressedBackground:" + pressHex
+                        + "; focusedBackground:" + bgHex);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.border(), 1),
                 BorderFactory.createEmptyBorder(5, 14, 5, 14)

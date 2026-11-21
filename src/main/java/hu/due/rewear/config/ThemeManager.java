@@ -103,7 +103,10 @@ public final class ThemeManager {
         String mutedHex = dark ? "#9A9A9A" : "#555555";
         String borderHex = dark ? "#D0D0D0" : "#000000";
         String gridHex = dark ? "#2A2A2A" : "#D4D4D4";
-        String hoverHex = dark ? "#1A1A1A" : "#EDEDED";
+        String hoverHex = dark ? "#1C1C1C" : "#EAEAEA";
+        String pressHex = dark ? "#333333" : "#CFCFCF";
+        String defaultHoverHex = dark ? "#DCDCDC" : "#2A2A2A";
+        String defaultPressHex = dark ? "#BDBDBD" : "#424242";
 
         // Register FlatLaf global extra defaults BEFORE setup() so FlatLaf builds all derived colors cleanly
         Map<String, String> extra = new HashMap<>();
@@ -145,8 +148,8 @@ public final class ThemeManager {
         extra.put("Button.hoverBackground", hoverHex);
         extra.put("Button.hoverForeground", fgHex);
         extra.put("Button.hoverBorderColor", fgHex);
-        extra.put("Button.pressedBackground", fgHex);
-        extra.put("Button.pressedForeground", bgHex);
+        extra.put("Button.pressedBackground", pressHex);
+        extra.put("Button.pressedForeground", fgHex);
         extra.put("Button.focusedBackground", bgHex);
         extra.put("Button.focusedForeground", fgHex);
         extra.put("Button.margin", "5,14,5,14");
@@ -157,17 +160,19 @@ public final class ThemeManager {
         extra.put("Button.default.focusedBorderColor", fgHex);
         extra.put("Button.default.focusedBackground", fgHex);
         extra.put("Button.default.focusedForeground", bgHex);
-        extra.put("Button.default.hoverBackground", dark ? "#DCDCDC" : "#2A2A2A");
+        extra.put("Button.default.hoverBackground", defaultHoverHex);
         extra.put("Button.default.hoverForeground", bgHex);
-        extra.put("Button.default.pressedBackground", dark ? "#C4C4C4" : "#404040");
+        extra.put("Button.default.pressedBackground", defaultPressHex);
         extra.put("Button.default.pressedForeground", bgHex);
         extra.put("ToggleButton.background", bgHex);
         extra.put("ToggleButton.foreground", fgHex);
         extra.put("ToggleButton.borderColor", borderHex);
         extra.put("ToggleButton.hoverBackground", hoverHex);
+        extra.put("ToggleButton.pressedBackground", pressHex);
         extra.put("ToggleButton.selectedBackground", fgHex);
         extra.put("ToggleButton.selectedForeground", bgHex);
-        extra.put("ToggleButton.selectedHoverBackground", dark ? "#E6E6E6" : "#1A1A1A");
+        extra.put("ToggleButton.selectedHoverBackground", defaultHoverHex);
+        extra.put("ToggleButton.selectedPressedBackground", defaultPressHex);
         extra.put("TextField.background", bgHex);
         extra.put("TextField.foreground", fgHex);
         extra.put("TextField.caretForeground", fgHex);
@@ -235,6 +240,10 @@ public final class ThemeManager {
         defaults.put("TableHeader.font", monoFont(Font.BOLD, 11.5f));
         defaults.put("TabbedPane.showTabSeparators", true);
         defaults.put("TabbedPane.tabSeparatorsFullHeight", true);
+        defaults.put("OptionPane.informationIcon", BrutalistOptionPaneIcons.information());
+        defaults.put("OptionPane.warningIcon", BrutalistOptionPaneIcons.warning());
+        defaults.put("OptionPane.errorIcon", BrutalistOptionPaneIcons.error());
+        defaults.put("OptionPane.questionIcon", BrutalistOptionPaneIcons.question());
 
         // Update all open Swing windows cleanly
         FlatLaf.updateUI();
