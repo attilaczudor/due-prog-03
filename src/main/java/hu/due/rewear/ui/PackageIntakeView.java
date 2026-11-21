@@ -171,19 +171,6 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
         gbc.weightx = 1.0;
         form.add(quantitySpinner, gbc);
         gbc.gridwidth = 1;
-        row++;
-
-        gbc.gridx = 0;
-        gbc.gridy = row;
-        gbc.weightx = 0.0;
-        gbc.anchor = GridBagConstraints.NORTHWEST;
-        form.add(notesLabel, gbc);
-        gbc.gridx = 1;
-        gbc.gridwidth = 2;
-        gbc.weightx = 1.0;
-        notesArea.setLineWrap(true);
-        notesArea.setWrapStyleWord(true);
-        form.add(new JScrollPane(notesArea), gbc);
 
         leftPanel.add(form, BorderLayout.NORTH);
 
@@ -327,14 +314,13 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
         try {
             List<InventoryPackage> created = ctx.getInventoryService().createPackages(
                     tg, gt, qg, pt, loc, weight, qty,
-                    notesArea.getText(),
+                    null,
                     currentHexSuffix,
                     ctx.getSession().requireCurrentUser().id()
             );
 
             // Prepare fresh hex suffix for next entry
             currentHexSuffix = ctx.getProductCodeService().generateHexSuffix();
-            notesArea.setText("");
             quantitySpinner.setValue(1);
             refreshData();
 

@@ -223,7 +223,6 @@ public final class QrScannerView extends JPanel implements NavigableView {
         addDetailRow(detailsGrid, gbc, r++, lblHex, valHex);
         addDetailRow(detailsGrid, gbc, r++, lblLocation, valLocation);
         addDetailRow(detailsGrid, gbc, r++, lblOperator, valOperator);
-        addDetailRow(detailsGrid, gbc, r++, lblNotes, valNotes);
         leftCard.add(new JScrollPane(detailsGrid), BorderLayout.CENTER);
 
         // Right panel: Instant actions + movement history
@@ -480,8 +479,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
                     m.createdAt() != null ? DT_FMT.format(m.createdAt()) : "",
                     i18n.t("movement." + m.movementType().name()),
                     fromTo,
-                    m.userFullName(),
-                    m.note() != null ? m.note() : ""
+                    m.userFullName()
             });
         }
     }
@@ -666,8 +664,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
                 i18n.t("common.created_at"),
                 i18n.t("common.actions"),
                 i18n.t("intake.location"),
-                i18n.t("scanner.field.operator"),
-                i18n.t("common.notes")
+                i18n.t("scanner.field.operator")
         });
 
         if (lastResult != null) {

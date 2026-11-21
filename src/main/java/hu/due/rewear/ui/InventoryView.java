@@ -333,8 +333,7 @@ public final class InventoryView extends JPanel implements NavigableView {
                     stripZeros(p.weightKg()),
                     p.locationCode(),
                     p.status(),
-                    p.createdAt() != null ? DT_FMT.format(p.createdAt()) : "",
-                    p.notes() != null ? p.notes() : ""
+                    p.createdAt() != null ? DT_FMT.format(p.createdAt()) : ""
             });
         }
 
@@ -403,7 +402,7 @@ public final class InventoryView extends JPanel implements NavigableView {
 
         DefaultTableModel histModel = new DefaultTableModel(new Object[]{
                 i18n.t("common.created_at"), i18n.t("common.actions"),
-                i18n.t("intake.location"), i18n.t("scanner.field.operator"), i18n.t("common.notes")
+                i18n.t("intake.location"), i18n.t("scanner.field.operator")
         }, 0) {
             @Override public boolean isCellEditable(int row, int col) { return false; }
         };
@@ -414,8 +413,7 @@ public final class InventoryView extends JPanel implements NavigableView {
                     m.createdAt() != null ? DT_FMT.format(m.createdAt()) : "",
                     i18n.t("movement." + m.movementType().name()),
                     fromTo,
-                    m.userFullName(),
-                    m.note() != null ? m.note() : ""
+                    m.userFullName()
             });
         }
         JTable histTable = new JTable(histModel);
@@ -585,8 +583,7 @@ public final class InventoryView extends JPanel implements NavigableView {
                 i18n.t("intake.weight_kg"),
                 i18n.t("intake.location"),
                 i18n.t("common.status"),
-                i18n.t("common.created_at"),
-                i18n.t("common.notes")
+                i18n.t("common.created_at")
         });
 
         refreshData();

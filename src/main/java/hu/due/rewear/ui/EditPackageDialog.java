@@ -137,13 +137,6 @@ public final class EditPackageDialog extends JDialog {
         addRow(form, gbc, r++, i18n.t("intake.location") + ":", locationCombo);
         addRow(form, gbc, r++, i18n.t("common.status") + ":", statusCombo);
 
-        gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; gbc.anchor = GridBagConstraints.NORTHWEST;
-        form.add(new JLabel(i18n.t("common.notes") + ":"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        notesArea.setLineWrap(true);
-        notesArea.setWrapStyleWord(true);
-        form.add(new JScrollPane(notesArea), gbc);
-
         topSplit.add(form, BorderLayout.CENTER);
 
         // Right QR Preview Card
@@ -191,8 +184,7 @@ public final class EditPackageDialog extends JDialog {
                 i18n.t("common.created_at").toUpperCase(),
                 i18n.t("common.actions").toUpperCase(),
                 i18n.t("intake.location").toUpperCase(),
-                i18n.t("scanner.field.operator").toUpperCase(),
-                i18n.t("common.notes").toUpperCase()
+                i18n.t("scanner.field.operator").toUpperCase()
         });
         for (StockMovement m : ctx.getMovementDao().findByPackageId(original.id())) {
             String fromTo = (m.fromLocationCode() != null ? m.fromLocationCode() : "—")
@@ -201,8 +193,7 @@ public final class EditPackageDialog extends JDialog {
                     m.createdAt() != null ? DT_FMT.format(m.createdAt()) : "",
                     i18n.t("movement." + m.movementType().name()).toUpperCase(),
                     fromTo,
-                    m.userFullName(),
-                    m.note() != null ? m.note() : ""
+                    m.userFullName()
             });
         }
         BrutalistStyle.styleTable(historyTable);
@@ -292,7 +283,6 @@ public final class EditPackageDialog extends JDialog {
 
             BigDecimal w = original.weightKg().stripTrailingZeros();
             weightField.setText((w.scale() < 0 ? w.setScale(0) : w).toPlainString());
-            notesArea.setText(original.notes() != null ? original.notes() : "");
         } finally {
             loading = false;
         }
@@ -367,7 +357,7 @@ public final class EditPackageDialog extends JDialog {
 
         try {
             updatedPackage = ctx.getInventoryService().updatePackageDetails(
-                    original.id(), tg, gt, qg, pt, loc, weight, st, notesArea.getText(),
+                    original.id(), tg, gt, qg, pt, loc, weight, st, null,
                     ctx.getSession().requireCurrentUser().id()
             );
             if (openPrintPreview) {

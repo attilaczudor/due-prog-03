@@ -466,8 +466,7 @@ public final class AdminView extends JPanel implements NavigableView {
                     m.packageQrCode(),
                     i18n.t("movement." + m.movementType().name()).toUpperCase(),
                     fromTo,
-                    m.userFullName() + " (" + m.username() + ")",
-                    m.note() != null ? m.note() : ""
+                    m.userFullName() + " (" + m.username() + ")"
             });
         }
 
@@ -511,8 +510,7 @@ public final class AdminView extends JPanel implements NavigableView {
                 i18n.t("intake.generated_code").toUpperCase(),
                 i18n.t("common.actions").toUpperCase(),
                 i18n.t("intake.location").toUpperCase(),
-                i18n.t("scanner.field.operator").toUpperCase(),
-                i18n.t("common.notes").toUpperCase()
+                i18n.t("scanner.field.operator").toUpperCase()
         });
 
         refreshData();

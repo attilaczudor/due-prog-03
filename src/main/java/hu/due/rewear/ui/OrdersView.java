@@ -196,7 +196,6 @@ public final class OrdersView extends JPanel implements NavigableView {
             return;
         }
         JComboBox<Customer> customerCombo = new JComboBox<>(activeCustomers.toArray(new Customer[0]));
-        JTextField notesField = new JTextField(24);
 
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -204,8 +203,6 @@ public final class OrdersView extends JPanel implements NavigableView {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0; gbc.gridy = 0; form.add(new JLabel(i18n.t("orders.customer") + ":"), gbc);
         gbc.gridx = 1; form.add(customerCombo, gbc);
-        gbc.gridx = 0; gbc.gridy = 1; form.add(new JLabel(i18n.t("common.notes") + ":"), gbc);
-        gbc.gridx = 1; form.add(notesField, gbc);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("orders.new_order"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
@@ -216,7 +213,7 @@ public final class OrdersView extends JPanel implements NavigableView {
 
         try {
             Order created = ctx.getOrderService().createOrder(
-                    chosen.id(), notesField.getText(), ctx.getSession().requireCurrentUser().id());
+                    chosen.id(), null, ctx.getSession().requireCurrentUser().id());
             refreshDataSelecting(created.id());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
