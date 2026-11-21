@@ -451,18 +451,18 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 btn.putClientProperty(FlatClientProperties.STYLE,
                         "background:" + selBg + "; foreground:" + selFg
                                 + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + selHover
-                                + "; pressedBackground:" + selPress
-                                + "; focusedBackground:" + selBg);
+                                + "; hoverBackground:" + selHover + "; hoverForeground:" + selFg
+                                + "; pressedBackground:" + selPress + "; pressedForeground:" + selFg
+                                + "; focusedBackground:" + selBg + "; focusedForeground:" + selFg);
             } else {
                 btn.setBackground(ThemeManager.bg());
                 btn.setForeground(ThemeManager.fg());
                 btn.putClientProperty(FlatClientProperties.STYLE,
                         "background:" + unselBg + "; foreground:" + unselFg
                                 + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + unselHover
-                                + "; pressedBackground:" + unselPress
-                                + "; focusedBackground:" + unselBg);
+                                + "; hoverBackground:" + unselHover + "; hoverForeground:" + unselFg
+                                + "; pressedBackground:" + unselPress + "; pressedForeground:" + unselFg
+                                + "; focusedBackground:" + unselBg + "; focusedForeground:" + unselFg);
             }
         }
     }
@@ -488,9 +488,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             footerBtn.setForeground(ThemeManager.fg());
             footerBtn.putClientProperty(FlatClientProperties.STYLE,
                     "background:" + footBg + "; foreground:" + footFg
-                            + "; hoverBackground:" + footHover
-                            + "; pressedBackground:" + footPress
-                            + "; focusedBackground:" + footBg);
+                            + "; hoverBackground:" + footHover + "; hoverForeground:" + footFg
+                            + "; pressedBackground:" + footPress + "; pressedForeground:" + footFg
+                            + "; focusedBackground:" + footBg + "; focusedForeground:" + footFg);
             footerBtn.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
         }
         avatarBadge.repaint();

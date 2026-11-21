@@ -146,12 +146,9 @@ public final class ThemeManager {
         extra.put("Button.borderColor", borderHex);
         extra.put("Button.focusedBorderColor", fgHex);
         extra.put("Button.hoverBackground", hoverHex);
-        extra.put("Button.hoverForeground", fgHex);
         extra.put("Button.hoverBorderColor", fgHex);
         extra.put("Button.pressedBackground", pressHex);
-        extra.put("Button.pressedForeground", fgHex);
         extra.put("Button.focusedBackground", bgHex);
-        extra.put("Button.focusedForeground", fgHex);
         extra.put("Button.margin", "5,14,5,14");
         extra.put("Button.minimumWidth", "0");
         extra.put("Button.default.background", fgHex);

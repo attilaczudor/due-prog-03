@@ -71,8 +71,11 @@ public final class BrutalistStyle {
                 "background:" + bgHex
                         + "; foreground:" + fgHex
                         + "; hoverBackground:" + hoverHex
+                        + "; hoverForeground:" + fgHex
                         + "; pressedBackground:" + pressHex
-                        + "; focusedBackground:" + bgHex);
+                        + "; pressedForeground:" + fgHex
+                        + "; focusedBackground:" + bgHex
+                        + "; focusedForeground:" + fgHex);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.fg(), 1),
                 BorderFactory.createEmptyBorder(5, 14, 5, 14)
@@ -94,8 +97,11 @@ public final class BrutalistStyle {
                 "background:" + bgHex
                         + "; foreground:" + fgHex
                         + "; hoverBackground:" + hoverHex
+                        + "; hoverForeground:" + fgHex
                         + "; pressedBackground:" + pressHex
-                        + "; focusedBackground:" + bgHex);
+                        + "; pressedForeground:" + fgHex
+                        + "; focusedBackground:" + bgHex
+                        + "; focusedForeground:" + fgHex);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.border(), 1),
                 BorderFactory.createEmptyBorder(5, 14, 5, 14)

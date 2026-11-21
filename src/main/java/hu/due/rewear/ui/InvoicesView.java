@@ -386,20 +386,70 @@ public final class InvoicesView extends JPanel implements NavigableView {
         curCombo.addActionListener(e -> priceLabel.setText(
                 i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:"));
 
+        JTextField[] autoFields = {partnerF, taxF, addressF, emailF, descF, qtyF, unitF, priceF};
+
         orderPicker.addActionListener(e -> {
-            boolean manual = !(orderPicker.getSelectedItem() instanceof Order);
-            curCombo.setEnabled(manual);
             if (orderPicker.getSelectedItem() instanceof Order ord) {
-                curCombo.setSelectedItem(ord.effectiveCurrency());
+                CurrencyCode ordCur = ord.effectiveCurrency();
+                curCombo.setSelectedItem(ordCur);
+                curCombo.setEnabled(false);
+
+                Customer cust = ctx.getCustomerDao().findById(ord.customerId()).orElse(null);
+                partnerF.setText(cust != null ? cust.name() : ord.customerName());
+                taxF.setText(cust != null && cust.taxNumber() != null ? cust.taxNumber() : "");
+                addressF.setText(cust != null && cust.address() != null ? cust.address() : "");
+                emailF.setText(cust != null && cust.email() != null ? cust.email() : "");
+
+                var ordItems = ctx.getOrderItemDao().findByOrderId(ord.id());
+                String lang = i18n.getActiveLanguage();
+                if (ordItems.size() == 1) {
+                    var item = ordItems.get(0);
+                    descF.setText(item.packageQrCode() + " (" + item.localizedSummary(lang) + ")");
+                } else {
+                    descF.setText(ord.orderNumber() + " — " + ordItems.size() + " "
+                            + ("hu".equalsIgnoreCase(lang) ? "csomag" : "package(s)")
+                            + " (" + ordCur.format(ord.totalPrice()) + ")");
+                }
+
+                BigDecimal weight = ord.totalWeightKg() != null ? ord.totalWeightKg() : BigDecimal.ZERO;
+                qtyF.setText(weight.stripTrailingZeros().toPlainString());
+                unitF.setText("kg");
+
+                if (weight.compareTo(BigDecimal.ZERO) > 0 && ord.totalPrice() != null) {
+                    BigDecimal avgPerKg = ord.totalPrice().divide(weight, ordCur.scale(), java.math.RoundingMode.HALF_UP);
+                    priceF.setText(ordCur.formatPlain(avgPerKg));
+                } else {
+                    priceF.setText(ordCur.formatPlain(BigDecimal.ZERO));
+                }
+
+                ctx.getInvoiceDao().findByOrderId(ord.id()).ifPresentOrElse(
+                        existingInv -> vatF.setText(existingInv.vatRate().stripTrailingZeros().toPlainString()),
+                        () -> vatF.setText("27")
+                );
+
+                for (JTextField f : autoFields) {
+                    f.setEditable(false);
+                    f.setBackground(ThemeManager.surface());
+                    f.setForeground(ThemeManager.fg());
+                }
+            } else {
+                curCombo.setEnabled(true);
+                curCombo.setSelectedItem(ctx.getInvoiceService().getReportingCurrency());
+                partnerF.setText("");
+                taxF.setText("");
+                addressF.setText("");
+                emailF.setText("");
+                descF.setText("");
+                qtyF.setText("1");
+                unitF.setText("kg");
+                priceF.setText("0");
+                vatF.setText("27");
+                for (JTextField f : autoFields) {
+                    f.setEditable(true);
+                    f.setBackground(ThemeManager.bg());
+                    f.setForeground(ThemeManager.fg());
+                }
             }
-            partnerF.setEnabled(manual);
-            taxF.setEnabled(manual);
-            addressF.setEnabled(manual);
-            emailF.setEnabled(manual);
-            descF.setEnabled(manual);
-            qtyF.setEnabled(manual);
-            unitF.setEnabled(manual);
-            priceF.setEnabled(manual);
         });
 
         JPanel form = new JPanel(new GridBagLayout());
