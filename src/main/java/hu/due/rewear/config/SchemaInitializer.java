@@ -9,7 +9,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 /**
@@ -37,8 +42,30 @@ public final class SchemaInitializer {
                     }
                 }
             }
+            ensureUserProfileColumns(conn);
         });
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
+    }
+
+    private void ensureUserProfileColumns(Connection conn) throws SQLException {
+        Set<String> existing = new HashSet<>();
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(users)")) {
+            while (rs.next()) {
+                existing.add(rs.getString("name").toLowerCase());
+            }
+        }
+        try (Statement stmt = conn.createStatement()) {
+            if (!existing.contains("email")) {
+                stmt.execute("ALTER TABLE users ADD COLUMN email TEXT");
+            }
+            if (!existing.contains("phone")) {
+                stmt.execute("ALTER TABLE users ADD COLUMN phone TEXT");
+            }
+            if (!existing.contains("avatar_png")) {
+                stmt.execute("ALTER TABLE users ADD COLUMN avatar_png BLOB");
+            }
+        }
     }
 
     private String loadSchemaSql() {

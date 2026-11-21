@@ -21,17 +21,20 @@ import javax.swing.JToggleButton;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
 /**
  * Main ReWear WMS application window styled in stark Brutalist Monochrome (Light & Dark),
- * with RBAC-filtered sidebar navigation, live CSV language switcher, theme toggle,
- * and modular CardLayout workspace.
+ * with RBAC-filtered sidebar navigation, bottom-left language/theme controls & circular user avatar
+ * profile bar with settings gear trigger, minimal top bar, and modular CardLayout workspace.
  */
 public final class MainFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
 
@@ -58,19 +61,25 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JPanel brandPanel = new JPanel();
     private final JPanel brandTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
     private final JLabel brandLogoLabel = new JLabel();
-    private final JPanel navList = new JPanel();
-    private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
-    private final JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
-    private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel brandTagLabel = new JLabel("DUE-PROG-03");
+    private final JPanel navList = new JPanel();
 
-    private final JLabel activeViewTitleLabel = new JLabel();
-    private final JButton quickScanButton = new JButton();
+    // Sidebar bottom controls: language/theme row + circular avatar / name / role / gear button
+    private final JPanel sidebarFooter = new JPanel();
+    private final JPanel utilityRow = new JPanel(new BorderLayout(6, 0));
     private final JComboBox<String> langCombo = new JComboBox<>();
     private final JButton themeToggleButton = new JButton();
-    private final JLabel userBadgeLabel = new JLabel();
-    private final JLabel roleBadgeLabel = new JLabel();
-    private final JButton logoutButton = new JButton();
+
+    private final JPanel profilePanel = new JPanel(new BorderLayout(10, 0));
+    private final AvatarBadge avatarBadge = new AvatarBadge(38);
+    private final JPanel userMetaPanel = new JPanel();
+    private final JLabel userNameLabel = new JLabel();
+    private final JLabel userRoleLabel = new JLabel();
+    private final JButton settingsButton = new JButton();
+
+    private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
+    private final JLabel activeViewTitleLabel = new JLabel();
+    private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel statusBarLabel = new JLabel();
 
     private String currentViewKey;
@@ -81,13 +90,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         this.onLogout = onLogout;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(1200, 750));
+        setMinimumSize(new Dimension(1080, 720));
         setPreferredSize(new Dimension(1360, 840));
         LogoAssets.applyWindowIcon(this);
 
         buildUi();
         registerDefaultViews();
         populateLanguageCombo();
+        refreshUserProfileCard();
         applyTranslations();
         applyBrutalistChrome();
 
@@ -103,7 +113,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         JPanel root = new JPanel(new BorderLayout());
 
         // Left Brutalist Sidebar
-        sidebar.setPreferredSize(new Dimension(245, 0));
+        sidebar.setPreferredSize(new Dimension(260, 0));
 
         brandPanel.setLayout(new BoxLayout(brandPanel, BoxLayout.Y_AXIS));
         brandTop.add(brandLogoLabel);
@@ -143,43 +153,100 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
         navList.add(Box.createVerticalGlue());
         sidebar.add(navList, BorderLayout.CENTER);
-        root.add(sidebar, BorderLayout.WEST);
 
-        // Right Workspace (Topbar + Content + Footer)
-        JPanel rightArea = new JPanel(new BorderLayout());
+        // Sidebar Bottom Footer: Quick Language + Theme Row, then Profile Strip (Avatar | Name + Role | Gear)
+        sidebarFooter.setLayout(new BoxLayout(sidebarFooter, BoxLayout.Y_AXIS));
 
-        activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
-        topBar.add(activeViewTitleLabel, BorderLayout.WEST);
+        JSeparator topSep = createHairlineSeparator();
+        topSep.setAlignmentX(LEFT_ALIGNMENT);
+        sidebarFooter.add(topSep);
+        sidebarFooter.add(Box.createVerticalStrut(10));
 
-        quickScanButton.addActionListener(e -> navigateTo(VIEW_SCANNER));
-        rightControls.add(quickScanButton);
-
+        langCombo.setPreferredSize(new Dimension(68, 30));
         langCombo.addActionListener(e -> {
             if (!updatingLanguageCombo && langCombo.getSelectedItem() instanceof String code) {
                 ctx.getI18n().setLanguage(code.toLowerCase(Locale.ROOT));
                 ctx.getPreferences().setLanguage(code.toLowerCase(Locale.ROOT));
             }
         });
-        rightControls.add(langCombo);
 
+        themeToggleButton.setFont(ThemeManager.monoFont(Font.BOLD, 11f));
+        themeToggleButton.setPreferredSize(new Dimension(140, 30));
         themeToggleButton.addActionListener(e -> {
             boolean nextDark = !ctx.getPreferences().isDarkTheme();
             ctx.getPreferences().setDarkTheme(nextDark);
             ThemeManager.applyTheme(nextDark);
         });
-        rightControls.add(themeToggleButton);
 
-        User user = ctx.getSession().requireCurrentUser();
-        userBadgeLabel.setText(user.fullName().toUpperCase(Locale.ROOT));
-        userBadgeLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
-        rightControls.add(userBadgeLabel);
+        utilityRow.add(langCombo, BorderLayout.WEST);
+        utilityRow.add(themeToggleButton, BorderLayout.CENTER);
+        utilityRow.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+        utilityRow.setAlignmentX(LEFT_ALIGNMENT);
+        sidebarFooter.add(utilityRow);
 
-        rightControls.add(roleBadgeLabel);
+        sidebarFooter.add(Box.createVerticalStrut(10));
+        JSeparator midSep = createHairlineSeparator();
+        midSep.setAlignmentX(LEFT_ALIGNMENT);
+        sidebarFooter.add(midSep);
+        sidebarFooter.add(Box.createVerticalStrut(10));
 
-        logoutButton.addActionListener(e -> performLogout());
-        rightControls.add(logoutButton);
+        // Profile Strip: [Avatar] [Name / Role] [Gear]
+        MouseAdapter openProfileOnClick = new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                openProfileSettings();
+            }
+        };
 
-        topBar.add(rightControls, BorderLayout.EAST);
+        avatarBadge.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        avatarBadge.addMouseListener(openProfileOnClick);
+        JPanel avatarHolder = new JPanel(new BorderLayout());
+        avatarHolder.setOpaque(false);
+        avatarHolder.add(avatarBadge, BorderLayout.CENTER);
+        profilePanel.add(avatarHolder, BorderLayout.WEST);
+
+        userMetaPanel.setLayout(new BoxLayout(userMetaPanel, BoxLayout.Y_AXIS));
+        userMetaPanel.setOpaque(false);
+        userMetaPanel.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        userMetaPanel.addMouseListener(openProfileOnClick);
+
+        userNameLabel.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
+        userNameLabel.setAlignmentX(LEFT_ALIGNMENT);
+        userRoleLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 10.5f));
+        userRoleLabel.setAlignmentX(LEFT_ALIGNMENT);
+
+        userMetaPanel.add(Box.createVerticalGlue());
+        userMetaPanel.add(userNameLabel);
+        userMetaPanel.add(Box.createVerticalStrut(2));
+        userMetaPanel.add(userRoleLabel);
+        userMetaPanel.add(Box.createVerticalGlue());
+        profilePanel.add(userMetaPanel, BorderLayout.CENTER);
+
+        settingsButton.setIcon(AvatarBadge.createGearIcon(17));
+        settingsButton.setPreferredSize(new Dimension(34, 34));
+        settingsButton.setMinimumSize(new Dimension(34, 34));
+        settingsButton.setMaximumSize(new Dimension(34, 34));
+        settingsButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        settingsButton.setFocusPainted(false);
+        settingsButton.addActionListener(e -> openProfileSettings());
+        JPanel gearHolder = new JPanel(new BorderLayout());
+        gearHolder.setOpaque(false);
+        gearHolder.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+        gearHolder.add(settingsButton, BorderLayout.CENTER);
+        profilePanel.add(gearHolder, BorderLayout.EAST);
+
+        profilePanel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 46));
+        profilePanel.setAlignmentX(LEFT_ALIGNMENT);
+        sidebarFooter.add(profilePanel);
+
+        sidebar.add(sidebarFooter, BorderLayout.SOUTH);
+        root.add(sidebar, BorderLayout.WEST);
+
+        // Right Workspace (Minimal Topbar + Content + Footer)
+        JPanel rightArea = new JPanel(new BorderLayout());
+
+        activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
+        topBar.add(activeViewTitleLabel, BorderLayout.WEST);
         rightArea.add(topBar, BorderLayout.NORTH);
 
         rightArea.add(contentHost, BorderLayout.CENTER);
@@ -195,7 +262,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private static JSeparator createHairlineSeparator() {
         JSeparator sep = new JSeparator();
         sep.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-        sep.setPreferredSize(new Dimension(215, 1));
+        sep.setPreferredSize(new Dimension(225, 1));
         return sep;
     }
 
@@ -204,7 +271,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         btn.setHorizontalAlignment(SwingConstants.LEFT);
         btn.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
         btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        btn.setPreferredSize(new Dimension(215, 36));
+        btn.setPreferredSize(new Dimension(225, 36));
         btn.putClientProperty("i18nKey", i18nKey);
         btn.addActionListener(e -> navigateTo(viewKey));
         navGroup.add(btn);
@@ -246,6 +313,29 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         view.refreshData();
     }
 
+    private void openProfileSettings() {
+        ProfileSettingsDialog dialog = new ProfileSettingsDialog(
+                this,
+                ctx,
+                () -> {
+                    refreshUserProfileCard();
+                    if (currentViewKey != null && views.containsKey(currentViewKey)) {
+                        views.get(currentViewKey).refreshData();
+                    }
+                },
+                this::performLogout
+        );
+        dialog.setVisible(true);
+    }
+
+    private void refreshUserProfileCard() {
+        User user = ctx.getSession().requireCurrentUser();
+        avatarBadge.setUserAppearance(user.initials(), user.avatarPng());
+        userNameLabel.setText(user.displayName());
+        userNameLabel.setToolTipText(user.fullName() + " (@" + user.username() + ")");
+        userRoleLabel.setText(ctx.getI18n().t("role." + user.roleCode().name()).toUpperCase(Locale.ROOT));
+    }
+
     private void updateNavButtonStyles() {
         for (Map.Entry<String, JToggleButton> entry : navButtons.entrySet()) {
             JToggleButton btn = entry.getValue();
@@ -270,15 +360,23 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         brandTop.setBackground(ThemeManager.bg());
         brandLogoLabel.setIcon(LogoAssets.logoIcon(48, ThemeManager.isDarkMode()));
         navList.setBackground(ThemeManager.bg());
-        sidebar.setBorder(BrutalistStyle.hairlineRightRule(16, 12));
+        sidebarFooter.setBackground(ThemeManager.bg());
+        utilityRow.setBackground(ThemeManager.bg());
+        profilePanel.setBackground(ThemeManager.bg());
+        sidebar.setBorder(BrutalistStyle.hairlineRightRule(14, 12));
+
+        userNameLabel.setForeground(ThemeManager.fg());
+        userRoleLabel.setForeground(ThemeManager.muted());
+        settingsButton.setBackground(ThemeManager.bg());
+        settingsButton.setForeground(ThemeManager.fg());
+        settingsButton.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
+        avatarBadge.repaint();
 
         topBar.setBackground(ThemeManager.bg());
-        rightControls.setBackground(ThemeManager.bg());
         activeViewTitleLabel.setForeground(ThemeManager.fg());
-        userBadgeLabel.setForeground(ThemeManager.fg());
         topBar.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createMatteBorder(0, 0, 2, 0, ThemeManager.border()),
-                BorderFactory.createEmptyBorder(10, 18, 10, 18)
+                BorderFactory.createEmptyBorder(12, 18, 12, 18)
         ));
 
         statusBar.setBackground(ThemeManager.bg());
@@ -286,8 +384,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         statusBarLabel.setForeground(ThemeManager.muted());
 
         BrutalistStyle.styleBoxedTag(brandTagLabel, false);
-        BrutalistStyle.styleBoxedTag(roleBadgeLabel, true);
-        BrutalistStyle.stylePrimaryButton(quickScanButton);
         updateNavButtonStyles();
 
         for (NavigableView view : views.values()) {
@@ -329,12 +425,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         setTitle(i18n.t("app.title"));
-        quickScanButton.setText("[ " + i18n.t("nav.scanner").toUpperCase(Locale.ROOT) + " ]");
-        logoutButton.setText(i18n.t("app.logout").toUpperCase(Locale.ROOT));
         updateThemeButtonText();
-
-        User user = ctx.getSession().requireCurrentUser();
-        roleBadgeLabel.setText(i18n.t("role." + user.roleCode().name()).toUpperCase(Locale.ROOT));
+        settingsButton.setToolTipText(i18n.t("profile.settings.tooltip"));
+        refreshUserProfileCard();
 
         for (JToggleButton btn : navButtons.values()) {
             Object key = btn.getClientProperty("i18nKey");

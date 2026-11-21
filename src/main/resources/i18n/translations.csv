@@ -224,3 +224,20 @@ admin.i18n.export,Export translations.csv,translations.csv exportálása
 admin.i18n.reload,Load External translations.csv,Külső translations.csv betöltése
 admin.i18n.reset,Reset to Bundled Translations,Alapértelmezett fordítások visszaállítása
 admin.i18n.loaded,"Loaded languages: {0}","Betöltött nyelvek: {0}"
+profile.title,Profile & Account Settings,Profil és fiókbeállítások
+profile.settings.tooltip,Profile & Account Settings,Profil és fiókbeállítások
+profile.avatar.upload,Upload Photo,Kép feltöltése
+profile.avatar.remove,Remove Photo,Kép törlése
+profile.fullname,Full Name,Teljes név
+profile.email,Email Address,E-mail cím
+profile.phone,Phone / Contact,Telefon / Elérhetőség
+profile.password.section,Change Password (Optional),Jelszó módosítása (opcionális)
+profile.password.current,Current Password,Jelenlegi jelszó
+profile.password.new,New Password,Új jelszó
+profile.password.confirm,Confirm New Password,Új jelszó megerősítése
+profile.saved,Profile settings saved successfully.,A profilbeállítások sikeresen elmentve.
+profile.error.fullname,Full name cannot be empty.,A teljes név nem lehet üres.
+profile.error.password_mismatch,New passwords do not match.,Az új jelszavak nem egyeznek.
+profile.error.password_short,New password must be at least 6 characters.,Az új jelszónak legalább 6 karakternek kell lennie.
+profile.error.password_wrong,Current password is incorrect.,A jelenlegi jelszó hibás.
+profile.error.image,Could not read the selected image file.,A kiválasztott képfájl nem olvasható.

@@ -17,8 +17,8 @@ import java.util.Optional;
 public final class UserDao {
 
     private static final String BASE_SELECT = """
-            SELECT u.id, u.username, u.password_hash, u.full_name, u.role_id,
-                   r.code AS role_code, r.name AS role_name, u.active, u.created_at
+            SELECT u.id, u.username, u.password_hash, u.full_name, u.email, u.phone, u.avatar_png,
+                   u.role_id, r.code AS role_code, r.name AS role_name, u.active, u.created_at
             FROM users u
             JOIN roles r ON r.id = u.role_id
             """;
@@ -122,6 +122,25 @@ public final class UserDao {
         }
     }
 
+    public void updateAccountSettings(long userId, String fullName, String email, String phone, byte[] avatarPng) {
+        String sql = "UPDATE users SET full_name = ?, email = ?, phone = ?, avatar_png = ? WHERE id = ?";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, fullName.trim());
+            ps.setString(2, email == null || email.isBlank() ? null : email.trim());
+            ps.setString(3, phone == null || phone.isBlank() ? null : phone.trim());
+            if (avatarPng != null && avatarPng.length > 0) {
+                ps.setBytes(4, avatarPng);
+            } else {
+                ps.setNull(4, java.sql.Types.BLOB);
+            }
+            ps.setLong(5, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to update user account settings: " + userId, e);
+        }
+    }
+
     public void updatePasswordHash(long userId, String passwordHash) {
         String sql = "UPDATE users SET password_hash = ? WHERE id = ?";
         try (Connection conn = db.getConnection();
@@ -140,6 +159,9 @@ public final class UserDao {
                 rs.getString("username"),
                 rs.getString("password_hash"),
                 rs.getString("full_name"),
+                rs.getString("email"),
+                rs.getString("phone"),
+                rs.getBytes("avatar_png"),
                 rs.getLong("role_id"),
                 RoleCode.valueOf(rs.getString("role_code")),
                 rs.getString("role_name"),

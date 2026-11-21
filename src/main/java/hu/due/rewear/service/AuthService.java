@@ -101,4 +101,16 @@ public final class AuthService {
         userDao.updatePasswordHash(userId, hashPassword(newPassword));
         LOG.info("Administrator reset password for userId={}", userId);
     }
+
+    public User updateOwnProfile(long userId, String fullName, String email, String phone, byte[] avatarPng) {
+        if (fullName == null || fullName.isBlank()) {
+            throw new IllegalArgumentException("Full name is required.");
+        }
+        userDao.updateAccountSettings(userId, fullName.trim(), email, phone, avatarPng);
+        User updated = userDao.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Updated user not found: " + userId));
+        session.updateCurrentUser(updated);
+        LOG.info("Updated profile settings for user '{}'", updated.username());
+        return updated;
+    }
 }

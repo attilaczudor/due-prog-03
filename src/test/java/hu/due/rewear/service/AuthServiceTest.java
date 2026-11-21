@@ -95,4 +95,28 @@ class AuthServiceTest {
         assertEquals("hu", reloaded.getLanguage());
         assertTrue(reloaded.isDarkTheme());
     }
+
+    @Test
+    void updatesOwnProfileAndComputesInitials() {
+        AuthService.AuthResult login = authService.login("admin", "admin123".toCharArray());
+        assertTrue(login.isSuccess());
+        assertEquals("AC", login.user().initials());
+        assertEquals("Attila Czudor", login.user().displayName());
+
+        byte[] fakePng = new byte[]{(byte) 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A};
+        var updated = authService.updateOwnProfile(
+                login.user().id(),
+                "Czudor Attila",
+                "attila@rewear.hu",
+                "+36 30 555 0199",
+                fakePng
+        );
+
+        assertEquals("Czudor Attila", updated.fullName());
+        assertEquals("CA", updated.initials());
+        assertEquals("attila@rewear.hu", updated.email());
+        assertEquals("+36 30 555 0199", updated.phone());
+        assertEquals(fakePng.length, updated.avatarPng().length);
+        assertEquals("attila@rewear.hu", session.requireCurrentUser().email());
+    }
 }

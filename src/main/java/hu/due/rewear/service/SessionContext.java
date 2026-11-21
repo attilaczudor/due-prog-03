@@ -16,6 +16,12 @@ public final class SessionContext {
         this.currentUser = user;
     }
 
+    public synchronized void updateCurrentUser(User user) {
+        if (user != null && this.currentUser != null && this.currentUser.id() == user.id()) {
+            this.currentUser = user;
+        }
+    }
+
     public synchronized void logout() {
         this.currentUser = null;
     }
