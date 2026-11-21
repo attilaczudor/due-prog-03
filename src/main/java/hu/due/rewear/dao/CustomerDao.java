@@ -1,6 +1,7 @@
 package hu.due.rewear.dao;
 
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 
 import java.sql.Connection;
@@ -22,7 +23,7 @@ public final class CustomerDao {
     }
 
     public List<Customer> findAll(boolean activeOnly) {
-        String sql = "SELECT id, name, contact_name, email, phone, address, tax_number, active, created_at FROM customers "
+        String sql = "SELECT id, name, contact_name, email, phone, address, tax_number, preferred_currency, active, created_at FROM customers "
                 + (activeOnly ? "WHERE active = 1 " : "") + "ORDER BY name";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -38,7 +39,7 @@ public final class CustomerDao {
     }
 
     public Optional<Customer> findById(long id) {
-        String sql = "SELECT id, name, contact_name, email, phone, address, tax_number, active, created_at FROM customers WHERE id = ?";
+        String sql = "SELECT id, name, contact_name, email, phone, address, tax_number, preferred_currency, active, created_at FROM customers WHERE id = ?";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
@@ -51,14 +52,25 @@ public final class CustomerDao {
     }
 
     public long insert(String name, String contactName, String email, String phone, String address, String taxNumber) {
-        return db.executeInTransaction(conn -> insert(conn, name, contactName, email, phone, address, taxNumber, LocalDateTime.now()));
+        return insert(name, contactName, email, phone, address, taxNumber, CurrencyCode.EUR);
+    }
+
+    public long insert(String name, String contactName, String email, String phone, String address,
+                       String taxNumber, CurrencyCode preferredCurrency) {
+        return db.executeInTransaction(conn -> insert(conn, name, contactName, email, phone, address, taxNumber,
+                preferredCurrency, LocalDateTime.now()));
     }
 
     public long insert(Connection conn, String name, String contactName, String email, String phone,
                        String address, String taxNumber, LocalDateTime createdAt) throws SQLException {
+        return insert(conn, name, contactName, email, phone, address, taxNumber, CurrencyCode.EUR, createdAt);
+    }
+
+    public long insert(Connection conn, String name, String contactName, String email, String phone,
+                       String address, String taxNumber, CurrencyCode preferredCurrency, LocalDateTime createdAt) throws SQLException {
         String sql = """
-                INSERT INTO customers (name, contact_name, email, phone, address, tax_number, active, created_at)
-                VALUES (?, ?, ?, ?, ?, ?, 1, ?)
+                INSERT INTO customers (name, contact_name, email, phone, address, tax_number, preferred_currency, active, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, name.trim());
@@ -67,7 +79,8 @@ public final class CustomerDao {
             ps.setString(4, phone);
             ps.setString(5, address);
             ps.setString(6, taxNumber);
-            ps.setString(7, DaoDateUtil.format(createdAt));
+            ps.setString(7, (preferredCurrency != null ? preferredCurrency : CurrencyCode.EUR).name());
+            ps.setString(8, DaoDateUtil.format(createdAt));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -80,9 +93,14 @@ public final class CustomerDao {
 
     public void update(long id, String name, String contactName, String email, String phone,
                        String address, String taxNumber, boolean active) {
+        update(id, name, contactName, email, phone, address, taxNumber, CurrencyCode.EUR, active);
+    }
+
+    public void update(long id, String name, String contactName, String email, String phone,
+                       String address, String taxNumber, CurrencyCode preferredCurrency, boolean active) {
         String sql = """
                 UPDATE customers
-                SET name = ?, contact_name = ?, email = ?, phone = ?, address = ?, tax_number = ?, active = ?
+                SET name = ?, contact_name = ?, email = ?, phone = ?, address = ?, tax_number = ?, preferred_currency = ?, active = ?
                 WHERE id = ?
                 """;
         try (Connection conn = db.getConnection();
@@ -93,8 +111,9 @@ public final class CustomerDao {
             ps.setString(4, phone);
             ps.setString(5, address);
             ps.setString(6, taxNumber);
-            ps.setInt(7, active ? 1 : 0);
-            ps.setLong(8, id);
+            ps.setString(7, (preferredCurrency != null ? preferredCurrency : CurrencyCode.EUR).name());
+            ps.setInt(8, active ? 1 : 0);
+            ps.setLong(9, id);
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException("Failed to update customer: " + id, e);
@@ -110,6 +129,7 @@ public final class CustomerDao {
                 rs.getString("phone"),
                 rs.getString("address"),
                 rs.getString("tax_number"),
+                CurrencyCode.parse(rs.getString("preferred_currency")),
                 rs.getInt("active") == 1,
                 DaoDateUtil.parse(rs.getString("created_at"))
         );

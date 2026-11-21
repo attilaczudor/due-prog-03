@@ -10,11 +10,16 @@ public record Customer(
         String phone,
         String address,
         String taxNumber,
+        CurrencyCode preferredCurrency,
         boolean active,
         LocalDateTime createdAt
 ) {
+    public CurrencyCode effectiveCurrency() {
+        return preferredCurrency != null ? preferredCurrency : CurrencyCode.EUR;
+    }
+
     @Override
     public String toString() {
-        return name;
+        return name + " (" + effectiveCurrency().name() + ")";
     }
 }

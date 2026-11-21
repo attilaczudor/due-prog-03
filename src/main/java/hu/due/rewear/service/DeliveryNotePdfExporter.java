@@ -6,6 +6,7 @@ import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.pdf.PdfWriter;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
@@ -239,6 +240,7 @@ public final class DeliveryNotePdfExporter {
         };
         float rowH = 22f;
 
+        CurrencyCode cur = order.effectiveCurrency();
         g.setColor(Color.BLACK);
         g.setStroke(new BasicStroke(1.5f));
         g.drawLine(Math.round(margin), Math.round(y), Math.round(margin + contentW), Math.round(y));
@@ -247,8 +249,8 @@ public final class DeliveryNotePdfExporter {
         g.drawString("QR CODE", colX[1] + 2, y + 14);
         g.drawString("DESCRIPTION", colX[2] + 2, y + 14);
         g.drawString("KG", colX[3] + 2, y + 14);
-        g.drawString("EUR/KG", colX[4] + 2, y + 14);
-        g.drawString("TOTAL", colX[5] + 2, y + 14);
+        g.drawString(cur.name() + "/KG", colX[4] + 2, y + 14);
+        g.drawString(cur.name(), colX[5] + 2, y + 14);
         y += rowH;
         g.drawLine(Math.round(margin), Math.round(y), Math.round(margin + contentW), Math.round(y));
 
@@ -263,8 +265,8 @@ public final class DeliveryNotePdfExporter {
             g.drawString(truncate(item.packageQrCode(), g.getFontMetrics(), 176), colX[1] + 2, textY);
             g.drawString(truncate(item.localizedSummary(lang), g.getFontMetrics(), 165), colX[2] + 2, textY);
             g.drawString(stripZeros(item.weightKg()), colX[3] + 2, textY);
-            g.drawString(formatMoney(item.pricePerKg()), colX[4] + 2, textY);
-            g.drawString(formatMoney(item.lineTotal()), colX[5] + 2, textY);
+            g.drawString(cur.formatNumber(item.pricePerKg()), colX[4] + 2, textY);
+            g.drawString(cur.formatNumber(item.lineTotal()), colX[5] + 2, textY);
 
             y += rowH;
             g.setColor(new Color(0xCCCCCC));
@@ -276,14 +278,14 @@ public final class DeliveryNotePdfExporter {
             y += 14;
             g.setColor(Color.BLACK);
             g.setStroke(new BasicStroke(1.5f));
-            float sumBoxW = 225f;
+            float sumBoxW = 245f;
             float sumBoxX = margin + contentW - sumBoxW;
             g.drawRect(Math.round(sumBoxX), Math.round(y), Math.round(sumBoxW), 48);
 
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
             g.drawString(i18n.t("orders.total_weight") + ": " + stripZeros(order.totalWeightKg()) + " kg",
                     sumBoxX + 10, y + 19);
-            g.drawString(i18n.t("orders.total_price") + ": " + formatMoney(order.totalPrice()) + " EUR",
+            g.drawString(i18n.t("orders.total_price") + ": " + cur.format(order.totalPrice()),
                     sumBoxX + 10, y + 38);
 
             // Signature lines near bottom

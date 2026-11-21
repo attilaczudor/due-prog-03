@@ -1,6 +1,7 @@
 package hu.due.rewear.dao;
 
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderStatus;
 
@@ -20,7 +21,7 @@ public final class OrderDao {
 
     private static final String BASE_SELECT = """
             SELECT o.id, o.order_number, o.customer_id, c.name AS customer_name,
-                   o.status, o.total_weight_kg, o.total_price, o.notes,
+                   o.status, o.currency, o.total_weight_kg, o.total_price, o.notes,
                    o.created_by, u.full_name AS created_by_name, o.created_at, o.shipped_at
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
@@ -103,22 +104,30 @@ public final class OrderDao {
     public long insert(Connection conn, String orderNumber, long customerId, OrderStatus status,
                        BigDecimal totalWeightKg, BigDecimal totalPrice, String notes,
                        long createdBy, LocalDateTime createdAt, LocalDateTime shippedAt) throws SQLException {
+        return insert(conn, orderNumber, customerId, status, CurrencyCode.EUR,
+                totalWeightKg, totalPrice, notes, createdBy, createdAt, shippedAt);
+    }
+
+    public long insert(Connection conn, String orderNumber, long customerId, OrderStatus status,
+                       CurrencyCode currency, BigDecimal totalWeightKg, BigDecimal totalPrice, String notes,
+                       long createdBy, LocalDateTime createdAt, LocalDateTime shippedAt) throws SQLException {
         String sql = """
                 INSERT INTO orders (
-                    order_number, customer_id, status, total_weight_kg, total_price, notes,
+                    order_number, customer_id, status, currency, total_weight_kg, total_price, notes,
                     created_by, created_at, shipped_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setString(1, orderNumber);
             ps.setLong(2, customerId);
             ps.setString(3, status.name());
-            ps.setDouble(4, totalWeightKg.doubleValue());
-            ps.setDouble(5, totalPrice.doubleValue());
-            ps.setString(6, notes);
-            ps.setLong(7, createdBy);
-            ps.setString(8, DaoDateUtil.format(createdAt));
-            ps.setString(9, DaoDateUtil.format(shippedAt));
+            ps.setString(4, (currency != null ? currency : CurrencyCode.EUR).name());
+            ps.setDouble(5, totalWeightKg.doubleValue());
+            ps.setDouble(6, totalPrice.doubleValue());
+            ps.setString(7, notes);
+            ps.setLong(8, createdBy);
+            ps.setString(9, DaoDateUtil.format(createdAt));
+            ps.setString(10, DaoDateUtil.format(shippedAt));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -126,6 +135,15 @@ public final class OrderDao {
                 }
                 throw new SQLException("No generated key returned for orders insert");
             }
+        }
+    }
+
+    public void updateCurrency(Connection conn, long orderId, CurrencyCode currency) throws SQLException {
+        String sql = "UPDATE orders SET currency = ? WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, (currency != null ? currency : CurrencyCode.EUR).name());
+            ps.setLong(2, orderId);
+            ps.executeUpdate();
         }
     }
 
@@ -156,6 +174,7 @@ public final class OrderDao {
                 rs.getLong("customer_id"),
                 rs.getString("customer_name"),
                 OrderStatus.valueOf(rs.getString("status")),
+                CurrencyCode.parse(rs.getString("currency")),
                 BigDecimal.valueOf(rs.getDouble("total_weight_kg")),
                 BigDecimal.valueOf(rs.getDouble("total_price")),
                 rs.getString("notes"),

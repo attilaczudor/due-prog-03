@@ -2,6 +2,7 @@ package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -48,7 +49,8 @@ public final class QuickAddDictionaryDialog extends JDialog {
     private final JTextField codeField = new JTextField(14);
     private final JTextField nameEnField = new JTextField(20);
     private final JTextField nameHuField = new JTextField(20);
-    private final JTextField priceField = new JTextField("5.00", 12);
+    private final JTextField priceEurField = new JTextField("5.00", 12);
+    private final JTextField priceHufField = new JTextField("2000", 12);
     private final JTextField tareField = new JTextField("0.50", 12);
     private final JTextField maxWeightField = new JTextField("50", 12);
 
@@ -96,8 +98,11 @@ public final class QuickAddDictionaryDialog extends JDialog {
         addFieldRow(form, gbc, row++, i18n.t("common.name.en") + " *", nameEnField);
         addFieldRow(form, gbc, row++, i18n.t("common.name.hu") + " *", nameHuField);
 
-        if (kind == DictionaryKind.QUALITY_GRADE) {
-            addFieldRow(form, gbc, row++, i18n.t("dictionaries.default_price"), priceField);
+        if (kind == DictionaryKind.GARMENT_TYPE || kind == DictionaryKind.QUALITY_GRADE) {
+            BigDecimal fx = ctx.getSettingsDao().getEurToHufRate();
+            priceHufField.setText(CurrencyCode.HUF.formatPlain(new BigDecimal("5.00").multiply(fx)));
+            addFieldRow(form, gbc, row++, i18n.t("currency.price_eur_kg"), priceEurField);
+            addFieldRow(form, gbc, row++, i18n.t("currency.price_huf_kg"), priceHufField);
         } else if (kind == DictionaryKind.PACKAGE_TYPE) {
             addFieldRow(form, gbc, row++, i18n.t("dictionaries.tare_weight"), tareField);
             addFieldRow(form, gbc, row++, i18n.t("dictionaries.max_weight"), maxWeightField);
@@ -149,13 +154,21 @@ public final class QuickAddDictionaryDialog extends JDialog {
         try {
             createdId = switch (kind) {
                 case TARGET_GROUP -> ctx.getDictionaryDao().insertTargetGroup(code, nameEn, nameHu);
-                case GARMENT_TYPE -> ctx.getDictionaryDao().insertGarmentType(code, nameEn, nameHu);
-                case QUALITY_GRADE -> {
-                    BigDecimal price = new BigDecimal(priceField.getText().trim().replace(',', '.'));
-                    if (price.compareTo(BigDecimal.ZERO) < 0) {
-                        throw new IllegalArgumentException("Price must be >= 0");
+                case GARMENT_TYPE -> {
+                    BigDecimal eur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(priceEurField.getText()));
+                    BigDecimal huf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(priceHufField.getText()));
+                    if (eur.compareTo(BigDecimal.ZERO) < 0 || huf.compareTo(BigDecimal.ZERO) < 0) {
+                        throw new IllegalArgumentException("Prices must be >= 0");
                     }
-                    yield ctx.getDictionaryDao().insertQualityGrade(code, nameEn, nameHu, price);
+                    yield ctx.getDictionaryDao().insertGarmentType(code, nameEn, nameHu, eur, huf);
+                }
+                case QUALITY_GRADE -> {
+                    BigDecimal eur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(priceEurField.getText()));
+                    BigDecimal huf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(priceHufField.getText()));
+                    if (eur.compareTo(BigDecimal.ZERO) < 0 || huf.compareTo(BigDecimal.ZERO) < 0) {
+                        throw new IllegalArgumentException("Prices must be >= 0");
+                    }
+                    yield ctx.getDictionaryDao().insertQualityGrade(code, nameEn, nameHu, eur, huf);
                 }
                 case PACKAGE_TYPE -> {
                     BigDecimal tare = new BigDecimal(tareField.getText().trim().replace(',', '.'));

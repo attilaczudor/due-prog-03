@@ -1,5 +1,11 @@
--- ReWear WMS (due-prog-03) — 3NF SQLite Schema (12 Tables)
+-- ReWear WMS (due-prog-03) — 3NF SQLite Schema (15 Tables)
 PRAGMA foreign_keys = ON;
+
+-- 0. Portable Workspace Settings (FX rate, reporting currency, etc.)
+CREATE TABLE IF NOT EXISTS app_settings (
+    setting_key TEXT PRIMARY KEY,
+    setting_value TEXT NOT NULL
+);
 
 -- 1. Roles
 CREATE TABLE IF NOT EXISTS roles (
@@ -40,6 +46,8 @@ CREATE TABLE IF NOT EXISTS garment_types (
     code TEXT NOT NULL UNIQUE,
     name_en TEXT NOT NULL,
     name_hu TEXT NOT NULL,
+    price_eur_per_kg REAL NOT NULL DEFAULT 0 CHECK (price_eur_per_kg >= 0),
+    price_huf_per_kg REAL NOT NULL DEFAULT 0 CHECK (price_huf_per_kg >= 0),
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
@@ -50,6 +58,7 @@ CREATE TABLE IF NOT EXISTS quality_grades (
     name_en TEXT NOT NULL,
     name_hu TEXT NOT NULL,
     default_price_per_kg REAL NOT NULL DEFAULT 0 CHECK (default_price_per_kg >= 0),
+    default_price_huf_per_kg REAL NOT NULL DEFAULT 0 CHECK (default_price_huf_per_kg >= 0),
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
@@ -109,6 +118,7 @@ CREATE TABLE IF NOT EXISTS customers (
     phone TEXT,
     address TEXT,
     tax_number TEXT,
+    preferred_currency TEXT NOT NULL DEFAULT 'EUR' CHECK (preferred_currency IN ('EUR', 'HUF')),
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
     created_at TEXT NOT NULL
 );
@@ -120,6 +130,7 @@ CREATE TABLE IF NOT EXISTS orders (
     customer_id INTEGER NOT NULL,
     status TEXT NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT', 'PACKING', 'SHIPPED', 'CANCELLED')),
+    currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR', 'HUF')),
     total_weight_kg REAL NOT NULL DEFAULT 0 CHECK (total_weight_kg >= 0),
     total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0),
     notes TEXT,
@@ -180,7 +191,8 @@ CREATE TABLE IF NOT EXISTS invoices (
     vat_rate REAL NOT NULL DEFAULT 27 CHECK (vat_rate >= 0),
     vat_amount REAL NOT NULL DEFAULT 0 CHECK (vat_amount >= 0),
     gross_amount REAL NOT NULL DEFAULT 0 CHECK (gross_amount >= 0),
-    currency TEXT NOT NULL DEFAULT 'EUR',
+    currency TEXT NOT NULL DEFAULT 'EUR' CHECK (currency IN ('EUR', 'HUF')),
+    exchange_rate REAL NOT NULL DEFAULT 400.0 CHECK (exchange_rate > 0),
     created_by INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,

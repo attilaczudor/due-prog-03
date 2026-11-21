@@ -7,6 +7,7 @@ import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
 import hu.due.rewear.dao.RoleDao;
+import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
@@ -55,6 +56,7 @@ public final class AppContext {
     private final OrderDao orderDao;
     private final OrderItemDao orderItemDao;
     private final InvoiceDao invoiceDao;
+    private final SettingsDao settingsDao;
 
     private final AuthService authService;
     private final QrCodeService qrCodeService;
@@ -93,12 +95,13 @@ public final class AppContext {
         this.orderDao = new OrderDao(databaseManager);
         this.orderItemDao = new OrderItemDao(databaseManager);
         this.invoiceDao = new InvoiceDao(databaseManager);
+        this.settingsDao = new SettingsDao(databaseManager);
 
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
         this.inventoryService = new InventoryService(databaseManager, packageDao, movementDao, productCodeService);
         this.orderService = new OrderService(databaseManager, orderDao, orderItemDao, packageDao, movementDao);
-        this.invoiceService = new InvoiceService(databaseManager, invoiceDao, orderDao, orderItemDao, customerDao);
+        this.invoiceService = new InvoiceService(databaseManager, invoiceDao, orderDao, orderItemDao, customerDao, settingsDao);
         this.scannerService = new ScannerService(productCodeService, qrCodeService, packageDao, movementDao);
         this.ticketLabelPainter = new TicketLabelPainter(qrCodeService, i18n);
         this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
@@ -186,6 +189,10 @@ public final class AppContext {
 
     public InvoiceDao getInvoiceDao() {
         return invoiceDao;
+    }
+
+    public SettingsDao getSettingsDao() {
+        return settingsDao;
     }
 
     public AuthService getAuthService() {

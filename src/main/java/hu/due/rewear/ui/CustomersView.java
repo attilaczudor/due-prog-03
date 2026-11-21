@@ -3,12 +3,14 @@ package hu.due.rewear.ui;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Order;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -120,6 +122,8 @@ public final class CustomersView extends JPanel implements NavigableView {
         JTextField phoneF = new JTextField(existing != null ? safe(existing.phone()) : "", 22);
         JTextField addrF = new JTextField(existing != null ? safe(existing.address()) : "", 22);
         JTextField taxF = new JTextField(existing != null ? safe(existing.taxNumber()) : "", 22);
+        JComboBox<CurrencyCode> curCombo = new JComboBox<>(CurrencyCode.values());
+        curCombo.setSelectedItem(existing != null ? existing.effectiveCurrency() : CurrencyCode.HUF);
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
         JPanel form = new JPanel(new GridBagLayout());
@@ -133,6 +137,7 @@ public final class CustomersView extends JPanel implements NavigableView {
         addRow(form, gbc, r++, i18n.t("customers.phone"), phoneF);
         addRow(form, gbc, r++, i18n.t("customers.address"), addrF);
         addRow(form, gbc, r++, i18n.t("customers.tax_number"), taxF);
+        addCompRow(form, gbc, r++, i18n.t("customers.preferred_currency"), curCombo);
         if (existing != null) {
             gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
         }
@@ -147,12 +152,13 @@ public final class CustomersView extends JPanel implements NavigableView {
             if (company.isEmpty()) {
                 throw new IllegalArgumentException("Company name is required.");
             }
+            CurrencyCode prefCur = curCombo.getSelectedItem() instanceof CurrencyCode cc ? cc : CurrencyCode.EUR;
             if (existing == null) {
                 ctx.getCustomerDao().insert(company, contactF.getText().trim(), emailF.getText().trim(),
-                        phoneF.getText().trim(), addrF.getText().trim(), taxF.getText().trim());
+                        phoneF.getText().trim(), addrF.getText().trim(), taxF.getText().trim(), prefCur);
             } else {
                 ctx.getCustomerDao().update(existing.id(), company, contactF.getText().trim(), emailF.getText().trim(),
-                        phoneF.getText().trim(), addrF.getText().trim(), taxF.getText().trim(), activeBox.isSelected());
+                        phoneF.getText().trim(), addrF.getText().trim(), taxF.getText().trim(), prefCur, activeBox.isSelected());
             }
             refreshData();
         } catch (Exception ex) {
@@ -161,10 +167,14 @@ public final class CustomersView extends JPanel implements NavigableView {
     }
 
     private static void addRow(JPanel form, GridBagConstraints gbc, int row, String label, JTextField field) {
+        addCompRow(form, gbc, row, label, field);
+    }
+
+    private static void addCompRow(JPanel form, GridBagConstraints gbc, int row, String label, JComponent comp) {
         gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
         form.add(new JLabel(label), gbc);
         gbc.gridx = 1; gbc.weightx = 1;
-        form.add(field, gbc);
+        form.add(comp, gbc);
     }
 
     private void loadOrdersForSelectedCustomer() {
@@ -180,7 +190,7 @@ public final class CustomersView extends JPanel implements NavigableView {
                         o.orderNumber(),
                         i18n.t("status.order." + o.status().name()).toUpperCase(),
                         o.totalWeightKg().stripTrailingZeros().toPlainString() + " kg",
-                        o.totalPrice().setScale(2, RoundingMode.HALF_UP).toPlainString() + " EUR",
+                        o.effectiveCurrency().format(o.totalPrice()),
                         o.createdAt() != null ? DT_FMT.format(o.createdAt()) : ""
                 });
             }
@@ -230,6 +240,7 @@ public final class CustomersView extends JPanel implements NavigableView {
                     safe(c.phone()),
                     safe(c.address()),
                     safe(c.taxNumber()),
+                    c.effectiveCurrency().name(),
                     c.active() ? i18n.t("common.yes").toUpperCase() : i18n.t("common.no").toUpperCase()
             });
         }
@@ -254,6 +265,7 @@ public final class CustomersView extends JPanel implements NavigableView {
                 i18n.t("customers.phone").toUpperCase(),
                 i18n.t("customers.address").toUpperCase(),
                 i18n.t("customers.tax_number").toUpperCase(),
+                i18n.t("currency.label").toUpperCase(),
                 i18n.t("common.status").toUpperCase()
         });
         orderHistoryModel.setColumnIdentifiers(new Object[]{

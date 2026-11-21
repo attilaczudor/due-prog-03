@@ -95,9 +95,10 @@ public final class CsvExportService {
             writeRow(w, List.of(
                     "Invoice Number", "Direction", "Category", "Order Ref", "Partner",
                     "Tax Number", "Status", "Issue Date", "Due Date", "Paid Date",
-                    "Net (EUR)", "VAT %", "VAT (EUR)", "Gross (EUR)"
+                    "Currency", "EUR/HUF Rate", "Net", "VAT %", "VAT", "Gross"
             ));
             for (Invoice inv : invoices) {
+                var cur = inv.currencyCode();
                 writeRow(w, List.of(
                         inv.invoiceNumber(),
                         i18n.t("invoice.direction." + inv.direction().name()),
@@ -109,10 +110,12 @@ public final class CsvExportService {
                         inv.issueDate().toString(),
                         inv.dueDate().toString(),
                         inv.paidDate() != null ? inv.paidDate().toString() : "",
-                        inv.netAmount().toPlainString(),
+                        cur.name(),
+                        inv.effectiveExchangeRate().toPlainString(),
+                        cur.formatPlain(inv.netAmount()),
                         inv.vatRate().toPlainString(),
-                        inv.vatAmount().toPlainString(),
-                        inv.grossAmount().toPlainString()
+                        cur.formatPlain(inv.vatAmount()),
+                        cur.formatPlain(inv.grossAmount())
                 ));
             }
         }

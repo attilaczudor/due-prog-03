@@ -14,11 +14,14 @@ public record InventoryPackage(
         String garmentTypeCode,
         String garmentTypeNameEn,
         String garmentTypeNameHu,
+        BigDecimal garmentPriceEurPerKg,
+        BigDecimal garmentPriceHufPerKg,
         long qualityGradeId,
         String qualityGradeCode,
         String qualityGradeNameEn,
         String qualityGradeNameHu,
         BigDecimal defaultPricePerKg,
+        BigDecimal defaultPriceHufPerKg,
         long packageTypeId,
         String packageTypeCode,
         String packageTypeNameEn,
@@ -35,6 +38,21 @@ public record InventoryPackage(
         LocalDateTime createdAt,
         LocalDateTime updatedAt
 ) {
+    /**
+     * Resolves the default unit price per kg in the requested currency:
+     * uses the product/garment type's configured EUR/kg or HUF/kg price when > 0,
+     * falling back to the quality grade's EUR/kg or HUF/kg price.
+     */
+    public BigDecimal effectivePricePerKg(CurrencyCode currency) {
+        CurrencyCode cur = currency != null ? currency : CurrencyCode.EUR;
+        BigDecimal productPrice = cur == CurrencyCode.HUF ? garmentPriceHufPerKg : garmentPriceEurPerKg;
+        if (productPrice != null && productPrice.compareTo(BigDecimal.ZERO) > 0) {
+            return cur.round(productPrice);
+        }
+        BigDecimal gradePrice = cur == CurrencyCode.HUF ? defaultPriceHufPerKg : defaultPricePerKg;
+        return cur.round(gradePrice != null ? gradePrice : BigDecimal.ZERO);
+    }
+
     public String localizedTargetGroup(String lang) {
         return "hu".equalsIgnoreCase(lang) && targetGroupNameHu != null && !targetGroupNameHu.isBlank()
                 ? targetGroupNameHu : targetGroupNameEn;

@@ -2,6 +2,7 @@ package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.GarmentType;
 import hu.due.rewear.model.PackageType;
 import hu.due.rewear.model.QualityGrade;
@@ -156,7 +157,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                 int r = garmentTable.getSelectedRow();
                 if (r >= 0 && r < garments.size()) {
                     GarmentType g = garments.get(r);
-                    ctx.getDictionaryDao().updateGarmentType(g.id(), g.code(), g.nameEn(), g.nameHu(), !g.active());
+                    ctx.getDictionaryDao().updateGarmentType(g.id(), g.code(), g.nameEn(), g.nameHu(),
+                            g.priceEurPerKg(), g.priceHufPerKg(), !g.active());
                     refreshData();
                 }
             }
@@ -164,7 +166,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                 int r = qualityTable.getSelectedRow();
                 if (r >= 0 && r < qualities.size()) {
                     QualityGrade q = qualities.get(r);
-                    ctx.getDictionaryDao().updateQualityGrade(q.id(), q.code(), q.nameEn(), q.nameHu(), q.defaultPricePerKg(), !q.active());
+                    ctx.getDictionaryDao().updateQualityGrade(q.id(), q.code(), q.nameEn(), q.nameHu(),
+                            q.defaultPricePerKg(), q.defaultPriceHufPerKg(), !q.active());
                     refreshData();
                 }
             }
@@ -276,22 +279,47 @@ public final class DictionariesView extends JPanel implements NavigableView {
 
     private void openGarmentDialog(GarmentType existing) {
         I18nManager i18n = ctx.getI18n();
+        BigDecimal fxRate = ctx.getSettingsDao().getEurToHufRate();
         JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
         JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 20);
         JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 20);
+        JTextField eurF = new JTextField(existing != null ? CurrencyCode.EUR.formatPlain(existing.priceEurPerKg()) : "5.00", 12);
+        JTextField hufF = new JTextField(existing != null ? CurrencyCode.HUF.formatPlain(existing.priceHufPerKg())
+                : CurrencyCode.HUF.formatPlain(new BigDecimal("5.00").multiply(fxRate)), 12);
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
-        JPanel form = buildBaseForm(codeF, enF, huF, existing != null ? activeBox : null);
+        JButton convertBtn = new JButton(i18n.t("currency.convert_btn") + " (1 EUR = " + CurrencyCode.EUR.formatPlain(fxRate) + " HUF)");
+        convertBtn.addActionListener(e -> convertEurHufFields(eurF, hufF, fxRate));
+
+        JPanel form = buildBaseForm(codeF, enF, huF, null);
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        gbc.gridx = 0; gbc.gridy = 4; form.add(new JLabel(i18n.t("currency.price_eur_kg")), gbc);
+        gbc.gridx = 1; form.add(eurF, gbc);
+        gbc.gridx = 0; gbc.gridy = 5; form.add(new JLabel(i18n.t("currency.price_huf_kg")), gbc);
+        gbc.gridx = 1; form.add(hufF, gbc);
+        gbc.gridx = 1; gbc.gridy = 6; form.add(convertBtn, gbc);
+        if (existing != null) {
+            gbc.gridx = 1; gbc.gridy = 7; form.add(activeBox, gbc);
+        }
+
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("dictionaries.tab.garments"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
             return;
         }
         try {
             String code = validateCode(codeF.getText());
+            BigDecimal priceEur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(eurF.getText()));
+            BigDecimal priceHuf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(hufF.getText()));
+            if (priceEur.compareTo(BigDecimal.ZERO) < 0 || priceHuf.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Prices must be >= 0");
+            }
             if (existing == null) {
-                ctx.getDictionaryDao().insertGarmentType(code, requireText(enF), requireText(huF));
+                ctx.getDictionaryDao().insertGarmentType(code, requireText(enF), requireText(huF), priceEur, priceHuf);
             } else {
-                ctx.getDictionaryDao().updateGarmentType(existing.id(), code, requireText(enF), requireText(huF), activeBox.isSelected());
+                ctx.getDictionaryDao().updateGarmentType(existing.id(), code, requireText(enF), requireText(huF),
+                        priceEur, priceHuf, activeBox.isSelected());
             }
             refreshData();
         } catch (Exception ex) {
@@ -301,20 +329,29 @@ public final class DictionariesView extends JPanel implements NavigableView {
 
     private void openQualityDialog(QualityGrade existing) {
         I18nManager i18n = ctx.getI18n();
+        BigDecimal fxRate = ctx.getSettingsDao().getEurToHufRate();
         JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
         JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 20);
         JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 20);
-        JTextField priceF = new JTextField(existing != null ? existing.defaultPricePerKg().toPlainString() : "5.00", 12);
+        JTextField eurF = new JTextField(existing != null ? CurrencyCode.EUR.formatPlain(existing.defaultPricePerKg()) : "5.00", 12);
+        JTextField hufF = new JTextField(existing != null ? CurrencyCode.HUF.formatPlain(existing.defaultPriceHufPerKg())
+                : CurrencyCode.HUF.formatPlain(new BigDecimal("5.00").multiply(fxRate)), 12);
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
+
+        JButton convertBtn = new JButton(i18n.t("currency.convert_btn") + " (1 EUR = " + CurrencyCode.EUR.formatPlain(fxRate) + " HUF)");
+        convertBtn.addActionListener(e -> convertEurHufFields(eurF, hufF, fxRate));
 
         JPanel form = buildBaseForm(codeF, enF, huF, null);
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 4, 4, 4);
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        gbc.gridx = 0; gbc.gridy = 4; form.add(new JLabel(i18n.t("dictionaries.default_price")), gbc);
-        gbc.gridx = 1; form.add(priceF, gbc);
+        gbc.gridx = 0; gbc.gridy = 4; form.add(new JLabel(i18n.t("currency.price_eur_kg")), gbc);
+        gbc.gridx = 1; form.add(eurF, gbc);
+        gbc.gridx = 0; gbc.gridy = 5; form.add(new JLabel(i18n.t("currency.price_huf_kg")), gbc);
+        gbc.gridx = 1; form.add(hufF, gbc);
+        gbc.gridx = 1; gbc.gridy = 6; form.add(convertBtn, gbc);
         if (existing != null) {
-            gbc.gridx = 1; gbc.gridy = 5; form.add(activeBox, gbc);
+            gbc.gridx = 1; gbc.gridy = 7; form.add(activeBox, gbc);
         }
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("dictionaries.tab.qualities"),
@@ -323,16 +360,38 @@ public final class DictionariesView extends JPanel implements NavigableView {
         }
         try {
             String code = validateCode(codeF.getText());
-            BigDecimal price = new BigDecimal(priceF.getText().trim().replace(',', '.'));
-            if (price.compareTo(BigDecimal.ZERO) < 0) throw new IllegalArgumentException("Price must be >= 0");
+            BigDecimal priceEur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(eurF.getText()));
+            BigDecimal priceHuf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(hufF.getText()));
+            if (priceEur.compareTo(BigDecimal.ZERO) < 0 || priceHuf.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Prices must be >= 0");
+            }
             if (existing == null) {
-                ctx.getDictionaryDao().insertQualityGrade(code, requireText(enF), requireText(huF), price);
+                ctx.getDictionaryDao().insertQualityGrade(code, requireText(enF), requireText(huF), priceEur, priceHuf);
             } else {
-                ctx.getDictionaryDao().updateQualityGrade(existing.id(), code, requireText(enF), requireText(huF), price, activeBox.isSelected());
+                ctx.getDictionaryDao().updateQualityGrade(existing.id(), code, requireText(enF), requireText(huF),
+                        priceEur, priceHuf, activeBox.isSelected());
             }
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private static void convertEurHufFields(JTextField eurF, JTextField hufF, BigDecimal fxRate) {
+        try {
+            String eurTxt = eurF.getText().trim();
+            if (!eurTxt.isEmpty()) {
+                BigDecimal eur = CurrencyCode.parseAmount(eurTxt);
+                hufF.setText(CurrencyCode.HUF.formatPlain(CurrencyCode.EUR.convertTo(eur, CurrencyCode.HUF, fxRate)));
+                return;
+            }
+            String hufTxt = hufF.getText().trim();
+            if (!hufTxt.isEmpty()) {
+                BigDecimal huf = CurrencyCode.parseAmount(hufTxt);
+                eurF.setText(CurrencyCode.EUR.formatPlain(CurrencyCode.HUF.convertTo(huf, CurrencyCode.EUR, fxRate)));
+            }
+        } catch (Exception ignored) {
+            // Ignore malformed intermediate numbers while typing
         }
     }
 
@@ -451,13 +510,23 @@ public final class DictionariesView extends JPanel implements NavigableView {
         garments = ctx.getDictionaryDao().findGarmentTypes(false);
         garmentModel.setRowCount(0);
         for (GarmentType g : garments) {
-            garmentModel.addRow(new Object[]{g.code(), g.nameEn(), g.nameHu(), g.active() ? yes : no});
+            garmentModel.addRow(new Object[]{
+                    g.code(), g.nameEn(), g.nameHu(),
+                    CurrencyCode.EUR.format(g.priceEurPerKg()),
+                    CurrencyCode.HUF.format(g.priceHufPerKg()),
+                    g.active() ? yes : no
+            });
         }
 
         qualities = ctx.getDictionaryDao().findQualityGrades(false);
         qualityModel.setRowCount(0);
         for (QualityGrade q : qualities) {
-            qualityModel.addRow(new Object[]{q.code(), q.nameEn(), q.nameHu(), q.defaultPricePerKg(), q.active() ? yes : no});
+            qualityModel.addRow(new Object[]{
+                    q.code(), q.nameEn(), q.nameHu(),
+                    CurrencyCode.EUR.format(q.defaultPricePerKg()),
+                    CurrencyCode.HUF.format(q.defaultPriceHufPerKg()),
+                    q.active() ? yes : no
+            });
         }
 
         packages = ctx.getDictionaryDao().findPackageTypes(false);
@@ -482,12 +551,13 @@ public final class DictionariesView extends JPanel implements NavigableView {
         tabs.setTitleAt(3, i18n.t("dictionaries.tab.packages"));
 
         Object[] baseCols = new Object[]{i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"), i18n.t("common.status")};
-        targetModel.setColumnIdentifiers(baseCols);
-        garmentModel.setColumnIdentifiers(baseCols);
-        qualityModel.setColumnIdentifiers(new Object[]{
+        Object[] pricedCols = new Object[]{
                 i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"),
-                i18n.t("dictionaries.default_price"), i18n.t("common.status")
-        });
+                i18n.t("currency.price_eur_kg"), i18n.t("currency.price_huf_kg"), i18n.t("common.status")
+        };
+        targetModel.setColumnIdentifiers(baseCols);
+        garmentModel.setColumnIdentifiers(pricedCols);
+        qualityModel.setColumnIdentifiers(pricedCols);
         packageModel.setColumnIdentifiers(new Object[]{
                 i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"),
                 i18n.t("dictionaries.tare_weight"), i18n.t("dictionaries.max_weight"), i18n.t("common.status")

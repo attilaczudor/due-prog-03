@@ -10,6 +10,7 @@ import hu.due.rewear.dao.RoleDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
@@ -102,9 +103,10 @@ public final class DemoDataSeeder {
                     List<OrderItem> items = orderItemDao.findByOrderId(ord.id());
                     if (items.isEmpty()) continue;
                     Customer cust = customerDao.findById(ord.customerId()).orElse(null);
-                    BigDecimal net = ord.totalPrice().setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal vat = net.multiply(vat27).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-                    BigDecimal gross = net.add(vat).setScale(2, RoundingMode.HALF_UP);
+                    CurrencyCode cur = ord.effectiveCurrency();
+                    BigDecimal net = cur.round(ord.totalPrice());
+                    BigDecimal vat = cur.round(net.multiply(vat27).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+                    BigDecimal gross = cur.round(net.add(vat));
                     boolean paid = ord.status() == OrderStatus.SHIPPED && outSeq == 1;
                     String invNo = String.format("INV-OUT-%d-%04d", today.getYear(), outSeq++);
                     long invId = invoiceDao.insert(conn, invNo, InvoiceDirection.OUTGOING,
@@ -117,37 +119,43 @@ public final class DemoDataSeeder {
                             today.minusDays(paid ? 5 : 1),
                             today.plusDays(paid ? 9 : 13),
                             paid ? today.minusDays(3) : null,
-                            net, vat27, vat, gross, "EUR", creatorId, now.minusDays(paid ? 5 : 1));
+                            net, vat27, vat, gross, cur.name(), CurrencyCode.DEFAULT_EUR_HUF_RATE,
+                            creatorId, now.minusDays(paid ? 5 : 1));
                     for (OrderItem oi : items) {
                         String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
-                        invoiceDao.insertItem(conn, invId, desc, oi.weightKg(), "kg", oi.pricePerKg(), oi.lineTotal());
+                        invoiceDao.insertItem(conn, invId, desc, oi.weightKg(), "kg",
+                                cur.round(oi.pricePerKg()), cur.round(oi.lineTotal()));
                     }
                 }
             }
 
-            // Realistic Incoming (Expense) Invoices for warehouse P&L
+            // Realistic Dual-Currency Incoming (Expense) Invoices for warehouse P&L
+            // 1. European textile import in EUR
             seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0001", InvoiceCategory.RAW_STOCK_PURCHASE,
                     "EuroTex Import GmbH", "DE-294810221", "80331 München, Industriestr. 14",
                     "billing@eurotex-import.de", "Unsorted European Textile Lot (400 kg)",
-                    new BigDecimal("400"), "kg", new BigDecimal("0.95"), BigDecimal.ZERO,
+                    new BigDecimal("400"), "kg", new BigDecimal("0.95"), BigDecimal.ZERO, CurrencyCode.EUR,
                     today.minusDays(8), today.plusDays(6), InvoiceStatus.PAID, today.minusDays(6), creatorId, now);
 
+            // 2. Hungarian warehouse lease in HUF
             seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0002", InvoiceCategory.WAREHOUSE_RENT,
                     "Duna Ipari Park Kft.", "HU-14820911-2-07", "2400 Dunaújváros, Papírgyári út 12.",
                     "penzugy@dunaiparipark.hu", "Warehouse Hall B Monthly Lease",
-                    BigDecimal.ONE, "hó", new BigDecimal("250.00"), vat27,
+                    BigDecimal.ONE, "hó", new BigDecimal("110000"), vat27, CurrencyCode.HUF,
                     today.minusDays(6), today.plusDays(8), InvoiceStatus.PAID, today.minusDays(5), creatorId, now);
 
+            // 3. Hungarian utilities bill in HUF
             seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0003", InvoiceCategory.UTILITIES,
                     "MVM Next Energiakereskedelmi Zrt.", "HU-26713111-2-44", "1081 Budapest, II. János Pál pápa tér 20.",
                     "szamlazas@mvm.hu", "Warehouse Electricity & Heating",
-                    BigDecimal.ONE, "hó", new BigDecimal("85.00"), vat27,
+                    BigDecimal.ONE, "hó", new BigDecimal("36000"), vat27, CurrencyCode.HUF,
                     today.minusDays(2), today.plusDays(12), InvoiceStatus.ISSUED, null, creatorId, now);
 
+            // 4. Packaging & thermal labels in HUF
             seedIncomingExpense(conn, "INV-IN-" + today.getYear() + "-0004", InvoiceCategory.PACKAGING_SUPPLIES,
                     "ZebraLabel Pack Kft.", "HU-25104439-2-13", "2040 Budaörs, Gyár u. 2.",
                     "orders@zebralabel.hu", "Thermal Sticker Rolls 100x150 & 100x100 + Bale Straps",
-                    new BigDecimal("12"), "db", new BigDecimal("4.00"), vat27,
+                    new BigDecimal("12"), "db", new BigDecimal("1600"), vat27, CurrencyCode.HUF,
                     today.minusDays(4), today.plusDays(10), InvoiceStatus.PAID, today.minusDays(3), creatorId, now);
         });
         LOG.info("Seeded starter outgoing & incoming demo invoices.");
@@ -156,14 +164,15 @@ public final class DemoDataSeeder {
     private void seedIncomingExpense(Connection conn, String invNo, InvoiceCategory cat,
                                      String partner, String tax, String addr, String email,
                                      String desc, BigDecimal qty, String unit, BigDecimal unitPrice,
-                                     BigDecimal vatRate, LocalDate issue, LocalDate due,
+                                     BigDecimal vatRate, CurrencyCode currency, LocalDate issue, LocalDate due,
                                      InvoiceStatus status, LocalDate paid, long creatorId, LocalDateTime now) throws SQLException {
-        BigDecimal net = qty.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal vat = net.multiply(vatRate).divide(BigDecimal.valueOf(100), 2, RoundingMode.HALF_UP);
-        BigDecimal gross = net.add(vat).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal net = currency.round(qty.multiply(unitPrice));
+        BigDecimal vat = currency.round(net.multiply(vatRate).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP));
+        BigDecimal gross = currency.round(net.add(vat));
         long id = invoiceDao.insert(conn, invNo, InvoiceDirection.INCOMING, cat, null, null,
-                partner, tax, addr, email, status, issue, due, paid, net, vatRate, vat, gross, "EUR", creatorId, now);
-        invoiceDao.insertItem(conn, id, desc, qty, unit, unitPrice, net);
+                partner, tax, addr, email, status, issue, due, paid, net, vatRate, vat, gross,
+                currency.name(), CurrencyCode.DEFAULT_EUR_HUF_RATE, creatorId, now);
+        invoiceDao.insertItem(conn, id, desc, qty, unit, currency.round(unitPrice), net);
     }
 
     private void seedAll(Connection conn) throws SQLException {
@@ -194,27 +203,31 @@ public final class DemoDataSeeder {
         targets.put("U", dictionaryDao.insertTargetGroup(conn, "U", "Unisex", "Uniszex"));
         targets.put("H", dictionaryDao.insertTargetGroup(conn, "H", "Home Textiles", "Lakástextil"));
 
-        // 4. Garment / Product Types (TYPE)
+        // 4. Garment / Product Types (TYPE) with dual EUR/kg & HUF/kg pricing
         Map<String, Long> garments = new HashMap<>();
-        garments.put("TSH", dictionaryDao.insertGarmentType(conn, "TSH", "T-Shirts", "Pólók"));
-        garments.put("JNS", dictionaryDao.insertGarmentType(conn, "JNS", "Jeans", "Farmerek"));
-        garments.put("JKT", dictionaryDao.insertGarmentType(conn, "JKT", "Jackets", "Kabátok"));
-        garments.put("DRS", dictionaryDao.insertGarmentType(conn, "DRS", "Dresses", "Ruhák"));
-        garments.put("SWT", dictionaryDao.insertGarmentType(conn, "SWT", "Sweaters", "Pulóverek"));
-        garments.put("SHO", dictionaryDao.insertGarmentType(conn, "SHO", "Shoes", "Cipők"));
-        garments.put("MIX", dictionaryDao.insertGarmentType(conn, "MIX", "Mixed Garments", "Vegyes ruházat"));
+        Map<String, BigDecimal> garmentEur = new HashMap<>();
+        Map<String, BigDecimal> garmentHuf = new HashMap<>();
+        garments.put("TSH", dictionaryDao.insertGarmentType(conn, "TSH", "T-Shirts", "Pólók", new BigDecimal("4.50"), new BigDecimal("1800")));
+        garmentEur.put("TSH", new BigDecimal("4.50")); garmentHuf.put("TSH", new BigDecimal("1800"));
+        garments.put("JNS", dictionaryDao.insertGarmentType(conn, "JNS", "Jeans", "Farmerek", new BigDecimal("5.50"), new BigDecimal("2200")));
+        garmentEur.put("JNS", new BigDecimal("5.50")); garmentHuf.put("JNS", new BigDecimal("2200"));
+        garments.put("JKT", dictionaryDao.insertGarmentType(conn, "JKT", "Jackets", "Kabátok", new BigDecimal("7.50"), new BigDecimal("3000")));
+        garmentEur.put("JKT", new BigDecimal("7.50")); garmentHuf.put("JKT", new BigDecimal("3000"));
+        garments.put("DRS", dictionaryDao.insertGarmentType(conn, "DRS", "Dresses", "Ruhák", new BigDecimal("6.00"), new BigDecimal("2400")));
+        garmentEur.put("DRS", new BigDecimal("6.00")); garmentHuf.put("DRS", new BigDecimal("2400"));
+        garments.put("SWT", dictionaryDao.insertGarmentType(conn, "SWT", "Sweaters", "Pulóverek", new BigDecimal("5.00"), new BigDecimal("2000")));
+        garmentEur.put("SWT", new BigDecimal("5.00")); garmentHuf.put("SWT", new BigDecimal("2000"));
+        garments.put("SHO", dictionaryDao.insertGarmentType(conn, "SHO", "Shoes", "Cipők", new BigDecimal("8.00"), new BigDecimal("3200")));
+        garmentEur.put("SHO", new BigDecimal("8.00")); garmentHuf.put("SHO", new BigDecimal("3200"));
+        garments.put("MIX", dictionaryDao.insertGarmentType(conn, "MIX", "Mixed Garments", "Vegyes ruházat", new BigDecimal("3.50"), new BigDecimal("1400")));
+        garmentEur.put("MIX", new BigDecimal("3.50")); garmentHuf.put("MIX", new BigDecimal("1400"));
 
-        // 5. Quality Grades (QUALITY)
+        // 5. Quality Grades (QUALITY) with dual EUR/kg & HUF/kg fallback prices
         Map<String, Long> qualities = new HashMap<>();
-        Map<String, BigDecimal> gradePrices = new HashMap<>();
-        qualities.put("CR", dictionaryDao.insertQualityGrade(conn, "CR", "Cream / Extra", "Krém / Extra", new BigDecimal("9.50")));
-        gradePrices.put("CR", new BigDecimal("9.50"));
-        qualities.put("A", dictionaryDao.insertQualityGrade(conn, "A", "Grade A", "A osztály", new BigDecimal("5.20")));
-        gradePrices.put("A", new BigDecimal("5.20"));
-        qualities.put("B", dictionaryDao.insertQualityGrade(conn, "B", "Grade B", "B osztály", new BigDecimal("2.80")));
-        gradePrices.put("B", new BigDecimal("2.80"));
-        qualities.put("C", dictionaryDao.insertQualityGrade(conn, "C", "Grade C / Rags", "C osztály / Géprongy", new BigDecimal("0.90")));
-        gradePrices.put("C", new BigDecimal("0.90"));
+        qualities.put("CR", dictionaryDao.insertQualityGrade(conn, "CR", "Cream / Extra", "Krém / Extra", new BigDecimal("9.50"), new BigDecimal("3800")));
+        qualities.put("A", dictionaryDao.insertQualityGrade(conn, "A", "Grade A", "A osztály", new BigDecimal("5.20"), new BigDecimal("2080")));
+        qualities.put("B", dictionaryDao.insertQualityGrade(conn, "B", "Grade B", "B osztály", new BigDecimal("2.80"), new BigDecimal("1120")));
+        qualities.put("C", dictionaryDao.insertQualityGrade(conn, "C", "Grade C / Rags", "C osztály / Géprongy", new BigDecimal("0.90"), new BigDecimal("360")));
 
         // 6. Package Types (PACKAGETYPE)
         Map<String, Long> packages = new HashMap<>();
@@ -232,15 +245,15 @@ public final class DemoDataSeeder {
         locations.put("B-01-02", locationDao.insert(conn, "B-01-02", "B", "01", "02", new BigDecimal("800")));
         locations.put("C-01-01", locationDao.insert(conn, "C-01-01", "C", "01", "01", new BigDecimal("1200")));
 
-        // 8. Customers
+        // 8. Customers (Hungarian B2B in HUF, Slovak export partner in EUR)
         long cust1 = customerDao.insert(conn, "Duna Vintage Kft.", "Szabó Márta", "marta@dunavintage.hu",
-                "+36 30 555 1201", "2400 Dunaújváros, Vasmű út 18.", "24891234-2-07", now.minusDays(20));
+                "+36 30 555 1201", "2400 Dunaújváros, Vasmű út 18.", "24891234-2-07", CurrencyCode.HUF, now.minusDays(20));
         long cust2 = customerDao.insert(conn, "Pannon Textil Outlet Bt.", "Tóth Gábor", "rendeles@pannontextil.hu",
-                "+36 20 444 9832", "8000 Székesfehérvár, Budai út 44.", "21904411-2-07", now.minusDays(18));
+                "+36 20 444 9832", "8000 Székesfehérvár, Budai út 44.", "21904411-2-07", CurrencyCode.HUF, now.minusDays(18));
         long cust3 = customerDao.insert(conn, "GreenLoop Second-Hand S.R.O.", "Jana Nováková", "supply@greenloop.sk",
-                "+421 905 331 890", "811 06 Bratislava, Obchodná 22", "SK2024119822", now.minusDays(15));
+                "+421 905 331 890", "811 06 Bratislava, Obchodná 22", "SK2024119822", CurrencyCode.EUR, now.minusDays(15));
         long cust4 = customerDao.insert(conn, "Alföld Ruhabázis Kft.", "Varga László", "info@alfoldruha.hu",
-                "+36 70 312 6640", "6000 Kecskemét, Izsáki út 10.", "26778890-2-03", now.minusDays(9));
+                "+36 70 312 6640", "6000 Kecskemét, Izsáki út 10.", "26778890-2-03", CurrencyCode.HUF, now.minusDays(9));
 
         // 9. Inventory Packages + Stock Movements
         record SeedBale(LocalDateTime ts, String t, String g, String q, String p, String w, String hex,
@@ -275,7 +288,8 @@ public final class DemoDataSeeder {
 
         long[] pkgIds = new long[seedBales.length];
         BigDecimal[] pkgWeights = new BigDecimal[seedBales.length];
-        BigDecimal[] pkgPrices = new BigDecimal[seedBales.length];
+        BigDecimal[] pkgPricesEur = new BigDecimal[seedBales.length];
+        BigDecimal[] pkgPricesHuf = new BigDecimal[seedBales.length];
 
         for (int i = 0; i < seedBales.length; i++) {
             SeedBale b = seedBales[i];
@@ -289,7 +303,8 @@ public final class DemoDataSeeder {
             );
             pkgIds[i] = pkgId;
             pkgWeights[i] = weight;
-            pkgPrices[i] = gradePrices.get(b.q());
+            pkgPricesEur[i] = garmentEur.get(b.g());
+            pkgPricesHuf[i] = garmentHuf.get(b.g());
 
             movementDao.insert(conn, pkgId, MovementType.INTAKE, null, locId, b.userId(), "Initial intake", b.ts());
         }
@@ -300,35 +315,37 @@ public final class DemoDataSeeder {
         movementDao.insert(conn, pkgIds[2], MovementType.RELOCATE, locations.get("A-01-01"), locations.get("A-01-02"),
                 operatorId, "Consolidated denim rack", now.minusDays(2).withHour(12).withMinute(30));
 
-        // 10. Orders & Order Items
-        // Order 1: SHIPPED (indices 18, 19, 20)
+        // 10. Orders & Order Items (both HUF domestic and EUR export showcase)
+        // Order 1: SHIPPED in HUF (Hungarian domestic partner, indices 18, 19, 20)
         BigDecimal ord1Weight = pkgWeights[18].add(pkgWeights[19]).add(pkgWeights[20]);
-        BigDecimal ord1Price = pkgWeights[18].multiply(pkgPrices[18])
-                .add(pkgWeights[19].multiply(pkgPrices[19]))
-                .add(pkgWeights[20].multiply(pkgPrices[20]));
-        long order1Id = orderDao.insert(conn, "ORD-2026-0001", cust2, OrderStatus.SHIPPED,
+        BigDecimal ord1Price = CurrencyCode.HUF.round(pkgWeights[18].multiply(pkgPricesHuf[18])
+                .add(pkgWeights[19].multiply(pkgPricesHuf[19]))
+                .add(pkgWeights[20].multiply(pkgPricesHuf[20])));
+        long order1Id = orderDao.insert(conn, "ORD-2026-0001", cust2, OrderStatus.SHIPPED, CurrencyCode.HUF,
                 ord1Weight, ord1Price, "Completed autumn delivery", managerId, now.minusDays(6), now.minusDays(5));
         for (int idx : new int[]{18, 19, 20}) {
-            orderItemDao.insert(conn, order1Id, pkgIds[idx], pkgPrices[idx], pkgWeights[idx].multiply(pkgPrices[idx]));
+            orderItemDao.insert(conn, order1Id, pkgIds[idx], pkgPricesHuf[idx],
+                    CurrencyCode.HUF.round(pkgWeights[idx].multiply(pkgPricesHuf[idx])));
             movementDao.insert(conn, pkgIds[idx], MovementType.SHIP, locations.get(seedBales[idx].loc()), null,
                     managerId, "Shipped on ORD-2026-0001", now.minusDays(5));
         }
 
-        // Order 2: PACKING (indices 15, 16, 17)
+        // Order 2: PACKING in EUR (indices 15, 16, 17)
         BigDecimal ord2Weight = pkgWeights[15].add(pkgWeights[16]).add(pkgWeights[17]);
-        BigDecimal ord2Price = pkgWeights[15].multiply(pkgPrices[15])
-                .add(pkgWeights[16].multiply(pkgPrices[16]))
-                .add(pkgWeights[17].multiply(pkgPrices[17]));
-        long order2Id = orderDao.insert(conn, "ORD-2026-0002", cust1, OrderStatus.PACKING,
+        BigDecimal ord2Price = CurrencyCode.EUR.round(pkgWeights[15].multiply(pkgPricesEur[15])
+                .add(pkgWeights[16].multiply(pkgPricesEur[16]))
+                .add(pkgWeights[17].multiply(pkgPricesEur[17])));
+        long order2Id = orderDao.insert(conn, "ORD-2026-0002", cust1, OrderStatus.PACKING, CurrencyCode.EUR,
                 ord2Weight, ord2Price, "Ready for Friday pickup", managerId, now.minusDays(2), null);
         for (int idx : new int[]{15, 16, 17}) {
-            orderItemDao.insert(conn, order2Id, pkgIds[idx], pkgPrices[idx], pkgWeights[idx].multiply(pkgPrices[idx]));
+            orderItemDao.insert(conn, order2Id, pkgIds[idx], pkgPricesEur[idx],
+                    CurrencyCode.EUR.round(pkgWeights[idx].multiply(pkgPricesEur[idx])));
             movementDao.insert(conn, pkgIds[idx], MovementType.RESERVE, locations.get(seedBales[idx].loc()),
                     locations.get(seedBales[idx].loc()), managerId, "Reserved for ORD-2026-0002", now.minusDays(1));
         }
 
-        // Order 3: DRAFT (empty, ready to scan bales into during live demo!)
-        orderDao.insert(conn, "ORD-2026-0003", cust3, OrderStatus.DRAFT,
+        // Order 3: DRAFT in EUR (Slovak export customer, ready to scan bales into during live demo!)
+        orderDao.insert(conn, "ORD-2026-0003", cust3, OrderStatus.DRAFT, CurrencyCode.EUR,
                 BigDecimal.ZERO, BigDecimal.ZERO, "Export draft — scan bales to pack", adminId, now.minusHours(3), null);
     }
 }

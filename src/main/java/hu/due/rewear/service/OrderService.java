@@ -5,6 +5,7 @@ import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
 import hu.due.rewear.dao.StockMovementDao;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.MovementType;
 import hu.due.rewear.model.Order;
@@ -47,15 +48,20 @@ public final class OrderService {
     }
 
     public Order createOrder(long customerId, String notes, long userId) {
+        return createOrder(customerId, CurrencyCode.EUR, notes, userId);
+    }
+
+    public Order createOrder(long customerId, CurrencyCode currency, String notes, long userId) {
         LocalDateTime now = LocalDateTime.now();
+        CurrencyCode cur = currency != null ? currency : CurrencyCode.EUR;
         String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
         long orderId = db.executeInTransaction(conn -> {
             String orderNumber = orderDao.generateNextOrderNumber(conn);
-            return orderDao.insert(conn, orderNumber, customerId, OrderStatus.DRAFT,
+            return orderDao.insert(conn, orderNumber, customerId, OrderStatus.DRAFT, cur,
                     BigDecimal.ZERO, BigDecimal.ZERO, cleanNotes, userId, now, null);
         });
         Order created = orderDao.findById(orderId).orElseThrow();
-        LOG.info("Created order {} for customerId={} by userId={}", created.orderNumber(), customerId, userId);
+        LOG.info("Created order {} ({}) for customerId={} by userId={}", created.orderNumber(), cur, customerId, userId);
         return created;
     }
 
@@ -71,11 +77,12 @@ public final class OrderService {
             throw new IllegalStateException("Package " + pkg.qrCode() + " is not IN_STOCK (status: " + pkg.status() + ")");
         }
 
-        BigDecimal unitPrice = customPricePerKg != null ? customPricePerKg : pkg.defaultPricePerKg();
+        CurrencyCode cur = order.effectiveCurrency();
+        BigDecimal unitPrice = customPricePerKg != null ? cur.round(customPricePerKg) : pkg.effectivePricePerKg(cur);
         if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Price per kg must be >= 0");
         }
-        BigDecimal lineTotal = pkg.weightKg().multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal lineTotal = cur.round(pkg.weightKg().multiply(unitPrice));
         LocalDateTime now = LocalDateTime.now();
 
         db.runInTransaction(conn -> {
@@ -83,10 +90,39 @@ public final class OrderService {
             packageDao.updateStatus(conn, packageId, PackageStatus.RESERVED, now);
             movementDao.insert(conn, packageId, MovementType.RESERVE, pkg.locationId(), pkg.locationId(),
                     userId, "Reserved for " + order.orderNumber(), now);
-            recalculateTotals(conn, orderId);
+            recalculateTotals(conn, orderId, cur);
         });
 
-        LOG.info("Added package {} to order {}", pkg.qrCode(), order.orderNumber());
+        LOG.info("Added package {} to order {} ({} {}/kg)", pkg.qrCode(), order.orderNumber(), unitPrice, cur);
+        return orderDao.findById(orderId).orElseThrow();
+    }
+
+    /**
+     * Switches an open (DRAFT / PACKING) order between EUR and HUF, recalculating every allocated
+     * package's unit price from its product/grade price in the target currency and updating order totals.
+     */
+    public Order changeOrderCurrency(long orderId, CurrencyCode targetCurrency) {
+        Order order = orderDao.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (order.status() != OrderStatus.DRAFT && order.status() != OrderStatus.PACKING) {
+            throw new IllegalStateException("Cannot change currency for order in status: " + order.status());
+        }
+        CurrencyCode cur = targetCurrency != null ? targetCurrency : CurrencyCode.EUR;
+        if (order.effectiveCurrency() == cur) {
+            return order;
+        }
+        List<OrderItem> items = orderItemDao.findByOrderId(orderId);
+        db.runInTransaction(conn -> {
+            orderDao.updateCurrency(conn, orderId, cur);
+            for (OrderItem item : items) {
+                InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                BigDecimal unitPrice = pkg.effectivePricePerKg(cur);
+                BigDecimal lineTotal = cur.round(pkg.weightKg().multiply(unitPrice));
+                orderItemDao.updateItemPricing(conn, item.id(), unitPrice, lineTotal);
+            }
+            recalculateTotals(conn, orderId, cur);
+        });
+        LOG.info("Changed order {} currency to {}", order.orderNumber(), cur);
         return orderDao.findById(orderId).orElseThrow();
     }
 
@@ -110,7 +146,7 @@ public final class OrderService {
             packageDao.updateStatus(conn, pkg.id(), PackageStatus.IN_STOCK, now);
             movementDao.insert(conn, pkg.id(), MovementType.RELEASE, pkg.locationId(), pkg.locationId(),
                     userId, "Released from " + order.orderNumber(), now);
-            recalculateTotals(conn, orderId);
+            recalculateTotals(conn, orderId, order.effectiveCurrency());
         });
 
         return orderDao.findById(orderId).orElseThrow();
@@ -211,7 +247,7 @@ public final class OrderService {
         return changeOrderStatus(orderId, OrderStatus.CANCELLED, userId);
     }
 
-    private void recalculateTotals(Connection conn, long orderId) throws SQLException {
+    private void recalculateTotals(Connection conn, long orderId, CurrencyCode currency) throws SQLException {
         String sql = """
                 SELECT COALESCE(SUM(ip.weight_kg), 0) AS total_w,
                        COALESCE(SUM(oi.line_total), 0) AS total_p
@@ -226,7 +262,7 @@ public final class OrderService {
                 BigDecimal totalP = BigDecimal.ZERO;
                 if (rs.next()) {
                     totalW = BigDecimal.valueOf(rs.getDouble("total_w"));
-                    totalP = BigDecimal.valueOf(rs.getDouble("total_p")).setScale(2, RoundingMode.HALF_UP);
+                    totalP = currency.round(BigDecimal.valueOf(rs.getDouble("total_p")));
                 }
                 orderDao.updateTotals(conn, orderId, totalW, totalP);
             }

@@ -79,6 +79,17 @@ public final class OrderItemDao {
         }
     }
 
+    public void updateItemPricing(Connection conn, long orderItemId,
+                                  BigDecimal pricePerKg, BigDecimal lineTotal) throws SQLException {
+        String sql = "UPDATE order_items SET price_per_kg = ?, line_total = ? WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setDouble(1, pricePerKg.doubleValue());
+            ps.setDouble(2, lineTotal.doubleValue());
+            ps.setLong(3, orderItemId);
+            ps.executeUpdate();
+        }
+    }
+
     public void deleteById(Connection conn, long orderItemId) throws SQLException {
         String sql = "DELETE FROM order_items WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {

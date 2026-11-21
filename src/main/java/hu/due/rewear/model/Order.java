@@ -9,6 +9,7 @@ public record Order(
         long customerId,
         String customerName,
         OrderStatus status,
+        CurrencyCode currency,
         BigDecimal totalWeightKg,
         BigDecimal totalPrice,
         String notes,
@@ -17,4 +18,12 @@ public record Order(
         LocalDateTime createdAt,
         LocalDateTime shippedAt
 ) {
+    public CurrencyCode effectiveCurrency() {
+        return currency != null ? currency : CurrencyCode.EUR;
+    }
+
+    @Override
+    public String toString() {
+        return orderNumber + " — " + customerName + " (" + effectiveCurrency().format(totalPrice) + ")";
+    }
 }

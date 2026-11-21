@@ -6,6 +6,7 @@ import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.pdf.PdfWriter;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceItem;
@@ -262,6 +263,7 @@ public final class InvoicePdfExporter {
         }
         y += rowH;
 
+        CurrencyCode cur = inv.currencyCode();
         g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 8));
         for (int idx = 0; idx < slice.size(); idx++) {
             InvoiceItem item = slice.get(idx);
@@ -278,8 +280,8 @@ public final class InvoicePdfExporter {
                     truncate(item.description(), 46),
                     stripZeros(item.quantity()),
                     item.unit(),
-                    formatMoney(item.unitPrice()),
-                    formatMoney(item.lineNet())
+                    cur.formatNumber(item.unitPrice()),
+                    cur.formatNumber(item.lineNet())
             };
             cx = margin;
             for (int c = 0; c < cells.length; c++) {
@@ -291,24 +293,35 @@ public final class InvoicePdfExporter {
 
         if (isLastPage) {
             y += 16;
-            float sumW = 240f;
+            float sumW = 250f;
             float sx = margin + contentW - sumW;
             float sumH = 74f;
             g.setColor(Color.BLACK);
             g.setStroke(new BasicStroke(1.5f));
             g.drawRect(Math.round(sx), Math.round(y), Math.round(sumW), Math.round(sumH));
 
+            // Show FX rate reference note on the left when invoiced in EUR
+            if (cur == CurrencyCode.EUR) {
+                g.setColor(new Color(0x444444));
+                g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 8));
+                String fxNote = "FX: 1 EUR = " + formatMoney(inv.effectiveExchangeRate()) + " HUF";
+                String hufEq = "≈ " + CurrencyCode.HUF.format(cur.convertTo(inv.grossAmount(), CurrencyCode.HUF, inv.effectiveExchangeRate()));
+                g.drawString(fxNote, margin, y + 18);
+                g.drawString(hufEq, margin, y + 32);
+                g.setColor(Color.BLACK);
+            }
+
             g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));
             drawSummaryRow(g, i18n.t("invoice.net_amount").toUpperCase(Locale.ROOT) + ":",
-                    formatMoney(inv.netAmount()) + " " + inv.currency(), sx + 10, sx + sumW - 10, y + 18);
+                    cur.format(inv.netAmount()), sx + 10, sx + sumW - 10, y + 18);
             drawSummaryRow(g, i18n.t("invoice.vat").toUpperCase(Locale.ROOT) + " (" + stripZeros(inv.vatRate()) + "%):",
-                    formatMoney(inv.vatAmount()) + " " + inv.currency(), sx + 10, sx + sumW - 10, y + 36);
+                    cur.format(inv.vatAmount()), sx + 10, sx + sumW - 10, y + 36);
 
             g.fillRect(Math.round(sx), Math.round(y + 46), Math.round(sumW), 28);
             g.setColor(Color.WHITE);
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
             drawSummaryRow(g, i18n.t("invoice.gross_amount").toUpperCase(Locale.ROOT) + ":",
-                    formatMoney(inv.grossAmount()) + " " + inv.currency(), sx + 10, sx + sumW - 10, y + 64);
+                    cur.format(inv.grossAmount()), sx + 10, sx + sumW - 10, y + 64);
 
             // Signature lines
             float sigY = Math.min(pageH - 70f, y + sumH + 54f);

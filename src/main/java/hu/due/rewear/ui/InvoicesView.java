@@ -3,6 +3,7 @@ package hu.due.rewear.ui;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.FinancialSummary;
 import hu.due.rewear.model.Invoice;
@@ -65,6 +66,16 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     private final AppContext ctx;
 
+    // Currency & Exchange Rate Control Bar
+    private final JPanel fxBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
+    private final JLabel reportingCurLabel = new JLabel();
+    private final JButton reportHufBtn = new JButton("HUF");
+    private final JButton reportEurBtn = new JButton("EUR");
+    private final JLabel fxRateLabel = new JLabel();
+    private final JTextField fxRateField = new JTextField("400.00", 7);
+    private final JLabel fxSuffixLabel = new JLabel("HUF");
+    private final JButton saveFxBtn = new JButton();
+
     // 4 Financial KPI Cards
     private final JPanel kpiCardIncome = new JPanel();
     private final JPanel kpiCardExpense = new JPanel();
@@ -76,10 +87,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JLabel kpiTitleBalance = new JLabel();
     private final JLabel kpiTitleUnpaid = new JLabel();
 
-    private final JLabel kpiValIncome = new JLabel("0.00 EUR");
-    private final JLabel kpiValExpense = new JLabel("0.00 EUR");
-    private final JLabel kpiValBalance = new JLabel("0.00 EUR");
-    private final JLabel kpiValUnpaid = new JLabel("0.00 EUR");
+    private final JLabel kpiValIncome = new JLabel("0 HUF");
+    private final JLabel kpiValExpense = new JLabel("0 HUF");
+    private final JLabel kpiValBalance = new JLabel("0 HUF");
+    private final JLabel kpiValUnpaid = new JLabel("0 HUF");
 
     private final JLabel kpiSubIncome = new JLabel(" ");
     private final JLabel kpiSubExpense = new JLabel(" ");
@@ -90,6 +101,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JPanel filterCard = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
     private final JTextField searchField = new JTextField(16);
     private final JComboBox<FilterItem<InvoiceDirection>> directionFilter = new JComboBox<>();
+    private final JComboBox<FilterItem<CurrencyCode>> currencyFilter = new JComboBox<>();
     private final JComboBox<FilterItem<InvoiceStatus>> statusFilter = new JComboBox<>();
     private final JComboBox<FilterItem<InvoiceCategory>> categoryFilter = new JComboBox<>();
     private final JButton refreshBtn = new JButton();
@@ -137,6 +149,23 @@ public final class InvoicesView extends JPanel implements NavigableView {
         northStack.setLayout(new BoxLayout(northStack, BoxLayout.Y_AXIS));
         northStack.setOpaque(false);
 
+        // 0. Reporting Currency & Exchange Rate Strip
+        fxBar.setAlignmentX(LEFT_ALIGNMENT);
+        reportingCurLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
+        fxRateLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
+        fxSuffixLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
+        fxRateField.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
+        fxBar.add(reportingCurLabel);
+        fxBar.add(reportHufBtn);
+        fxBar.add(reportEurBtn);
+        fxBar.add(Box.createHorizontalStrut(12));
+        fxBar.add(fxRateLabel);
+        fxBar.add(fxRateField);
+        fxBar.add(fxSuffixLabel);
+        fxBar.add(saveFxBtn);
+        northStack.add(fxBar);
+        northStack.add(Box.createVerticalStrut(8));
+
         // 1. Financial KPI Cards
         JPanel kpiGrid = new JPanel(new GridLayout(1, 4, 12, 0));
         kpiGrid.setOpaque(false);
@@ -156,6 +185,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         filterCard.setAlignmentX(LEFT_ALIGNMENT);
         filterCard.add(searchField);
         filterCard.add(directionFilter);
+        filterCard.add(currencyFilter);
         filterCard.add(statusFilter);
         filterCard.add(categoryFilter);
         filterCard.add(refreshBtn);
@@ -184,6 +214,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         addComponentListener(new ComponentAdapter() {
             @Override
             public void componentResized(ComponentEvent e) {
+                fxBar.revalidate();
                 filterCard.revalidate();
                 actionBar.revalidate();
                 northStack.revalidate();
@@ -204,8 +235,14 @@ public final class InvoicesView extends JPanel implements NavigableView {
     }
 
     private void wireEvents() {
+        reportHufBtn.addActionListener(e -> switchReportingCurrency(CurrencyCode.HUF));
+        reportEurBtn.addActionListener(e -> switchReportingCurrency(CurrencyCode.EUR));
+        saveFxBtn.addActionListener(e -> handleSaveFxRate());
+        fxRateField.addActionListener(e -> handleSaveFxRate());
+
         searchField.addActionListener(e -> applyFiltersAndRender());
         directionFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
+        currencyFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         statusFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         categoryFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         refreshBtn.addActionListener(e -> refreshData());
@@ -229,6 +266,38 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 }
             }
         });
+    }
+
+    private void switchReportingCurrency(CurrencyCode target) {
+        ctx.getInvoiceService().setReportingCurrency(target);
+        styleReportingButtons();
+        applyFiltersAndRender();
+    }
+
+    private void handleSaveFxRate() {
+        I18nManager i18n = ctx.getI18n();
+        try {
+            BigDecimal rate = CurrencyCode.parseAmount(fxRateField.getText());
+            ctx.getInvoiceService().updateEurToHufRate(rate);
+            BigDecimal saved = ctx.getInvoiceService().getCurrentEurToHufRate();
+            fxRateField.setText(CurrencyCode.EUR.formatPlain(saved));
+            applyFiltersAndRender();
+            JOptionPane.showMessageDialog(this, i18n.t("currency.fx_saved", CurrencyCode.EUR.formatPlain(saved)),
+                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void styleReportingButtons() {
+        CurrencyCode active = ctx.getInvoiceService().getReportingCurrency();
+        if (active == CurrencyCode.HUF) {
+            BrutalistStyle.stylePrimaryButton(reportHufBtn);
+            BrutalistStyle.styleSecondaryButton(reportEurBtn);
+        } else {
+            BrutalistStyle.styleSecondaryButton(reportHufBtn);
+            BrutalistStyle.stylePrimaryButton(reportEurBtn);
+        }
     }
 
     private Invoice getSelectedInvoice() {
@@ -301,6 +370,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
             orderPicker.addItem(o);
         }
 
+        JComboBox<CurrencyCode> curCombo = new JComboBox<>(CurrencyCode.values());
+        curCombo.setSelectedItem(ctx.getInvoiceService().getReportingCurrency());
         JTextField partnerF = new JTextField(22);
         JTextField taxF = new JTextField(22);
         JTextField addressF = new JTextField(22);
@@ -308,11 +379,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
         JTextField descF = new JTextField(22);
         JTextField qtyF = new JTextField("1", 10);
         JTextField unitF = new JTextField("kg", 8);
-        JTextField priceF = new JTextField("0.00", 10);
+        JTextField priceF = new JTextField("0", 10);
         JTextField vatF = new JTextField("27", 8);
+        JLabel priceLabel = new JLabel(i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:");
+
+        curCombo.addActionListener(e -> priceLabel.setText(
+                i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:"));
 
         orderPicker.addActionListener(e -> {
             boolean manual = !(orderPicker.getSelectedItem() instanceof Order);
+            curCombo.setEnabled(manual);
+            if (orderPicker.getSelectedItem() instanceof Order ord) {
+                curCombo.setSelectedItem(ord.effectiveCurrency());
+            }
             partnerF.setEnabled(manual);
             taxF.setEnabled(manual);
             addressF.setEnabled(manual);
@@ -329,6 +408,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
         addFormRow(form, gbc, r++, i18n.t("invoice.from_order"), orderPicker);
+        addFormRow(form, gbc, r++, i18n.t("currency.label") + " *", curCombo);
         addFormRow(form, gbc, r++, i18n.t("invoice.partner") + " *", partnerF);
         addFormRow(form, gbc, r++, i18n.t("invoice.tax_number"), taxF);
         addFormRow(form, gbc, r++, i18n.t("invoice.address"), addressF);
@@ -336,7 +416,9 @@ public final class InvoicesView extends JPanel implements NavigableView {
         addFormRow(form, gbc, r++, i18n.t("invoice.item.description") + " *", descF);
         addFormRow(form, gbc, r++, i18n.t("invoice.item.qty") + " *", qtyF);
         addFormRow(form, gbc, r++, i18n.t("invoice.item.unit"), unitF);
-        addFormRow(form, gbc, r++, i18n.t("invoice.item.unit_price") + " (EUR) *", priceF);
+        gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; form.add(priceLabel, gbc);
+        gbc.gridx = 1; gbc.weightx = 1; form.add(priceF, gbc);
+        r++;
         addFormRow(form, gbc, r, i18n.t("invoice.vat_rate"), vatF);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.new_outgoing"),
@@ -345,18 +427,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
         }
 
         try {
-            BigDecimal vatRate = new BigDecimal(vatF.getText().trim().replace(',', '.'));
+            BigDecimal vatRate = CurrencyCode.parseAmount(vatF.getText());
             long userId = ctx.getSession().requireCurrentUser().id();
             Invoice created;
             if (orderPicker.getSelectedItem() instanceof Order chosenOrder) {
                 created = ctx.getInvoiceService().ensureInvoiceForOrder(chosenOrder.id(), vatRate, userId);
             } else {
-                BigDecimal qty = new BigDecimal(qtyF.getText().trim().replace(',', '.'));
-                BigDecimal unitPrice = new BigDecimal(priceF.getText().trim().replace(',', '.'));
+                CurrencyCode chosenCur = curCombo.getSelectedItem() instanceof CurrencyCode cc ? cc : CurrencyCode.EUR;
+                BigDecimal qty = CurrencyCode.parseAmount(qtyF.getText());
+                BigDecimal unitPrice = CurrencyCode.parseAmount(priceF.getText());
                 created = ctx.getInvoiceService().createManualInvoice(
                         InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, null,
                         partnerF.getText(), taxF.getText(), addressF.getText(), emailF.getText(),
-                        descF.getText(), qty, unitF.getText(), unitPrice, vatRate,
+                        descF.getText(), qty, unitF.getText(), unitPrice, vatRate, chosenCur,
                         LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
             }
             refreshDataSelecting(created.id());
@@ -373,6 +456,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 catCombo.addItem(new FilterItem<>(cat, i18n.t("invoice.category." + cat.name())));
             }
         }
+        JComboBox<CurrencyCode> curCombo = new JComboBox<>(CurrencyCode.values());
+        curCombo.setSelectedItem(ctx.getInvoiceService().getReportingCurrency());
         JTextField invNoF = new JTextField(22);
         JTextField partnerF = new JTextField(22);
         JTextField taxF = new JTextField(22);
@@ -381,8 +466,11 @@ public final class InvoicesView extends JPanel implements NavigableView {
         JTextField descF = new JTextField(22);
         JTextField qtyF = new JTextField("1", 10);
         JTextField unitF = new JTextField("db", 8);
-        JTextField priceF = new JTextField("0.00", 10);
+        JTextField priceF = new JTextField("0", 10);
         JTextField vatF = new JTextField("27", 8);
+        JLabel priceLabel = new JLabel(i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:");
+        curCombo.addActionListener(e -> priceLabel.setText(
+                i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:"));
 
         JComboBox<StatusChoice> initStatusCombo = new JComboBox<>();
         for (InvoiceStatus st : List.of(InvoiceStatus.ISSUED, InvoiceStatus.PAID, InvoiceStatus.DRAFT)) {
@@ -395,6 +483,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
         addFormRow(form, gbc, r++, i18n.t("invoice.category") + " *", catCombo);
+        addFormRow(form, gbc, r++, i18n.t("currency.label") + " *", curCombo);
         addFormRow(form, gbc, r++, i18n.t("invoice.number_optional"), invNoF);
         addFormRow(form, gbc, r++, i18n.t("invoice.partner") + " *", partnerF);
         addFormRow(form, gbc, r++, i18n.t("invoice.tax_number"), taxF);
@@ -403,7 +492,9 @@ public final class InvoicesView extends JPanel implements NavigableView {
         addFormRow(form, gbc, r++, i18n.t("invoice.item.description") + " *", descF);
         addFormRow(form, gbc, r++, i18n.t("invoice.item.qty") + " *", qtyF);
         addFormRow(form, gbc, r++, i18n.t("invoice.item.unit"), unitF);
-        addFormRow(form, gbc, r++, i18n.t("invoice.item.unit_price") + " (EUR) *", priceF);
+        gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; form.add(priceLabel, gbc);
+        gbc.gridx = 1; gbc.weightx = 1; form.add(priceF, gbc);
+        r++;
         addFormRow(form, gbc, r++, i18n.t("invoice.vat_rate"), vatF);
         addFormRow(form, gbc, r, i18n.t("common.status"), initStatusCombo);
 
@@ -416,15 +507,16 @@ public final class InvoicesView extends JPanel implements NavigableView {
             @SuppressWarnings("unchecked")
             FilterItem<InvoiceCategory> catItem = (FilterItem<InvoiceCategory>) catCombo.getSelectedItem();
             StatusChoice stChoice = (StatusChoice) initStatusCombo.getSelectedItem();
-            BigDecimal qty = new BigDecimal(qtyF.getText().trim().replace(',', '.'));
-            BigDecimal price = new BigDecimal(priceF.getText().trim().replace(',', '.'));
-            BigDecimal vatRate = new BigDecimal(vatF.getText().trim().replace(',', '.'));
+            CurrencyCode chosenCur = curCombo.getSelectedItem() instanceof CurrencyCode cc ? cc : CurrencyCode.EUR;
+            BigDecimal qty = CurrencyCode.parseAmount(qtyF.getText());
+            BigDecimal price = CurrencyCode.parseAmount(priceF.getText());
+            BigDecimal vatRate = CurrencyCode.parseAmount(vatF.getText());
             Invoice created = ctx.getInvoiceService().createManualInvoice(
                     InvoiceDirection.INCOMING,
                     catItem != null ? catItem.value() : InvoiceCategory.OTHER_EXPENSE,
                     invNoF.getText(),
                     partnerF.getText(), taxF.getText(), addressF.getText(), emailF.getText(),
-                    descF.getText(), qty, unitF.getText(), price, vatRate,
+                    descF.getText(), qty, unitF.getText(), price, vatRate, chosenCur,
                     LocalDate.now(), LocalDate.now().plusDays(14),
                     stChoice != null ? stChoice.status() : InvoiceStatus.ISSUED,
                     ctx.getSession().requireCurrentUser().id());
@@ -471,6 +563,12 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 directionFilter.addItem(new FilterItem<>(d, i18n.t("invoice.direction." + d.name())));
             }
 
+            currencyFilter.removeAllItems();
+            currencyFilter.addItem(new FilterItem<>(null, i18n.t("currency.label") + ": " + i18n.t("common.all")));
+            for (CurrencyCode c : CurrencyCode.values()) {
+                currencyFilter.addItem(new FilterItem<>(c, c.name()));
+            }
+
             statusFilter.removeAllItems();
             statusFilter.addItem(new FilterItem<>(null, i18n.t("common.status") + ": " + i18n.t("common.all")));
             for (InvoiceStatus s : InvoiceStatus.values()) {
@@ -499,6 +597,9 @@ public final class InvoicesView extends JPanel implements NavigableView {
         InvoiceDirection selDir = directionFilter.getSelectedItem() instanceof FilterItem<?> fi
                 ? (InvoiceDirection) fi.value() : null;
         @SuppressWarnings("unchecked")
+        CurrencyCode selCur = currencyFilter.getSelectedItem() instanceof FilterItem<?> fi
+                ? (CurrencyCode) fi.value() : null;
+        @SuppressWarnings("unchecked")
         InvoiceStatus selStatus = statusFilter.getSelectedItem() instanceof FilterItem<?> fi
                 ? (InvoiceStatus) fi.value() : null;
         @SuppressWarnings("unchecked")
@@ -508,10 +609,11 @@ public final class InvoicesView extends JPanel implements NavigableView {
         List<Invoice> result = new ArrayList<>();
         for (Invoice inv : allInvoices) {
             if (selDir != null && inv.direction() != selDir) continue;
+            if (selCur != null && inv.currencyCode() != selCur) continue;
             if (selStatus != null && inv.status() != selStatus) continue;
             if (selCat != null && inv.category() != selCat) continue;
             if (!q.isEmpty()) {
-                String hay = (inv.invoiceNumber() + " " + inv.partnerName() + " "
+                String hay = (inv.invoiceNumber() + " " + inv.partnerName() + " " + inv.currency() + " "
                         + (inv.orderNumber() != null ? inv.orderNumber() : "")).toLowerCase(Locale.ROOT);
                 if (!hay.contains(q)) continue;
             }
@@ -519,24 +621,32 @@ public final class InvoicesView extends JPanel implements NavigableView {
         }
         filteredInvoices = result;
 
-        // KPIs reflect full financial picture across all non-cancelled invoices (or filtered view)
+        // Consolidated dual-currency P&L KPIs in active reporting currency + native EUR/HUF split
         FinancialSummary summary = ctx.getInvoiceService().computeSummary(filteredInvoices);
-        kpiValIncome.setText("+" + summary.totalIncome().toPlainString() + " EUR");
-        kpiSubIncome.setText(i18n.t("invoice.kpi.paid_sub", summary.paidIncome().toPlainString()));
+        CurrencyCode rep = summary.reportingCurrency();
+        BigDecimal currentFx = ctx.getInvoiceService().getCurrentEurToHufRate();
 
-        kpiValExpense.setText("-" + summary.totalExpenses().toPlainString() + " EUR");
-        kpiSubExpense.setText(i18n.t("invoice.kpi.paid_sub", summary.paidExpenses().toPlainString()));
+        kpiValIncome.setText("+" + rep.format(summary.totalIncome()));
+        kpiSubIncome.setText("EUR: " + CurrencyCode.EUR.formatNumber(summary.incomeEur())
+                + "  |  HUF: " + CurrencyCode.HUF.formatNumber(summary.incomeHuf()));
 
-        String sign = summary.netBalance().signum() >= 0 ? "+" : "";
-        kpiValBalance.setText(sign + summary.netBalance().toPlainString() + " EUR");
-        kpiSubBalance.setText(i18n.t("invoice.direction.short.OUTGOING") + " / "
-                + i18n.t("invoice.direction.short.INCOMING"));
+        kpiValExpense.setText("-" + rep.format(summary.totalExpenses()));
+        kpiSubExpense.setText("EUR: " + CurrencyCode.EUR.formatNumber(summary.expenseEur())
+                + "  |  HUF: " + CurrencyCode.HUF.formatNumber(summary.expenseHuf()));
 
-        kpiValUnpaid.setText(summary.unpaidAmount().toPlainString() + " EUR");
-        kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", summary.unpaidCount()));
+        kpiValBalance.setText(rep.formatSigned(summary.netBalance()));
+        kpiSubBalance.setText(i18n.t("invoice.kpi.paid_sub",
+                rep.formatSigned(summary.paidIncome().subtract(summary.paidExpenses())))
+                + "  (@ " + CurrencyCode.EUR.formatPlain(currentFx) + ")");
+
+        kpiValUnpaid.setText(rep.format(summary.unpaidAmount()));
+        kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", summary.unpaidCount())
+                + "  |  EUR: " + CurrencyCode.EUR.formatNumber(summary.unpaidEur())
+                + " / HUF: " + CurrencyCode.HUF.formatNumber(summary.unpaidHuf()));
 
         tableModel.setRowCount(0);
         for (Invoice inv : filteredInvoices) {
+            CurrencyCode cur = inv.currencyCode();
             tableModel.addRow(new Object[]{
                     inv.invoiceNumber(),
                     inv.direction(),
@@ -545,14 +655,15 @@ public final class InvoicesView extends JPanel implements NavigableView {
                     inv.orderNumber() != null ? inv.orderNumber() : "—",
                     inv.issueDate().toString(),
                     inv.dueDate().toString(),
-                    inv.netAmount().toPlainString() + " EUR",
-                    inv.grossAmount().toPlainString() + " EUR",
+                    cur.name(),
+                    cur.format(inv.netAmount()),
+                    cur.format(inv.grossAmount()),
                     inv.status()
             });
         }
-        if (table.getColumnCount() >= 10) {
+        if (table.getColumnCount() >= 11) {
             table.getColumnModel().getColumn(1).setCellRenderer(new DirectionCellRenderer());
-            table.getColumnModel().getColumn(9).setCellRenderer(new InvoiceStatusCellRenderer());
+            table.getColumnModel().getColumn(10).setCellRenderer(new InvoiceStatusCellRenderer());
         }
         syncSelectedInvoiceControls();
     }
@@ -586,6 +697,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     @Override
     public void refreshData() {
+        fxRateField.setText(CurrencyCode.EUR.formatPlain(ctx.getInvoiceService().getCurrentEurToHufRate()));
+        styleReportingButtons();
         allInvoices = ctx.getInvoiceDao().findAll();
         applyFiltersAndRender();
     }
@@ -593,6 +706,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
+        reportingCurLabel.setText(i18n.t("currency.reporting").toUpperCase(Locale.ROOT) + ":");
+        fxRateLabel.setText(i18n.t("currency.fx_rate").toUpperCase(Locale.ROOT) + ": 1 EUR =");
+        saveFxBtn.setText(i18n.t("currency.fx_save").toUpperCase(Locale.ROOT));
+
         kpiTitleIncome.setText(i18n.t("invoice.kpi.income").toUpperCase(Locale.ROOT));
         kpiTitleExpense.setText(i18n.t("invoice.kpi.expenses").toUpperCase(Locale.ROOT));
         kpiTitleBalance.setText(i18n.t("invoice.kpi.balance").toUpperCase(Locale.ROOT));
@@ -615,6 +732,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 i18n.t("orders.number").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.issue_date").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.due_date").toUpperCase(Locale.ROOT),
+                i18n.t("currency.label").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.net_amount").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.gross_amount").toUpperCase(Locale.ROOT),
                 i18n.t("common.status").toUpperCase(Locale.ROOT)
@@ -626,6 +744,12 @@ public final class InvoicesView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         setBackground(ThemeManager.bg());
+        BrutalistStyle.applyBoxCard(fxBar, 6, 10);
+        reportingCurLabel.setForeground(ThemeManager.fg());
+        fxRateLabel.setForeground(ThemeManager.fg());
+        fxSuffixLabel.setForeground(ThemeManager.fg());
+        styleReportingButtons();
+        BrutalistStyle.styleSecondaryButton(saveFxBtn);
         for (JPanel card : List.of(kpiCardIncome, kpiCardExpense, kpiCardBalance, kpiCardUnpaid)) {
             BrutalistStyle.applyBoxCard(card, 12, 14);
         }

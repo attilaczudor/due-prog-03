@@ -8,6 +8,7 @@ public record QualityGrade(
         String nameEn,
         String nameHu,
         BigDecimal defaultPricePerKg,
+        BigDecimal defaultPriceHufPerKg,
         boolean active
 ) {
     public String localizedName(String lang) {
@@ -16,5 +17,10 @@ public record QualityGrade(
 
     public String displayLabel(String lang) {
         return code + " — " + localizedName(lang);
+    }
+
+    public BigDecimal priceFor(CurrencyCode currency) {
+        BigDecimal raw = currency == CurrencyCode.HUF ? defaultPriceHufPerKg : defaultPricePerKg;
+        return currency.round(raw != null ? raw : BigDecimal.ZERO);
     }
 }

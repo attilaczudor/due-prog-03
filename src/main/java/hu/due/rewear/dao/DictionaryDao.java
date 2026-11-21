@@ -86,7 +86,7 @@ public final class DictionaryDao {
     // --- Garment / Product Types ---
 
     public List<GarmentType> findGarmentTypes(boolean activeOnly) {
-        String sql = "SELECT id, code, name_en, name_hu, active FROM garment_types "
+        String sql = "SELECT id, code, name_en, name_hu, price_eur_per_kg, price_huf_per_kg, active FROM garment_types "
                 + (activeOnly ? "WHERE active = 1 " : "") + "ORDER BY code";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -98,6 +98,8 @@ public final class DictionaryDao {
                         rs.getString("code"),
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
+                        BigDecimal.valueOf(rs.getDouble("price_eur_per_kg")),
+                        BigDecimal.valueOf(rs.getDouble("price_huf_per_kg")),
                         rs.getInt("active") == 1
                 ));
             }
@@ -108,26 +110,48 @@ public final class DictionaryDao {
     }
 
     public long insertGarmentType(String code, String nameEn, String nameHu) {
-        return db.executeInTransaction(conn -> insertGarmentType(conn, code, nameEn, nameHu));
+        return insertGarmentType(code, nameEn, nameHu, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    public long insertGarmentType(String code, String nameEn, String nameHu,
+                                  BigDecimal priceEurPerKg, BigDecimal priceHufPerKg) {
+        return db.executeInTransaction(conn -> insertGarmentType(conn, code, nameEn, nameHu, priceEurPerKg, priceHufPerKg));
     }
 
     public long insertGarmentType(Connection conn, String code, String nameEn, String nameHu) throws SQLException {
-        String sql = "INSERT INTO garment_types (code, name_en, name_hu, active) VALUES (?, ?, ?, 1)";
+        return insertGarmentType(conn, code, nameEn, nameHu, BigDecimal.ZERO, BigDecimal.ZERO);
+    }
+
+    public long insertGarmentType(Connection conn, String code, String nameEn, String nameHu,
+                                  BigDecimal priceEurPerKg, BigDecimal priceHufPerKg) throws SQLException {
+        String sql = """
+                INSERT INTO garment_types (code, name_en, name_hu, price_eur_per_kg, price_huf_per_kg, active)
+                VALUES (?, ?, ?, ?, ?, 1)
+                """;
         return executeInsertWithKey(conn, sql, ps -> {
             ps.setString(1, code.trim().toUpperCase());
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
+            ps.setDouble(4, priceEurPerKg != null ? priceEurPerKg.doubleValue() : 0.0);
+            ps.setDouble(5, priceHufPerKg != null ? priceHufPerKg.doubleValue() : 0.0);
         });
     }
 
-    public void updateGarmentType(long id, String code, String nameEn, String nameHu, boolean active) {
-        String sql = "UPDATE garment_types SET code = ?, name_en = ?, name_hu = ?, active = ? WHERE id = ?";
+    public void updateGarmentType(long id, String code, String nameEn, String nameHu,
+                                  BigDecimal priceEurPerKg, BigDecimal priceHufPerKg, boolean active) {
+        String sql = """
+                UPDATE garment_types
+                SET code = ?, name_en = ?, name_hu = ?, price_eur_per_kg = ?, price_huf_per_kg = ?, active = ?
+                WHERE id = ?
+                """;
         executeUpdate(sql, ps -> {
             ps.setString(1, code.trim().toUpperCase());
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setInt(4, active ? 1 : 0);
-            ps.setLong(5, id);
+            ps.setDouble(4, priceEurPerKg != null ? priceEurPerKg.doubleValue() : 0.0);
+            ps.setDouble(5, priceHufPerKg != null ? priceHufPerKg.doubleValue() : 0.0);
+            ps.setInt(6, active ? 1 : 0);
+            ps.setLong(7, id);
         });
     }
 
@@ -142,7 +166,7 @@ public final class DictionaryDao {
     // --- Quality Grades ---
 
     public List<QualityGrade> findQualityGrades(boolean activeOnly) {
-        String sql = "SELECT id, code, name_en, name_hu, default_price_per_kg, active FROM quality_grades "
+        String sql = "SELECT id, code, name_en, name_hu, default_price_per_kg, default_price_huf_per_kg, active FROM quality_grades "
                 + (activeOnly ? "WHERE active = 1 " : "") + "ORDER BY default_price_per_kg DESC, code";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
@@ -155,6 +179,7 @@ public final class DictionaryDao {
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
                         BigDecimal.valueOf(rs.getDouble("default_price_per_kg")),
+                        BigDecimal.valueOf(rs.getDouble("default_price_huf_per_kg")),
                         rs.getInt("active") == 1
                 ));
             }
@@ -165,37 +190,51 @@ public final class DictionaryDao {
     }
 
     public long insertQualityGrade(String code, String nameEn, String nameHu, BigDecimal defaultPricePerKg) {
-        return db.executeInTransaction(conn -> insertQualityGrade(conn, code, nameEn, nameHu, defaultPricePerKg));
+        return insertQualityGrade(code, nameEn, nameHu, defaultPricePerKg,
+                defaultPricePerKg.multiply(new BigDecimal("400")));
+    }
+
+    public long insertQualityGrade(String code, String nameEn, String nameHu,
+                                   BigDecimal defaultPricePerKg, BigDecimal defaultPriceHufPerKg) {
+        return db.executeInTransaction(conn -> insertQualityGrade(conn, code, nameEn, nameHu, defaultPricePerKg, defaultPriceHufPerKg));
     }
 
     public long insertQualityGrade(Connection conn, String code, String nameEn, String nameHu,
                                    BigDecimal defaultPricePerKg) throws SQLException {
+        return insertQualityGrade(conn, code, nameEn, nameHu, defaultPricePerKg,
+                defaultPricePerKg.multiply(new BigDecimal("400")));
+    }
+
+    public long insertQualityGrade(Connection conn, String code, String nameEn, String nameHu,
+                                   BigDecimal defaultPricePerKg, BigDecimal defaultPriceHufPerKg) throws SQLException {
         String sql = """
-                INSERT INTO quality_grades (code, name_en, name_hu, default_price_per_kg, active)
-                VALUES (?, ?, ?, ?, 1)
+                INSERT INTO quality_grades (code, name_en, name_hu, default_price_per_kg, default_price_huf_per_kg, active)
+                VALUES (?, ?, ?, ?, ?, 1)
                 """;
         return executeInsertWithKey(conn, sql, ps -> {
             ps.setString(1, code.trim().toUpperCase());
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, defaultPricePerKg.doubleValue());
+            ps.setDouble(4, defaultPricePerKg != null ? defaultPricePerKg.doubleValue() : 0.0);
+            ps.setDouble(5, defaultPriceHufPerKg != null ? defaultPriceHufPerKg.doubleValue() : 0.0);
         });
     }
 
     public void updateQualityGrade(long id, String code, String nameEn, String nameHu,
-                                   BigDecimal defaultPricePerKg, boolean active) {
+                                   BigDecimal defaultPricePerKg, BigDecimal defaultPriceHufPerKg, boolean active) {
         String sql = """
                 UPDATE quality_grades
-                SET code = ?, name_en = ?, name_hu = ?, default_price_per_kg = ?, active = ?
+                SET code = ?, name_en = ?, name_hu = ?, default_price_per_kg = ?, default_price_huf_per_kg = ?, active = ?
                 WHERE id = ?
                 """;
         executeUpdate(sql, ps -> {
             ps.setString(1, code.trim().toUpperCase());
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, defaultPricePerKg.doubleValue());
-            ps.setInt(5, active ? 1 : 0);
-            ps.setLong(6, id);
+            ps.setDouble(4, defaultPricePerKg != null ? defaultPricePerKg.doubleValue() : 0.0);
+            ps.setDouble(5, defaultPriceHufPerKg != null ? defaultPriceHufPerKg.doubleValue() : 0.0);
+            ps.setInt(6, active ? 1 : 0);
+            ps.setLong(7, id);
         });
     }
 

@@ -3,6 +3,7 @@ package hu.due.rewear.ui;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.Invoice;
@@ -69,7 +70,10 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final JPanel detailHeaderPanel = new JPanel(new BorderLayout(8, 6));
     private final JLabel orderHeaderTitle = new JLabel("—");
     private final JLabel orderStatusTag = new JLabel(" ");
+    private final JLabel orderCurrencyTag = new JLabel(" ");
+    private final JComboBox<CurrencyCode> orderCurrencyCombo = new JComboBox<>(CurrencyCode.values());
     private final JLabel orderMetaLabel = new JLabel(" ");
+    private boolean syncingCurrencyCombo = false;
 
     private final JPanel scanBarPanel = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 6));
     private final JLabel scanLabel = new JLabel();
@@ -129,10 +133,12 @@ public final class OrdersView extends JPanel implements NavigableView {
         // Right Order Detail Workspace
         JPanel rightPanel = new JPanel(new BorderLayout(0, 10));
 
-        JPanel topMetaRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 0));
+        JPanel topMetaRow = new JPanel(new WrapLayout(FlowLayout.LEFT, 10, 0));
         orderHeaderTitle.setFont(ThemeManager.monoFont(Font.BOLD, 16f));
         topMetaRow.add(orderHeaderTitle);
         topMetaRow.add(orderStatusTag);
+        topMetaRow.add(orderCurrencyTag);
+        topMetaRow.add(orderCurrencyCombo);
         detailHeaderPanel.add(topMetaRow, BorderLayout.NORTH);
         orderMetaLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
         detailHeaderPanel.add(orderMetaLabel, BorderLayout.CENTER);
@@ -189,6 +195,11 @@ public final class OrdersView extends JPanel implements NavigableView {
 
         applyStatusBtn.addActionListener(e -> handleApplyStatus());
         previewDocsBtn.addActionListener(e -> handlePreviewDocuments());
+        orderCurrencyCombo.addActionListener(e -> {
+            if (!syncingCurrencyCombo) {
+                handleChangeOrderCurrency();
+            }
+        });
     }
 
     private Order getSelectedOrder() {
@@ -205,6 +216,15 @@ public final class OrdersView extends JPanel implements NavigableView {
             return;
         }
         JComboBox<Customer> customerCombo = new JComboBox<>(activeCustomers.toArray(new Customer[0]));
+        JComboBox<CurrencyCode> currencyCombo = new JComboBox<>(CurrencyCode.values());
+        if (!activeCustomers.isEmpty()) {
+            currencyCombo.setSelectedItem(activeCustomers.get(0).effectiveCurrency());
+        }
+        customerCombo.addActionListener(e -> {
+            if (customerCombo.getSelectedItem() instanceof Customer c) {
+                currencyCombo.setSelectedItem(c.effectiveCurrency());
+            }
+        });
 
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -212,6 +232,8 @@ public final class OrdersView extends JPanel implements NavigableView {
         gbc.fill = GridBagConstraints.HORIZONTAL;
         gbc.gridx = 0; gbc.gridy = 0; form.add(new JLabel(i18n.t("orders.customer") + ":"), gbc);
         gbc.gridx = 1; form.add(customerCombo, gbc);
+        gbc.gridx = 0; gbc.gridy = 1; form.add(new JLabel(i18n.t("currency.label") + ":"), gbc);
+        gbc.gridx = 1; form.add(currencyCombo, gbc);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("orders.new_order"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
@@ -219,12 +241,47 @@ public final class OrdersView extends JPanel implements NavigableView {
         }
         Customer chosen = (Customer) customerCombo.getSelectedItem();
         if (chosen == null) return;
+        CurrencyCode chosenCur = currencyCombo.getSelectedItem() instanceof CurrencyCode cc
+                ? cc : chosen.effectiveCurrency();
 
         try {
             Order created = ctx.getOrderService().createOrder(
-                    chosen.id(), null, ctx.getSession().requireCurrentUser().id());
+                    chosen.id(), chosenCur, null, ctx.getSession().requireCurrentUser().id());
             refreshDataSelecting(created.id());
         } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleChangeOrderCurrency() {
+        Order order = getSelectedOrder();
+        if (order == null || !(orderCurrencyCombo.getSelectedItem() instanceof CurrencyCode target)) {
+            return;
+        }
+        if (order.effectiveCurrency() == target) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        if (!currentItems.isEmpty()) {
+            int confirm = JOptionPane.showConfirmDialog(
+                    this,
+                    i18n.t("orders.currency_change_confirm", order.orderNumber(), target.name()),
+                    i18n.t("common.confirm"),
+                    JOptionPane.YES_NO_OPTION);
+            if (confirm != JOptionPane.YES_OPTION) {
+                syncingCurrencyCombo = true;
+                orderCurrencyCombo.setSelectedItem(order.effectiveCurrency());
+                syncingCurrencyCombo = false;
+                return;
+            }
+        }
+        try {
+            ctx.getOrderService().changeOrderCurrency(order.id(), target);
+            refreshDataSelecting(order.id());
+        } catch (Exception ex) {
+            syncingCurrencyCombo = true;
+            orderCurrencyCombo.setSelectedItem(order.effectiveCurrency());
+            syncingCurrencyCombo = false;
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
@@ -391,19 +448,34 @@ public final class OrdersView extends JPanel implements NavigableView {
             currentItems = List.of();
             orderHeaderTitle.setText("—");
             orderStatusTag.setText(" ");
+            orderCurrencyTag.setText(" ");
             orderMetaLabel.setText(" ");
             setEditButtonsEnabled(false, false);
             return;
         }
 
+        CurrencyCode cur = order.effectiveCurrency();
         orderHeaderTitle.setText(order.orderNumber() + " // " + order.customerName());
         orderStatusTag.setText(i18n.t("status.order." + order.status().name()).toUpperCase());
         BrutalistStyle.styleBoxedTag(orderStatusTag, order.status() == OrderStatus.SHIPPED || order.status() == OrderStatus.PACKING);
+        orderCurrencyTag.setText(cur.name());
+        BrutalistStyle.styleBoxedTag(orderCurrencyTag, false);
+        syncingCurrencyCombo = true;
+        orderCurrencyCombo.setSelectedItem(cur);
+        syncingCurrencyCombo = false;
         syncStatusDropdown(order.status());
+
+        itemsModel.setColumnIdentifiers(new Object[]{
+                i18n.t("intake.generated_code").toUpperCase(),
+                i18n.t("intake.garment_type").toUpperCase(),
+                "KG",
+                cur.name() + "/KG",
+                cur.name()
+        });
 
         orderMetaLabel.setText(
                 i18n.t("orders.total_weight") + ": " + stripZeros(order.totalWeightKg()) + " kg   |   "
-                        + i18n.t("orders.total_price") + ": " + formatMoney(order.totalPrice()) + " EUR   |   "
+                        + i18n.t("orders.total_price") + ": " + cur.format(order.totalPrice()) + "   |   "
                         + i18n.t("common.created_at") + ": " + (order.createdAt() != null ? DT_FMT.format(order.createdAt()) : "—")
         );
 
@@ -413,8 +485,8 @@ public final class OrdersView extends JPanel implements NavigableView {
                     item.packageQrCode(),
                     item.localizedSummary(lang),
                     stripZeros(item.weightKg()),
-                    formatMoney(item.pricePerKg()),
-                    formatMoney(item.lineTotal())
+                    cur.formatNumber(item.pricePerKg()),
+                    cur.formatNumber(item.lineTotal())
             });
         }
 
@@ -427,6 +499,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         scanAddBtn.setEnabled(editable);
         pickStockBtn.setEnabled(editable);
         removeItemBtn.setEnabled(editable);
+        orderCurrencyCombo.setEnabled(editable);
         statusDropdown.setEnabled(hasOrder);
         applyStatusBtn.setEnabled(hasOrder);
         previewDocsBtn.setEnabled(hasOrder);
@@ -500,7 +573,7 @@ public final class OrdersView extends JPanel implements NavigableView {
                     o.customerName(),
                     i18n.t("status.order." + o.status().name()).toUpperCase(),
                     stripZeros(o.totalWeightKg()) + " kg",
-                    formatMoney(o.totalPrice())
+                    o.effectiveCurrency().format(o.totalPrice())
             });
             if (prevId != null && o.id() == prevId) {
                 selectRow = i;
@@ -539,7 +612,7 @@ public final class OrdersView extends JPanel implements NavigableView {
                 i18n.t("orders.customer").toUpperCase(),
                 i18n.t("common.status").toUpperCase(),
                 "KG",
-                "EUR"
+                i18n.t("orders.total_price").toUpperCase()
         });
         itemsModel.setColumnIdentifiers(new Object[]{
                 i18n.t("intake.generated_code").toUpperCase(),

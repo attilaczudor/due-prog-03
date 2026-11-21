@@ -25,8 +25,17 @@ public record Invoice(
         BigDecimal vatAmount,
         BigDecimal grossAmount,
         String currency,
+        BigDecimal exchangeRate,
         long createdBy,
         String createdByName,
         LocalDateTime createdAt
 ) {
+    public CurrencyCode currencyCode() {
+        return CurrencyCode.parse(currency);
+    }
+
+    public BigDecimal effectiveExchangeRate() {
+        return exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0
+                ? exchangeRate : CurrencyCode.DEFAULT_EUR_HUF_RATE;
+    }
 }

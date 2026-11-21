@@ -194,7 +194,7 @@ orders.new_order,New Order,Új rendelés
 orders.order_number,Order #,Rendelésszám
 orders.customer,Customer,Ügyfél
 orders.total_weight,Total Weight (kg),Összsúly (kg)
-orders.total_price,Total Price (EUR),Végösszeg (EUR)
+orders.total_price,Total Price,Végösszeg
 orders.items_title,Order Line Items (Allocated Packages),Rendelési tételek (Kiosztott csomagok)
 orders.add_by_scan,Scan QR to Add Bale,QR szkennelése rendeléshez
 orders.scan_placeholder,Scan or enter QR code + Enter...,Olvasson be QR kódot + Enter...
@@ -290,7 +290,7 @@ invoice.kpi.income,Total Income (Outgoing),Összes bevétel (Kimenő)
 invoice.kpi.expenses,Total Expenses (Incoming),Összes kiadás (Bejövő)
 invoice.kpi.balance,Net Balance (Income − Expenses),Nettó egyenleg (Bevétel − Kiadás)
 invoice.kpi.unpaid,Open / Unpaid Invoices,Fizetésre váró számlák
-invoice.kpi.paid_sub,"Paid: {0} EUR","Fizetve: {0} EUR"
+invoice.kpi.paid_sub,"Paid: {0}","Fizetve: {0}"
 invoice.kpi.unpaid_sub,"{0} open invoice(s)","{0} nyitott számla"
 invoice.direction,Type,Irányszám / Típus
 invoice.direction.OUTGOING,Outgoing (Income),Kimenő (Bevétel)
@@ -339,3 +339,13 @@ invoice.tax_number,Tax Number,Adószám
 invoice.address,Address,Cím
 invoice.email,Email,E-mail
 invoice.vat_rate,VAT Rate (%),ÁFA kulcs (%)
+currency.label,Currency,Deviza
+currency.price_eur_kg,Price (EUR/kg),Ár (EUR/kg)
+currency.price_huf_kg,Price (HUF/kg),Ár (HUF/kg)
+currency.convert_btn,Convert ⇄,Átszámítás ⇄
+currency.reporting,Summary Currency,Összesítés devizája
+currency.fx_rate,Exchange Rate,Árfolyam
+currency.fx_save,Save Rate,Árfolyam mentése
+currency.fx_saved,"Exchange rate updated to 1 EUR = {0} HUF.","Árfolyam frissítve: 1 EUR = {0} HUF."
+customers.preferred_currency,Default Currency,Alapértelmezett deviza
+orders.currency_change_confirm,"Switch order {0} to {1} and recalculate all line item prices in {1}?","Átváltja a(z) {0} rendelést {1} devizára és újraszámolja a tételek árait {1} devizában?"

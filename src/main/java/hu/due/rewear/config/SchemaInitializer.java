@@ -48,8 +48,70 @@ public final class SchemaInitializer {
             }
             ensureUserProfileColumns(conn);
             ensureSuperAdminRoleAndAccount(conn);
+            ensureMultiCurrencySchema(conn);
         });
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
+    }
+
+    private void ensureMultiCurrencySchema(Connection conn) throws SQLException {
+        // 1. Seed default FX rate & reporting currency in app_settings if missing
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('fx.eur_huf', '400.00')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('finance.reporting_currency', 'HUF')");
+        }
+
+        // 2. Add dual-currency columns to existing tables if upgrading from an older DB
+        addColumnIfMissing(conn, "garment_types", "price_eur_per_kg", "REAL NOT NULL DEFAULT 0");
+        addColumnIfMissing(conn, "garment_types", "price_huf_per_kg", "REAL NOT NULL DEFAULT 0");
+        addColumnIfMissing(conn, "quality_grades", "default_price_huf_per_kg", "REAL NOT NULL DEFAULT 0");
+        addColumnIfMissing(conn, "customers", "preferred_currency", "TEXT NOT NULL DEFAULT 'EUR'");
+        addColumnIfMissing(conn, "orders", "currency", "TEXT NOT NULL DEFAULT 'EUR'");
+        addColumnIfMissing(conn, "invoices", "exchange_rate", "REAL NOT NULL DEFAULT 400.0");
+
+        // 3. Backfill realistic EUR/kg & HUF/kg product prices on existing garment_types that still have 0/0
+        String[][] defaultGarmentPrices = {
+                {"TSH", "4.50", "1800"},
+                {"JNS", "5.50", "2200"},
+                {"JKT", "7.50", "3000"},
+                {"DRS", "6.00", "2400"},
+                {"SWT", "5.00", "2000"},
+                {"SHO", "8.00", "3200"},
+                {"MIX", "3.50", "1400"}
+        };
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE garment_types SET price_eur_per_kg = ?, price_huf_per_kg = ? "
+                        + "WHERE upper(code) = ? AND price_eur_per_kg = 0 AND price_huf_per_kg = 0")) {
+            for (String[] row : defaultGarmentPrices) {
+                ps.setDouble(1, Double.parseDouble(row[1]));
+                ps.setDouble(2, Double.parseDouble(row[2]));
+                ps.setString(3, row[0]);
+                ps.executeUpdate();
+            }
+        }
+
+        // 4. Backfill HUF/kg fallback prices on existing quality_grades when 0
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("UPDATE quality_grades SET default_price_huf_per_kg = ROUND(default_price_per_kg * 400.0, 0) "
+                    + "WHERE default_price_huf_per_kg = 0 AND default_price_per_kg > 0");
+            // Default Hungarian customers (.hu email) to HUF if still set to default EUR and untouched
+            stmt.execute("UPDATE customers SET preferred_currency = 'HUF' "
+                    + "WHERE preferred_currency = 'EUR' AND lower(COALESCE(email, '')) LIKE '%.hu'");
+        }
+    }
+
+    private void addColumnIfMissing(Connection conn, String table, String column, String definition) throws SQLException {
+        Set<String> cols = new HashSet<>();
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
+            while (rs.next()) {
+                cols.add(rs.getString("name").toLowerCase());
+            }
+        }
+        if (!cols.contains(column.toLowerCase())) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
+            }
+        }
     }
 
     private void ensureSuperAdminRoleAndAccount(Connection conn) throws SQLException {
