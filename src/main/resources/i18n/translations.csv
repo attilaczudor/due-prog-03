@@ -175,18 +175,30 @@ customers.email,Email,E-mail
 customers.phone,Phone,Telefon
 customers.address,Address,Cím
 customers.tax_number,Tax Number,Adószám
+customers.add_title,Add B2B Customer,Új B2B ügyfél hozzáadása
+customers.edit_title,Edit B2B Customer,B2B ügyfél szerkesztése
+customers.order_history,Customer Order History,Ügyfél rendelési előzményei
 orders.title,Orders & Dispatch,Rendelések és Kiszállítás
 orders.new_order,New Order,Új rendelés
 orders.order_number,Order #,Rendelésszám
 orders.customer,Customer,Ügyfél
 orders.total_weight,Total Weight (kg),Összsúly (kg)
-orders.total_price,Total Price,Végösszeg
+orders.total_price,Total Price (EUR),Végösszeg (EUR)
+orders.items_title,Order Line Items (Allocated Packages),Rendelési tételek (Kiosztott csomagok)
 orders.add_by_scan,Scan QR to Add Bale,QR szkennelése rendeléshez
+orders.scan_placeholder,Scan or enter QR code + Enter...,Olvasson be QR kódot + Enter...
+orders.scan_added,"Added {0} to order {1}.","A(z) {0} csomag hozzáadva a(z) {1} rendeléshez."
 orders.add_from_stock,Pick from Stock,Kiválasztás készletből
+orders.remove_item,Remove Selected Item,Tétel eltávolítása
 orders.start_packing,Start Packing,Összekészítés indítása
 orders.mark_shipped,Ship Order,Rendelés kiszállítása
 orders.cancel_order,Cancel Order,Rendelés törlése
 orders.export_delivery_note,PDF Delivery Note,PDF Szállítólevél
+orders.empty_stock,No available IN_STOCK packages to pick.,Nincs szabad (Készleten lévő) választható csomag.
+orders.select_order,Please select an order first.,Kérjük előbb válasszon ki egy rendelést.
+orders.delivery_note.title,DELIVERY NOTE / PACKING LIST,SZÁLLÍTÓLEVÉL / CSOMAGJEGYZÉK
+orders.delivery_note.signature_sender,Warehouse Dispatch Signature,Raktári kiadó aláírása
+orders.delivery_note.signature_receiver,Customer / Carrier Signature,Átvevő / Fuvarozó aláírása
 admin.title,Administration & Maintenance,Adminisztráció és Karbantartás
 admin.tab.users,Users & Roles,Felhasználók és Jogosultságok
 admin.tab.audit,Audit Log,Mozgásnapló (Audit)

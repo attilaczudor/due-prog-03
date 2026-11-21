@@ -1,6 +1,7 @@
 package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
+import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.GarmentType;
 import hu.due.rewear.model.InventoryPackage;
@@ -88,6 +89,9 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
     private final JButton saveAndPrintBtn = new JButton();
     private final JButton saveOnlyBtn = new JButton();
 
+    private JPanel formPanel;
+    private JPanel previewCardPanel;
+
     private String currentHexSuffix;
     private boolean loadingCombos = false;
 
@@ -114,11 +118,9 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
     private void buildUi() {
         // Left: Form panel
         JPanel leftPanel = new JPanel(new BorderLayout(0, 12));
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(16, 18, 16, 18)
-        ));
+        formPanel = new JPanel(new GridBagLayout());
+        JPanel form = formPanel;
+        BrutalistStyle.applyBoxCard(form, 16, 18);
 
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(6, 6, 6, 6);
@@ -194,13 +196,11 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
         leftPanel.add(actionBar, BorderLayout.CENTER);
 
         // Right: Live QR & Code Preview Card
-        JPanel previewCard = new JPanel();
+        previewCardPanel = new JPanel();
+        JPanel previewCard = previewCardPanel;
         previewCard.setLayout(new BoxLayout(previewCard, BoxLayout.Y_AXIS));
-        previewCard.setPreferredSize(new Dimension(410, 480));
-        previewCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(18, 20, 18, 20)
-        ));
+        previewCard.setPreferredSize(new Dimension(420, 490));
+        BrutalistStyle.applyBoxCard(previewCard, 18, 20);
 
         previewCardTitle.setFont(previewCardTitle.getFont().deriveFont(Font.BOLD, 15f));
         previewCardTitle.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -576,5 +576,18 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
         saveOnlyBtn.setText(i18n.t("intake.save_only"));
 
         refreshData();
+        applyTheme();
+    }
+
+    @Override
+    public void applyTheme() {
+        if (formPanel != null) {
+            BrutalistStyle.applyBoxCard(formPanel, 16, 18);
+        }
+        if (previewCardPanel != null) {
+            BrutalistStyle.applyBoxCard(previewCardPanel, 18, 20);
+        }
+        BrutalistStyle.stylePrimaryButton(saveAndPrintBtn);
+        generatedCodeValue.setBorder(BrutalistStyle.boxBorder(8, 12));
     }
 }

@@ -107,7 +107,7 @@ public final class PrintPreviewDialog extends JDialog {
 
         // Top toolbar
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
-        toolbar.setBorder(BorderFactory.createEtchedBorder());
+        BrutalistStyle.applyBoxCard(toolbar, 6, 8);
 
         toolbar.add(new JLabel(i18n.t("print.preset") + ":"));
         for (LabelPreset preset : LabelPreset.values()) {

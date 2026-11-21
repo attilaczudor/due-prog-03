@@ -1,6 +1,7 @@
 package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
+import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.GarmentType;
 import hu.due.rewear.model.InventoryPackage;
@@ -86,6 +87,7 @@ public final class InventoryView extends JPanel implements NavigableView {
 
     private List<InventoryPackage> currentRows = List.of();
     private boolean loadingFilters = false;
+    private JPanel filterBarPanel;
 
     private record FilterItem<T>(T value, String label) {
         @Override
@@ -110,7 +112,8 @@ public final class InventoryView extends JPanel implements NavigableView {
         // Filter Bar (2 compact rows)
         JPanel topPanel = new JPanel(new BorderLayout(0, 6));
 
-        JPanel filterRow1 = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        filterBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
+        JPanel filterRow1 = filterBarPanel;
         filterRow1.add(searchField);
         filterRow1.add(statusFilter);
         filterRow1.add(targetFilter);
@@ -121,7 +124,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         filterRow1.add(searchBtn);
         filterRow1.add(clearBtn);
         filterRow1.add(refreshBtn);
-        filterRow1.setBorder(BorderFactory.createEtchedBorder());
+        BrutalistStyle.applyBoxCard(filterRow1, 6, 8);
         topPanel.add(filterRow1, BorderLayout.NORTH);
 
         JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
@@ -545,6 +548,17 @@ public final class InventoryView extends JPanel implements NavigableView {
         });
 
         refreshData();
+        applyTheme();
+    }
+
+    @Override
+    public void applyTheme() {
+        if (filterBarPanel != null) {
+            BrutalistStyle.applyBoxCard(filterBarPanel, 6, 8);
+        }
+        BrutalistStyle.stylePrimaryButton(batchPrintBtn);
+        BrutalistStyle.styleTable(table);
+        table.repaint();
     }
 
     private final class StatusCellRenderer extends DefaultTableCellRenderer {
@@ -554,16 +568,19 @@ public final class InventoryView extends JPanel implements NavigableView {
             JLabel lbl = (JLabel) super.getTableCellRendererComponent(t, value, isSelected, hasFocus, row, column);
             lbl.setHorizontalAlignment(SwingConstants.CENTER);
             if (value instanceof PackageStatus status) {
-                lbl.setText(ctx.getI18n().t("status.package." + status.name()));
-                lbl.setFont(lbl.getFont().deriveFont(Font.BOLD));
+                lbl.setText("[ " + ctx.getI18n().t("status.package." + status.name()).toUpperCase() + " ]");
+                lbl.setFont(ThemeManager.monoFont(Font.BOLD, 11f));
                 if (!isSelected) {
-                    lbl.setForeground(Color.WHITE);
-                    lbl.setBackground(switch (status) {
-                        case IN_STOCK -> new Color(0x15803D);
-                        case RESERVED -> new Color(0xD97706);
-                        case SHIPPED -> new Color(0x1D4ED8);
-                        case DISCARDED -> new Color(0x64748B);
-                    });
+                    if (status == PackageStatus.IN_STOCK) {
+                        lbl.setBackground(ThemeManager.fg());
+                        lbl.setForeground(ThemeManager.bg());
+                    } else if (status == PackageStatus.RESERVED) {
+                        lbl.setBackground(ThemeManager.bg());
+                        lbl.setForeground(ThemeManager.fg());
+                    } else {
+                        lbl.setBackground(ThemeManager.surface());
+                        lbl.setForeground(ThemeManager.muted());
+                    }
                 }
             }
             return lbl;

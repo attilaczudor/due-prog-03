@@ -1,6 +1,7 @@
 package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
+import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.PackageFilter;
@@ -300,12 +301,22 @@ public final class LocationsView extends JPanel implements NavigableView {
         });
 
         refreshData();
+        applyTheme();
+    }
+
+    @Override
+    public void applyTheme() {
+        BrutalistStyle.stylePrimaryButton(addBtn);
+        BrutalistStyle.styleTable(locTable);
+        BrutalistStyle.styleTable(storedTable);
+        locTable.repaint();
     }
 
     private static final class OccupancyBarRenderer extends JProgressBar implements TableCellRenderer {
         OccupancyBarRenderer() {
             super(0, 100);
             setStringPainted(true);
+            setBorderPainted(true);
         }
 
         @Override
@@ -314,13 +325,9 @@ public final class LocationsView extends JPanel implements NavigableView {
             int pct = value instanceof Number n ? n.intValue() : 0;
             setValue(Math.min(100, Math.max(0, pct)));
             setString(pct + "%");
-            if (pct >= 95) {
-                setForeground(new Color(0xDC2626));
-            } else if (pct >= 75) {
-                setForeground(new Color(0xD97706));
-            } else {
-                setForeground(new Color(0x16A34A));
-            }
+            setBackground(ThemeManager.bg());
+            setForeground(ThemeManager.fg());
+            setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
             return this;
         }
     }

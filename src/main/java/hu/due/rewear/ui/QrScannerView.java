@@ -1,6 +1,7 @@
 package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
+import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.Order;
@@ -118,6 +119,10 @@ public final class QrScannerView extends JPanel implements NavigableView {
 
     private ScannerService.ScanResult lastResult;
 
+    private JPanel scanBoxPanel;
+    private JPanel leftCardPanel;
+    private JPanel rightPanelBox;
+
     public QrScannerView(AppContext ctx) {
         this.ctx = ctx;
 
@@ -137,11 +142,9 @@ public final class QrScannerView extends JPanel implements NavigableView {
         JPanel topWrapper = new JPanel();
         topWrapper.setLayout(new BoxLayout(topWrapper, BoxLayout.Y_AXIS));
 
-        JPanel scanBox = new JPanel(new BorderLayout(8, 8));
-        scanBox.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(12, 14, 12, 14)
-        ));
+        scanBoxPanel = new JPanel(new BorderLayout(8, 8));
+        JPanel scanBox = scanBoxPanel;
+        BrutalistStyle.applyBoxCard(scanBox, 12, 14);
 
         inputPromptLabel.setFont(inputPromptLabel.getFont().deriveFont(Font.BOLD, 13f));
         scanBox.add(inputPromptLabel, BorderLayout.NORTH);
@@ -181,11 +184,9 @@ public final class QrScannerView extends JPanel implements NavigableView {
         add(topWrapper, BorderLayout.NORTH);
 
         // Center split pane: Left Product Card | Right Actions & Movement History
-        JPanel leftCard = new JPanel(new BorderLayout(0, 12));
-        leftCard.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(14, 16, 14, 16)
-        ));
+        leftCardPanel = new JPanel(new BorderLayout(0, 12));
+        JPanel leftCard = leftCardPanel;
+        BrutalistStyle.applyBoxCard(leftCard, 14, 16);
 
         JPanel cardTop = new JPanel(new BorderLayout(12, 0));
         qrThumbLabel.setPreferredSize(new Dimension(150, 150));
@@ -226,11 +227,9 @@ public final class QrScannerView extends JPanel implements NavigableView {
         leftCard.add(new JScrollPane(detailsGrid), BorderLayout.CENTER);
 
         // Right panel: Instant actions + movement history
-        JPanel rightPanel = new JPanel(new BorderLayout(0, 12));
-        rightPanel.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createEtchedBorder(),
-                BorderFactory.createEmptyBorder(14, 16, 14, 16)
-        ));
+        rightPanelBox = new JPanel(new BorderLayout(0, 12));
+        JPanel rightPanel = rightPanelBox;
+        BrutalistStyle.applyBoxCard(rightPanel, 14, 16);
 
         JPanel actionGrid = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
         relocateBtn.setPreferredSize(new Dimension(175, 36));
@@ -415,7 +414,8 @@ public final class QrScannerView extends JPanel implements NavigableView {
 
     private void resetToWaitingState() {
         lastResult = null;
-        setBanner(ctx.getI18n().t("scanner.status.waiting"), new Color(0xE2E8F0), new Color(0x1E293B));
+        setBanner(ctx.getI18n().t("scanner.status.waiting").toUpperCase(), ThemeManager.surface(), ThemeManager.fg());
+        statusBanner.setBorder(BrutalistStyle.boxBorder(8, 12));
         clearDetailCard();
     }
 
@@ -455,14 +455,8 @@ public final class QrScannerView extends JPanel implements NavigableView {
     }
 
     private void setStatusPill(PackageStatus status) {
-        statusPillLabel.setText(ctx.getI18n().t("status.package." + status.name()));
-        statusPillLabel.setForeground(Color.WHITE);
-        statusPillLabel.setBackground(switch (status) {
-            case IN_STOCK -> new Color(0x15803D);
-            case RESERVED -> new Color(0xD97706);
-            case SHIPPED -> new Color(0x1D4ED8);
-            case DISCARDED -> new Color(0x64748B);
-        });
+        statusPillLabel.setText(ctx.getI18n().t("status.package." + status.name()).toUpperCase());
+        BrutalistStyle.styleBoxedTag(statusPillLabel, status == PackageStatus.IN_STOCK);
     }
 
     private void updateActionButtons(InventoryPackage pkg) {
@@ -680,6 +674,23 @@ public final class QrScannerView extends JPanel implements NavigableView {
             displayScanResult(lastResult);
         } else {
             resetToWaitingState();
+        }
+        applyTheme();
+    }
+
+    @Override
+    public void applyTheme() {
+        if (scanBoxPanel != null) BrutalistStyle.applyBoxCard(scanBoxPanel, 12, 14);
+        if (leftCardPanel != null) BrutalistStyle.applyBoxCard(leftCardPanel, 14, 16);
+        if (rightPanelBox != null) BrutalistStyle.applyBoxCard(rightPanelBox, 14, 16);
+        BrutalistStyle.stylePrimaryButton(lookupBtn);
+        BrutalistStyle.styleTable(historyTable);
+        qrThumbLabel.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
+        if (lastResult == null) {
+            setBanner(ctx.getI18n().t("scanner.status.waiting").toUpperCase(), ThemeManager.surface(), ThemeManager.fg());
+            statusBanner.setBorder(BrutalistStyle.boxBorder(8, 12));
+        } else if (lastResult.inventoryPackage() != null) {
+            setStatusPill(lastResult.inventoryPackage().status());
         }
     }
 }

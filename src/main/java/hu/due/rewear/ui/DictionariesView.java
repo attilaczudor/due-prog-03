@@ -494,5 +494,15 @@ public final class DictionariesView extends JPanel implements NavigableView {
         });
 
         refreshData();
+        applyTheme();
+    }
+
+    @Override
+    public void applyTheme() {
+        BrutalistStyle.stylePrimaryButton(addBtn);
+        BrutalistStyle.styleTable(targetTable);
+        BrutalistStyle.styleTable(garmentTable);
+        BrutalistStyle.styleTable(qualityTable);
+        BrutalistStyle.styleTable(packageTable);
     }
 }

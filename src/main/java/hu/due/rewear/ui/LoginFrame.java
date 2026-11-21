@@ -29,14 +29,17 @@ import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * Bilingual FlatLaf sign-in window with live language selector, theme toggle, and demo quick-fill buttons.
+ * Bilingual Brutalist Monochrome sign-in window with live language selector,
+ * Light/Dark theme toggle, and 1-click demo quick-fill buttons.
  */
-public final class LoginFrame extends JFrame implements LanguageChangeListener {
+public final class LoginFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
 
     private final AppContext ctx;
     private final Runnable onLoginSuccess;
 
-    private final JLabel brandLabel = new JLabel("ReWear WMS", SwingConstants.CENTER);
+    private final JPanel cardPanel = new JPanel(new BorderLayout(0, 12));
+    private final JLabel brandLabel = new JLabel("REWEAR WMS", SwingConstants.CENTER);
+    private final JLabel versionTagLabel = new JLabel("DUE-PROG-03", SwingConstants.CENTER);
     private final JLabel subtitleLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel usernameLabel = new JLabel();
     private final JLabel passwordLabel = new JLabel();
@@ -61,16 +64,18 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
         buildUi();
         populateLanguages();
         applyTranslations();
+        applyBrutalistStyling();
 
         ctx.getI18n().addListener(this);
+        ThemeManager.addListener(this);
         pack();
-        setMinimumSize(new Dimension(460, 420));
+        setMinimumSize(new Dimension(500, 440));
         setLocationRelativeTo(null);
     }
 
     private void buildUi() {
-        JPanel root = new JPanel(new BorderLayout(0, 12));
-        root.setBorder(BorderFactory.createEmptyBorder(16, 24, 18, 24));
+        JPanel outer = new JPanel(new BorderLayout(0, 12));
+        outer.setBorder(BorderFactory.createEmptyBorder(18, 22, 18, 22));
 
         // Top controls: language + theme
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
@@ -90,20 +95,24 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
             updateThemeButtonText();
         });
         topBar.add(themeToggleButton);
-        root.add(topBar, BorderLayout.NORTH);
+        outer.add(topBar, BorderLayout.NORTH);
 
-        // Center form card
+        // Center brutalist boxed card
         JPanel center = new JPanel();
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
-        brandLabel.setFont(brandLabel.getFont().deriveFont(Font.BOLD, 26f));
-        brandLabel.setAlignmentX(CENTER_ALIGNMENT);
-        subtitleLabel.setFont(subtitleLabel.getFont().deriveFont(Font.PLAIN, 13f));
+        JPanel brandRow = new JPanel(new FlowLayout(FlowLayout.CENTER, 10, 0));
+        brandLabel.setFont(ThemeManager.monoFont(Font.BOLD, 24f));
+        brandRow.add(brandLabel);
+        brandRow.add(versionTagLabel);
+        brandRow.setAlignmentX(CENTER_ALIGNMENT);
+
+        subtitleLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
         subtitleLabel.setAlignmentX(CENTER_ALIGNMENT);
 
         center.add(Box.createVerticalStrut(4));
-        center.add(brandLabel);
-        center.add(Box.createVerticalStrut(4));
+        center.add(brandRow);
+        center.add(Box.createVerticalStrut(6));
         center.add(subtitleLabel);
         center.add(Box.createVerticalStrut(20));
 
@@ -133,26 +142,26 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
         center.add(form);
         center.add(Box.createVerticalStrut(8));
 
-        errorLabel.setForeground(new Color(0xC62828));
+        errorLabel.setForeground(new Color(0xDC2626));
         errorLabel.setAlignmentX(CENTER_ALIGNMENT);
         center.add(errorLabel);
         center.add(Box.createVerticalStrut(10));
 
-        loginButton.setFont(loginButton.getFont().deriveFont(Font.BOLD, 14f));
         loginButton.setAlignmentX(CENTER_ALIGNMENT);
         loginButton.setPreferredSize(new Dimension(220, 38));
         loginButton.setMaximumSize(new Dimension(260, 38));
         loginButton.addActionListener(e -> attemptLogin());
         center.add(loginButton);
 
-        root.add(center, BorderLayout.CENTER);
+        cardPanel.add(center, BorderLayout.CENTER);
+        outer.add(cardPanel, BorderLayout.CENTER);
 
         // Bottom demo quick-fill panel
         JPanel footer = new JPanel();
         footer.setLayout(new BoxLayout(footer, BoxLayout.Y_AXIS));
-        footer.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
+        footer.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
 
-        demoHintLabel.setFont(demoHintLabel.getFont().deriveFont(Font.PLAIN, 11.5f));
+        demoHintLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
         demoHintLabel.setAlignmentX(CENTER_ALIGNMENT);
         footer.add(demoHintLabel);
         footer.add(Box.createVerticalStrut(6));
@@ -163,11 +172,11 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
             passwordField.setText(creds[1]);
             errorLabel.setText(" ");
         };
-        JButton adminBtn = new JButton("Admin");
+        JButton adminBtn = new JButton("ADMIN");
         adminBtn.addActionListener(e -> fill.accept(new String[]{"admin", "admin123"}));
-        JButton managerBtn = new JButton("Manager");
+        JButton managerBtn = new JButton("MANAGER");
         managerBtn.addActionListener(e -> fill.accept(new String[]{"manager", "manager123"}));
-        JButton operatorBtn = new JButton("Operator");
+        JButton operatorBtn = new JButton("OPERATOR");
         operatorBtn.addActionListener(e -> fill.accept(new String[]{"operator", "operator123"}));
 
         quickFillPanel.add(adminBtn);
@@ -175,10 +184,18 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
         quickFillPanel.add(operatorBtn);
         footer.add(quickFillPanel);
 
-        root.add(footer, BorderLayout.SOUTH);
+        outer.add(footer, BorderLayout.SOUTH);
 
-        setContentPane(root);
+        setContentPane(outer);
         getRootPane().setDefaultButton(loginButton);
+    }
+
+    private void applyBrutalistStyling() {
+        BrutalistStyle.applyBoxCard(cardPanel, 18, 22);
+        BrutalistStyle.styleBoxedTag(versionTagLabel, false);
+        BrutalistStyle.stylePrimaryButton(loginButton);
+        subtitleLabel.setForeground(ThemeManager.muted());
+        demoHintLabel.setForeground(ThemeManager.muted());
     }
 
     private void populateLanguages() {
@@ -200,6 +217,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
         AuthService.AuthResult result = ctx.getAuthService().login(username, password);
         if (result.isSuccess()) {
             ctx.getI18n().removeListener(this);
+            ThemeManager.removeListener(this);
             dispose();
             onLoginSuccess.run();
         } else if (result.status() == AuthService.AuthStatus.INACTIVE_USER) {
@@ -232,5 +250,12 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener {
     public void onLanguageChanged(String languageCode) {
         populateLanguages();
         applyTranslations();
+    }
+
+    @Override
+    public void onThemeChanged(boolean dark) {
+        applyBrutalistStyling();
+        updateThemeButtonText();
+        repaint();
     }
 }

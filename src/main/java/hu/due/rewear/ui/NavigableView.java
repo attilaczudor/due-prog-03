@@ -18,4 +18,8 @@ public interface NavigableView {
     }
 
     void applyTranslations();
+
+    default void applyTheme() {
+        // Optional hook called when Light/Dark Brutalist theme toggles.
+    }
 }

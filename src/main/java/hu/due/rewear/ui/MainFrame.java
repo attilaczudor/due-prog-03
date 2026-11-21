@@ -4,7 +4,6 @@ import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.i18n.LanguageChangeListener;
-import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import hu.due.rewear.service.SessionContext;
 
@@ -22,7 +21,6 @@ import javax.swing.JToggleButton;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
-import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -31,10 +29,11 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * Main ReWear WMS application window with RBAC-filtered sidebar navigation,
- * live CSV language switcher, Light/Dark theme toggle, and modular CardLayout workspace.
+ * Main ReWear WMS application window styled in stark Brutalist Monochrome (Light & Dark),
+ * with RBAC-filtered sidebar navigation, live CSV language switcher, theme toggle,
+ * and modular CardLayout workspace.
  */
-public final class MainFrame extends JFrame implements LanguageChangeListener {
+public final class MainFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
 
     public static final String VIEW_DASHBOARD = "dashboard";
     public static final String VIEW_INTAKE = "intake";
@@ -55,6 +54,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
     private final Map<String, JToggleButton> navButtons = new LinkedHashMap<>();
     private final ButtonGroup navGroup = new ButtonGroup();
 
+    private final JPanel sidebar = new JPanel(new BorderLayout());
+    private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
+    private final JPanel statusBar = new JPanel(new BorderLayout());
+    private final JLabel brandTagLabel = new JLabel("DUE-PROG-03");
+
     private final JLabel activeViewTitleLabel = new JLabel();
     private final JButton quickScanButton = new JButton();
     private final JComboBox<String> langCombo = new JComboBox<>();
@@ -72,15 +76,17 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
         this.onLogout = onLogout;
 
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        setMinimumSize(new Dimension(1180, 740));
-        setPreferredSize(new Dimension(1320, 820));
+        setMinimumSize(new Dimension(1200, 750));
+        setPreferredSize(new Dimension(1360, 840));
 
         buildUi();
         registerDefaultViews();
         populateLanguageCombo();
         applyTranslations();
+        applyBrutalistChrome();
 
         ctx.getI18n().addListener(this);
+        ThemeManager.addListener(this);
         navigateTo(VIEW_DASHBOARD);
 
         pack();
@@ -90,22 +96,19 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
     private void buildUi() {
         JPanel root = new JPanel(new BorderLayout());
 
-        // Left Sidebar
-        JPanel sidebar = new JPanel(new BorderLayout());
-        sidebar.setPreferredSize(new Dimension(235, 0));
-        sidebar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 0, 1, Color.GRAY),
-                BorderFactory.createEmptyBorder(16, 12, 16, 12)
-        ));
+        // Left Brutalist Sidebar
+        sidebar.setPreferredSize(new Dimension(245, 0));
 
         JPanel brandPanel = new JPanel();
         brandPanel.setLayout(new BoxLayout(brandPanel, BoxLayout.Y_AXIS));
-        JLabel brandTitle = new JLabel("ReWear WMS");
-        brandTitle.setFont(brandTitle.getFont().deriveFont(Font.BOLD, 20f));
-        JLabel brandSub = new JLabel("due-prog-03");
-        brandSub.setFont(brandSub.getFont().deriveFont(Font.PLAIN, 12f));
-        brandPanel.add(brandTitle);
-        brandPanel.add(brandSub);
+        JPanel brandTop = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        JLabel brandTitle = new JLabel("REWEAR WMS");
+        brandTitle.setFont(ThemeManager.monoFont(Font.BOLD, 16f));
+        brandTop.add(brandTitle);
+        brandTop.add(brandTagLabel);
+        brandTop.setAlignmentX(LEFT_ALIGNMENT);
+
+        brandPanel.add(brandTop);
         brandPanel.add(Box.createVerticalStrut(12));
         brandPanel.add(new JSeparator());
         brandPanel.add(Box.createVerticalStrut(10));
@@ -144,13 +147,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
         // Right Workspace (Topbar + Content + Footer)
         JPanel rightArea = new JPanel(new BorderLayout());
 
-        JPanel topBar = new JPanel(new BorderLayout(12, 0));
-        topBar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 1, 0, Color.GRAY),
-                BorderFactory.createEmptyBorder(10, 16, 10, 16)
-        ));
-
-        activeViewTitleLabel.setFont(activeViewTitleLabel.getFont().deriveFont(Font.BOLD, 17f));
+        activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
         topBar.add(activeViewTitleLabel, BorderLayout.WEST);
 
         JPanel rightControls = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
@@ -169,20 +166,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
             boolean nextDark = !ctx.getPreferences().isDarkTheme();
             ctx.getPreferences().setDarkTheme(nextDark);
             ThemeManager.applyTheme(nextDark);
-            updateThemeButtonText();
         });
         rightControls.add(themeToggleButton);
 
         User user = ctx.getSession().requireCurrentUser();
-        userBadgeLabel.setText(user.fullName());
-        userBadgeLabel.setFont(userBadgeLabel.getFont().deriveFont(Font.BOLD, 12.5f));
+        userBadgeLabel.setText(user.fullName().toUpperCase(Locale.ROOT));
+        userBadgeLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
         rightControls.add(userBadgeLabel);
 
-        roleBadgeLabel.setOpaque(true);
-        roleBadgeLabel.setForeground(Color.WHITE);
-        roleBadgeLabel.setBackground(roleColor(user.roleCode()));
-        roleBadgeLabel.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
-        roleBadgeLabel.setFont(roleBadgeLabel.getFont().deriveFont(Font.BOLD, 11f));
         rightControls.add(roleBadgeLabel);
 
         logoutButton.addActionListener(e -> performLogout());
@@ -193,12 +184,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
 
         rightArea.add(contentHost, BorderLayout.CENTER);
 
-        JPanel statusBar = new JPanel(new BorderLayout());
-        statusBar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(1, 0, 0, 0, Color.GRAY),
-                BorderFactory.createEmptyBorder(4, 12, 4, 12)
-        ));
-        statusBarLabel.setFont(statusBarLabel.getFont().deriveFont(Font.PLAIN, 11.5f));
+        statusBarLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
         statusBar.add(statusBarLabel, BorderLayout.WEST);
         rightArea.add(statusBar, BorderLayout.SOUTH);
 
@@ -209,14 +195,15 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
     private void addNavButton(JPanel container, String viewKey, String i18nKey) {
         JToggleButton btn = new JToggleButton();
         btn.setHorizontalAlignment(SwingConstants.LEFT);
-        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 38));
-        btn.setPreferredSize(new Dimension(205, 38));
+        btn.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
+        btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        btn.setPreferredSize(new Dimension(215, 36));
         btn.putClientProperty("i18nKey", i18nKey);
         btn.addActionListener(e -> navigateTo(viewKey));
         navGroup.add(btn);
         navButtons.put(viewKey, btn);
         container.add(btn);
-        container.add(Box.createVerticalStrut(4));
+        container.add(Box.createVerticalStrut(5));
     }
 
     private void registerDefaultViews() {
@@ -226,8 +213,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
         registerView(new InventoryView(ctx));
         registerView(new LocationsView(ctx));
         registerView(new DictionariesView(ctx));
-        registerView(new PlaceholderView(VIEW_CUSTOMERS, "nav.customers", ctx));
-        registerView(new PlaceholderView(VIEW_ORDERS, "nav.orders", ctx));
+        registerView(new CustomersView(ctx));
+        registerView(new OrdersView(ctx));
         registerView(new PlaceholderView(VIEW_ADMIN, "nav.admin", ctx));
     }
 
@@ -246,13 +233,57 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
         if (btn != null) {
             btn.setSelected(true);
         }
-        activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()));
+        updateNavButtonStyles();
+        activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()).toUpperCase(Locale.ROOT));
         cardLayout.show(contentHost, viewKey);
         view.refreshData();
     }
 
+    private void updateNavButtonStyles() {
+        for (Map.Entry<String, JToggleButton> entry : navButtons.entrySet()) {
+            JToggleButton btn = entry.getValue();
+            boolean selected = entry.getKey().equals(currentViewKey);
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.border(), 1),
+                    BorderFactory.createEmptyBorder(6, 10, 6, 10)
+            ));
+            if (selected) {
+                btn.setBackground(ThemeManager.fg());
+                btn.setForeground(ThemeManager.bg());
+            } else {
+                btn.setBackground(ThemeManager.bg());
+                btn.setForeground(ThemeManager.fg());
+            }
+        }
+    }
+
+    private void applyBrutalistChrome() {
+        sidebar.setBackground(ThemeManager.bg());
+        sidebar.setBorder(BrutalistStyle.hairlineRightRule(16, 12));
+
+        topBar.setBackground(ThemeManager.bg());
+        topBar.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createMatteBorder(0, 0, 2, 0, ThemeManager.border()),
+                BorderFactory.createEmptyBorder(10, 18, 10, 18)
+        ));
+
+        statusBar.setBackground(ThemeManager.bg());
+        statusBar.setBorder(BrutalistStyle.hairlineTopRule(5, 14));
+        statusBarLabel.setForeground(ThemeManager.muted());
+
+        BrutalistStyle.styleBoxedTag(brandTagLabel, false);
+        BrutalistStyle.styleBoxedTag(roleBadgeLabel, true);
+        BrutalistStyle.stylePrimaryButton(quickScanButton);
+        updateNavButtonStyles();
+
+        for (NavigableView view : views.values()) {
+            view.applyTheme();
+        }
+    }
+
     public void setStatusMessage(String message) {
-        statusBarLabel.setText(message + "   |   DB: " + ctx.getDatabaseManager().getDatabasePath().getFileName());
+        statusBarLabel.setText(message.toUpperCase(Locale.ROOT)
+                + "  //  DB: " + ctx.getDatabaseManager().getDatabasePath().getFileName());
     }
 
     public void populateLanguageCombo() {
@@ -270,6 +301,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
 
     private void performLogout() {
         ctx.getI18n().removeListener(this);
+        ThemeManager.removeListener(this);
         ctx.getAuthService().logout();
         dispose();
         onLogout.run();
@@ -277,45 +309,44 @@ public final class MainFrame extends JFrame implements LanguageChangeListener {
 
     private void updateThemeButtonText() {
         boolean isDark = ctx.getPreferences().isDarkTheme();
-        themeToggleButton.setText(ctx.getI18n().t(isDark ? "app.theme.light" : "app.theme.dark"));
+        themeToggleButton.setText(ctx.getI18n().t(isDark ? "app.theme.light" : "app.theme.dark").toUpperCase(Locale.ROOT));
     }
 
     private void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         setTitle(i18n.t("app.title"));
-        quickScanButton.setText("QR " + i18n.t("nav.scanner"));
-        logoutButton.setText(i18n.t("app.logout"));
+        quickScanButton.setText("[ QR " + i18n.t("nav.scanner").toUpperCase(Locale.ROOT) + " ]");
+        logoutButton.setText(i18n.t("app.logout").toUpperCase(Locale.ROOT));
         updateThemeButtonText();
 
         User user = ctx.getSession().requireCurrentUser();
-        roleBadgeLabel.setText(i18n.t("role." + user.roleCode().name()));
+        roleBadgeLabel.setText(i18n.t("role." + user.roleCode().name()).toUpperCase(Locale.ROOT));
 
         for (JToggleButton btn : navButtons.values()) {
             Object key = btn.getClientProperty("i18nKey");
             if (key instanceof String i18nKey) {
-                btn.setText(i18n.t(i18nKey));
+                btn.setText(i18n.t(i18nKey).toUpperCase(Locale.ROOT));
             }
         }
         for (NavigableView view : views.values()) {
             view.applyTranslations();
         }
         if (currentViewKey != null && views.containsKey(currentViewKey)) {
-            activeViewTitleLabel.setText(i18n.t(views.get(currentViewKey).getTitleI18nKey()));
+            activeViewTitleLabel.setText(i18n.t(views.get(currentViewKey).getTitleI18nKey()).toUpperCase(Locale.ROOT));
         }
         setStatusMessage(i18n.t("app.ready"));
-    }
-
-    private static Color roleColor(RoleCode role) {
-        return switch (role) {
-            case ADMIN -> new Color(0x5E35B1);
-            case MANAGER -> new Color(0x00796B);
-            case OPERATOR -> new Color(0x1565C0);
-        };
     }
 
     @Override
     public void onLanguageChanged(String languageCode) {
         populateLanguageCombo();
         applyTranslations();
+    }
+
+    @Override
+    public void onThemeChanged(boolean dark) {
+        updateThemeButtonText();
+        applyBrutalistChrome();
+        repaint();
     }
 }
