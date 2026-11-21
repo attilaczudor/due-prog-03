@@ -143,6 +143,9 @@ scanner.action.add_to_order,Add to Open Order,Hozzáadás nyitott rendeléshez
 inventory.title,Warehouse Inventory,Raktári Készlet
 inventory.batch_print,Batch Print Preview (A4 4-up),Csoportos nyomtatási előnézet (A4 4-es)
 inventory.view_details,Details & History,Részletek és előzmények
+inventory.edit_title,Edit Package Details,Csomag adatainak szerkesztése
+inventory.edit.code_changed,QR code updated to match new details — reprint label recommended.,A QR-kód frissült az új adatok alapján — címke újranyomtatása javasolt.
+inventory.edit.saved,Package details updated successfully.,A csomag adatai sikeresen frissítve.
 inventory.discard,Discard Package,Selejtezés
 inventory.discard.confirm,"Mark package {0} as DISCARDED?","Biztosan selejtezi a(z) {0} csomagot?"
 inventory.select_one,Please select a package from the table first.,Kérjük előbb válasszon ki egy csomagot a táblázatból.

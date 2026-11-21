@@ -34,6 +34,8 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
@@ -127,6 +129,21 @@ public final class LocationsView extends JPanel implements NavigableView {
             if (row >= 0 && row < storedPackages.size()) {
                 Window owner = SwingUtilities.getWindowAncestor(this);
                 PrintPreviewDialog.showPreview(owner, ctx, List.of(storedPackages.get(row)), LabelPreset.THERMAL_100X150);
+            }
+        });
+
+        storedTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    int row = storedTable.getSelectedRow();
+                    if (row >= 0 && row < storedPackages.size()) {
+                        Window owner = SwingUtilities.getWindowAncestor(LocationsView.this);
+                        if (EditPackageDialog.showDialog(owner, ctx, storedPackages.get(row)) != null) {
+                            refreshData();
+                        }
+                    }
+                }
             }
         });
     }

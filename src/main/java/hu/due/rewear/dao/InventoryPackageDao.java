@@ -196,6 +196,35 @@ public final class InventoryPackageDao {
         }
     }
 
+    public void updateDetails(Connection conn, long packageId, String qrCode,
+                              long targetGroupId, long garmentTypeId, long qualityGradeId,
+                              long packageTypeId, long locationId, BigDecimal weightKg,
+                              String hexSuffix, PackageStatus status, String notes,
+                              LocalDateTime updatedAt) throws SQLException {
+        String sql = """
+                UPDATE inventory_packages
+                SET qr_code = ?, target_group_id = ?, garment_type_id = ?, quality_grade_id = ?,
+                    package_type_id = ?, location_id = ?, weight_kg = ?, hex_suffix = ?,
+                    status = ?, notes = ?, updated_at = ?
+                WHERE id = ?
+                """;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, qrCode.trim().toUpperCase());
+            ps.setLong(2, targetGroupId);
+            ps.setLong(3, garmentTypeId);
+            ps.setLong(4, qualityGradeId);
+            ps.setLong(5, packageTypeId);
+            ps.setLong(6, locationId);
+            ps.setDouble(7, weightKg.doubleValue());
+            ps.setString(8, hexSuffix.trim().toUpperCase());
+            ps.setString(9, status.name());
+            ps.setString(10, notes);
+            ps.setString(11, DaoDateUtil.format(updatedAt));
+            ps.setLong(12, packageId);
+            ps.executeUpdate();
+        }
+    }
+
     public int countByStatus(PackageStatus status) {
         String sql = "SELECT COUNT(*) FROM inventory_packages WHERE status = ?";
         try (Connection conn = db.getConnection();

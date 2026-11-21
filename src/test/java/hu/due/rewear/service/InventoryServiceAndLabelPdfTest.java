@@ -94,6 +94,15 @@ class InventoryServiceAndLabelPdfTest {
         inventoryService.verifyStocktake(first.id(), "Checked OK", userId);
         List<StockMovement> history = movementDao.findByPackageId(first.id());
         assertEquals(3, history.size());
+
+        // Edit details (weight + notes) and verify QR code updates cleanly while preserving entry time & hex
+        InventoryPackage edited = inventoryService.updatePackageDetails(
+                first.id(), tg, gt, qg, pt, locs.get(1), new BigDecimal("32"),
+                PackageStatus.IN_STOCK, "Re-weighed bale", userId
+        );
+        assertTrue(edited.qrCode().contains("-32-A7"));
+        assertEquals("Re-weighed bale", edited.notes());
+        assertEquals(4, movementDao.findByPackageId(first.id()).size());
     }
 
     @Test

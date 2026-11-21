@@ -40,6 +40,8 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Window;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.math.BigDecimal;
 import java.nio.file.Path;
@@ -70,6 +72,7 @@ public final class InventoryView extends JPanel implements NavigableView {
     private final JButton refreshBtn = new JButton();
 
     private final JButton detailsBtn = new JButton();
+    private final JButton editBtn = new JButton();
     private final JButton relocateBtn = new JButton();
     private final JButton printSingleBtn = new JButton();
     private final JButton batchPrintBtn = new JButton();
@@ -109,25 +112,31 @@ public final class InventoryView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Filter Bar (2 compact rows)
+        // Filter Bar (clean 2-row brutalist panel so every dropdown & button stays visible)
         JPanel topPanel = new JPanel(new BorderLayout(0, 6));
 
-        filterBarPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
-        JPanel filterRow1 = filterBarPanel;
-        filterRow1.add(searchField);
-        filterRow1.add(statusFilter);
-        filterRow1.add(targetFilter);
-        filterRow1.add(garmentFilter);
-        filterRow1.add(qualityFilter);
-        filterRow1.add(packageFilter);
-        filterRow1.add(locationFilter);
-        filterRow1.add(searchBtn);
-        filterRow1.add(clearBtn);
-        filterRow1.add(refreshBtn);
-        BrutalistStyle.applyBoxCard(filterRow1, 6, 8);
-        topPanel.add(filterRow1, BorderLayout.NORTH);
+        filterBarPanel = new JPanel(new BorderLayout(0, 4));
+        JPanel searchRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        searchRow.add(searchField);
+        searchRow.add(locationFilter);
+        searchRow.add(searchBtn);
+        searchRow.add(clearBtn);
+        searchRow.add(refreshBtn);
+
+        JPanel dropdownRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 2));
+        dropdownRow.add(statusFilter);
+        dropdownRow.add(targetFilter);
+        dropdownRow.add(garmentFilter);
+        dropdownRow.add(qualityFilter);
+        dropdownRow.add(packageFilter);
+
+        filterBarPanel.add(searchRow, BorderLayout.NORTH);
+        filterBarPanel.add(dropdownRow, BorderLayout.SOUTH);
+        BrutalistStyle.applyBoxCard(filterBarPanel, 6, 8);
+        topPanel.add(filterBarPanel, BorderLayout.NORTH);
 
         JPanel actionRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
+        actionRow.add(editBtn);
         actionRow.add(detailsBtn);
         actionRow.add(relocateBtn);
         actionRow.add(printSingleBtn);
@@ -179,11 +188,33 @@ public final class InventoryView extends JPanel implements NavigableView {
         locationFilter.addActionListener(e -> { if (!loadingFilters) loadTableRows(); });
 
         detailsBtn.addActionListener(e -> showDetailsDialog());
+        editBtn.addActionListener(e -> openEditDialog());
         relocateBtn.addActionListener(e -> handleRelocate());
         printSingleBtn.addActionListener(e -> handleSinglePrint());
         batchPrintBtn.addActionListener(e -> handleBatchPrint());
         discardBtn.addActionListener(e -> handleDiscard());
         exportCsvBtn.addActionListener(e -> handleExportCsv());
+
+        table.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    openEditDialog();
+                }
+            }
+        });
+    }
+
+    private void openEditDialog() {
+        InventoryPackage pkg = requireSingleSelection();
+        if (pkg == null) {
+            return;
+        }
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        InventoryPackage updated = EditPackageDialog.showDialog(owner, ctx, pkg);
+        if (updated != null) {
+            refreshData();
+        }
     }
 
     private void populateFilterDropdowns() {
@@ -527,6 +558,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         searchBtn.setText(i18n.t("common.search"));
         clearBtn.setText(i18n.t("common.clear"));
         refreshBtn.setText(i18n.t("common.refresh"));
+        editBtn.setText(i18n.t("common.edit"));
         detailsBtn.setText(i18n.t("inventory.view_details"));
         relocateBtn.setText(i18n.t("scanner.action.relocate"));
         printSingleBtn.setText(i18n.t("scanner.action.reprint"));
