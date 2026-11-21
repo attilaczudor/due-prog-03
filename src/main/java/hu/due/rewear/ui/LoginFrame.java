@@ -53,9 +53,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final JButton managerBtn = new JButton("MANAGER");
     private final JButton operatorBtn = new JButton("OPERATOR");
 
-    private final JLabel langLabel = new JLabel();
     private final JComboBox<String> langCombo = new JComboBox<>();
-    private final JButton themeToggleButton = new JButton();
 
     private boolean updatingControls = false;
 
@@ -81,10 +79,9 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private void buildUi() {
         outer.setBorder(BorderFactory.createEmptyBorder(16, 26, 18, 26));
 
-        // Top controls: language + theme
-        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        // Top-right minimal language dropdown only
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
         topBar.setOpaque(false);
-        topBar.add(langLabel);
         langCombo.addActionListener(e -> {
             if (!updatingControls && langCombo.getSelectedItem() instanceof String code) {
                 ctx.getI18n().setLanguage(code.toLowerCase(Locale.ROOT));
@@ -92,14 +89,6 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
             }
         });
         topBar.add(langCombo);
-
-        themeToggleButton.addActionListener(e -> {
-            boolean nextDark = !ctx.getPreferences().isDarkTheme();
-            ctx.getPreferences().setDarkTheme(nextDark);
-            ThemeManager.applyTheme(nextDark);
-            updateThemeButtonText();
-        });
-        topBar.add(themeToggleButton);
         outer.add(topBar, BorderLayout.NORTH);
 
         // Center borderless login content
@@ -198,9 +187,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         loginHeadingLabel.setForeground(ThemeManager.fg());
         usernameLabel.setForeground(ThemeManager.fg());
         passwordLabel.setForeground(ThemeManager.fg());
-        langLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
-        BrutalistStyle.styleSecondaryButton(themeToggleButton);
         BrutalistStyle.styleSecondaryButton(adminBtn);
         BrutalistStyle.styleSecondaryButton(managerBtn);
         BrutalistStyle.styleSecondaryButton(operatorBtn);
@@ -239,11 +226,6 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         }
     }
 
-    private void updateThemeButtonText() {
-        boolean isDark = ctx.getPreferences().isDarkTheme();
-        themeToggleButton.setText(ctx.getI18n().t(isDark ? "app.theme.light" : "app.theme.dark"));
-    }
-
     private void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         setTitle(i18n.t("login.title"));
@@ -252,8 +234,6 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         passwordLabel.setText(i18n.t("login.password"));
         loginButton.setText(i18n.t("login.button"));
         loginAsLabel.setText(i18n.t("login.login_as"));
-        langLabel.setText(i18n.t("app.language") + ":");
-        updateThemeButtonText();
     }
 
     @Override
@@ -265,7 +245,6 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     @Override
     public void onThemeChanged(boolean dark) {
         applyBrutalistStyling();
-        updateThemeButtonText();
         repaint();
     }
 }
