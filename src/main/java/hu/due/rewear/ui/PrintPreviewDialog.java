@@ -29,6 +29,8 @@ import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.Window;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.print.Book;
 import java.awt.print.PageFormat;
 import java.awt.print.PrinterException;
@@ -82,7 +84,7 @@ public final class PrintPreviewDialog extends JDialog {
         this.packages = List.copyOf(packages);
         this.activePreset = initialPreset != null ? initialPreset : LabelPreset.THERMAL_100X150;
 
-        setMinimumSize(new Dimension(920, 720));
+        setMinimumSize(new Dimension(680, 560));
         setPreferredSize(new Dimension(1020, 780));
 
         buildUi();
@@ -105,11 +107,13 @@ public final class PrintPreviewDialog extends JDialog {
         JPanel root = new JPanel(new BorderLayout(0, 8));
         root.setBorder(BorderFactory.createEmptyBorder(10, 12, 10, 12));
 
-        // Top toolbar
-        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 10, 6));
+        // Top toolbar (WrapLayout with grouped label+control pairs so narrowing never clips controls)
+        JPanel toolbar = new JPanel(new WrapLayout(FlowLayout.LEFT, 10, 6));
         BrutalistStyle.applyBoxCard(toolbar, 6, 8);
 
-        toolbar.add(new JLabel(i18n.t("print.preset") + ":"));
+        JPanel presetGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        presetGroup.setOpaque(false);
+        presetGroup.add(new JLabel(i18n.t("print.preset") + ":"));
         for (LabelPreset preset : LabelPreset.values()) {
             PresetOption opt = new PresetOption(preset, i18n.t(preset.getI18nKey()));
             presetCombo.addItem(opt);
@@ -124,27 +128,37 @@ public final class PrintPreviewDialog extends JDialog {
                 rebuildPrintable();
             }
         });
-        toolbar.add(presetCombo);
+        presetGroup.add(presetCombo);
+        toolbar.add(presetGroup);
 
-        toolbar.add(new JLabel(i18n.t("print.zoom") + ":"));
-        zoomSlider.setPreferredSize(new Dimension(120, 24));
+        JPanel zoomGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        zoomGroup.setOpaque(false);
+        zoomGroup.add(new JLabel(i18n.t("print.zoom") + ":"));
+        zoomSlider.setPreferredSize(new Dimension(110, 24));
         zoomSlider.addChangeListener(e -> {
             zoomValueLabel.setText(zoomSlider.getValue() + "%");
             previewCanvas.updatePreferredSize();
             previewCanvas.revalidate();
             previewCanvas.repaint();
         });
-        toolbar.add(zoomSlider);
-        toolbar.add(zoomValueLabel);
+        zoomGroup.add(zoomSlider);
+        zoomGroup.add(zoomValueLabel);
+        toolbar.add(zoomGroup);
 
-        toolbar.add(new JLabel(i18n.t("print.copies") + ":"));
+        JPanel copiesGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        copiesGroup.setOpaque(false);
+        copiesGroup.add(new JLabel(i18n.t("print.copies") + ":"));
         copiesSpinner.setPreferredSize(new Dimension(58, 26));
-        toolbar.add(copiesSpinner);
+        copiesGroup.add(copiesSpinner);
+        toolbar.add(copiesGroup);
 
-        toolbar.add(new JLabel(i18n.t("print.printer") + ":"));
+        JPanel printerGroup = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+        printerGroup.setOpaque(false);
+        printerGroup.add(new JLabel(i18n.t("print.printer") + ":"));
         populatePrinters();
         printerCombo.setPreferredSize(new Dimension(210, 26));
-        toolbar.add(printerCombo);
+        printerGroup.add(printerCombo);
+        toolbar.add(printerGroup);
 
         root.add(toolbar, BorderLayout.NORTH);
 
@@ -154,8 +168,8 @@ public final class PrintPreviewDialog extends JDialog {
         scrollPane.getVerticalScrollBar().setUnitIncrement(16);
         root.add(scrollPane, BorderLayout.CENTER);
 
-        // Bottom bar: pagination + export/print buttons
-        JPanel bottomBar = new JPanel(new BorderLayout());
+        // Bottom bar: pagination + wrapping export/print buttons
+        JPanel bottomBar = new JPanel(new BorderLayout(8, 0));
 
         JPanel pager = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 4));
         prevPageBtn.addActionListener(e -> {
@@ -177,7 +191,7 @@ public final class PrintPreviewDialog extends JDialog {
         pager.add(nextPageBtn);
         bottomBar.add(pager, BorderLayout.WEST);
 
-        JPanel actions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
+        JPanel actions = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
         JButton savePngBtn = new JButton(i18n.t("print.button.png"));
         savePngBtn.addActionListener(e -> exportQrPng());
 
@@ -194,9 +208,18 @@ public final class PrintPreviewDialog extends JDialog {
         actions.add(savePdfBtn);
         actions.add(printBtn);
         actions.add(closeBtn);
-        bottomBar.add(actions, BorderLayout.EAST);
+        bottomBar.add(actions, BorderLayout.CENTER);
 
         root.add(bottomBar, BorderLayout.SOUTH);
+        root.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentResized(ComponentEvent e) {
+                toolbar.revalidate();
+                actions.revalidate();
+                bottomBar.revalidate();
+                root.revalidate();
+            }
+        });
         setContentPane(root);
     }
 

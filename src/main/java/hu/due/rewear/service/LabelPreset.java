@@ -5,6 +5,7 @@ package hu.due.rewear.service;
  */
 public enum LabelPreset {
     THERMAL_100X150("print.preset.thermal_100x150", 100.0, 150.0, 1, 1),
+    THERMAL_100X100("print.preset.thermal_100x100", 100.0, 100.0, 1, 1),
     THERMAL_80X100("print.preset.thermal_80x100", 80.0, 100.0, 1, 1),
     A6_CARD("print.preset.a6", 105.0, 148.0, 1, 1),
     A4_4UP("print.preset.a4_4up", 210.0, 297.0, 2, 2);

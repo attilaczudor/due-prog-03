@@ -103,9 +103,14 @@ intake.validation.capacity,"Warning: Location capacity ({0} kg) will be exceeded
 print.title,Ticket / Label Print Preview,Címke nyomtatási előnézet
 print.preset,Paper / Label Format,Papír / Címke formátum
 print.preset.thermal_100x150,Thermal Label 100 × 150 mm,Hőcímke 100 × 150 mm
+print.preset.thermal_100x100,Thermal Label 100 × 100 mm,Hőcímke 100 × 100 mm
 print.preset.thermal_80x100,Thermal Label 80 × 100 mm,Hőcímke 80 × 100 mm
 print.preset.a6,A6 Logistics Card,A6 Logisztikai kártya
 print.preset.a4_4up,A4 Sheet (4 labels per page),A4 Lap (4 címke / oldal)
+ticket.label.target,Target,Célcsoport
+ticket.label.type,Type,Terméktípus
+ticket.label.quality,Quality,Minőség
+ticket.label.pack,Package,Csomagolás
 print.zoom,Zoom,Nagyítás
 print.copies,Copies,Példányszám
 print.printer,Printer,Nyomtató

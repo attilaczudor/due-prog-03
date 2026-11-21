@@ -140,6 +140,10 @@ public final class I18nManager {
     }
 
     public String t(String key, Object... args) {
+        return tForLanguage(activeLanguage, key, args);
+    }
+
+    public String tForLanguage(String languageCode, String key, Object... args) {
         if (key == null || key.isBlank()) {
             return "";
         }
@@ -148,7 +152,8 @@ public final class I18nManager {
             LOG.warn("Missing translation key: {}", key);
             return "[" + key + "]";
         }
-        String template = perLang.get(activeLanguage);
+        String normalizedLang = languageCode == null ? FALLBACK_LANGUAGE : languageCode.trim().toLowerCase(Locale.ROOT);
+        String template = perLang.get(normalizedLang);
         if (template == null || template.isEmpty()) {
             template = perLang.get(FALLBACK_LANGUAGE);
         }

@@ -127,6 +127,10 @@ class InventoryServiceAndLabelPdfTest {
         exporter.exportToPdf(List.of(batch.get(0)), LabelPreset.THERMAL_100X150, thermalPdf);
         assertValidPdf(thermalPdf);
 
+        Path squarePdf = tempDir.resolve("thermal-100x100.pdf");
+        exporter.exportToPdf(List.of(batch.get(0)), LabelPreset.THERMAL_100X100, squarePdf);
+        assertValidPdf(squarePdf);
+
         Path a4Pdf = tempDir.resolve("a4-4up.pdf");
         exporter.exportToPdf(batch, LabelPreset.A4_4UP, a4Pdf);
         assertValidPdf(a4Pdf);
