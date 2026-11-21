@@ -1,5 +1,6 @@
 package hu.due.rewear.ui;
 
+import com.formdev.flatlaf.FlatClientProperties;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
@@ -424,6 +425,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private void updateNavButtonStyles() {
         int padH = sidebarCollapsed ? 0 : 10;
+        boolean dark = ThemeManager.isDarkMode();
+        String selBg = dark ? "#FFFFFF" : "#000000";
+        String selFg = dark ? "#000000" : "#FFFFFF";
+        String selHover = dark ? "#DCDCDC" : "#2A2A2A";
+        String unselBg = dark ? "#000000" : "#FFFFFF";
+        String unselFg = dark ? "#FFFFFF" : "#000000";
+        String unselHover = dark ? "#1C1C1C" : "#EDEDED";
+
         for (Map.Entry<String, JToggleButton> entry : navButtons.entrySet()) {
             JToggleButton btn = entry.getValue();
             boolean selected = entry.getKey().equals(currentViewKey);
@@ -434,9 +443,17 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             if (selected) {
                 btn.setBackground(ThemeManager.fg());
                 btn.setForeground(ThemeManager.bg());
+                btn.putClientProperty(FlatClientProperties.STYLE,
+                        "background:" + selBg + "; foreground:" + selFg
+                                + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
+                                + "; hoverBackground:" + selHover + "; hoverForeground:" + selFg);
             } else {
                 btn.setBackground(ThemeManager.bg());
                 btn.setForeground(ThemeManager.fg());
+                btn.putClientProperty(FlatClientProperties.STYLE,
+                        "background:" + unselBg + "; foreground:" + unselFg
+                                + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
+                                + "; hoverBackground:" + unselHover + "; hoverForeground:" + unselFg);
             }
         }
     }

@@ -1,5 +1,6 @@
 package hu.due.rewear.ui;
 
+import com.formdev.flatlaf.FlatClientProperties;
 import hu.due.rewear.config.ThemeManager;
 
 import javax.swing.BorderFactory;
@@ -57,9 +58,24 @@ public final class BrutalistStyle {
 
     /** Styles a button as an inverted primary CTA (black bg/white text in Light, white bg/black text in Dark). */
     public static void stylePrimaryButton(JButton button) {
+        boolean dark = ThemeManager.isDarkMode();
+        String bgHex = dark ? "#FFFFFF" : "#000000";
+        String fgHex = dark ? "#000000" : "#FFFFFF";
+        String hoverHex = dark ? "#DCDCDC" : "#2A2A2A";
+        String pressHex = dark ? "#C4C4C4" : "#404040";
+
         button.setBackground(ThemeManager.fg());
         button.setForeground(ThemeManager.bg());
         button.setFont(ThemeManager.monoFont(Font.BOLD, 12.5f));
+        button.putClientProperty(FlatClientProperties.STYLE,
+                "background:" + bgHex
+                        + "; foreground:" + fgHex
+                        + "; hoverBackground:" + hoverHex
+                        + "; hoverForeground:" + fgHex
+                        + "; pressedBackground:" + pressHex
+                        + "; pressedForeground:" + fgHex
+                        + "; focusedBackground:" + bgHex
+                        + "; focusedForeground:" + fgHex);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.fg(), 1),
                 BorderFactory.createEmptyBorder(5, 14, 5, 14)
@@ -68,9 +84,25 @@ public final class BrutalistStyle {
 
     /** Styles a secondary button with the exact same border & padding metrics as primary buttons. */
     public static void styleSecondaryButton(JButton button) {
+        boolean dark = ThemeManager.isDarkMode();
+        String bgHex = dark ? "#000000" : "#FFFFFF";
+        String fgHex = dark ? "#FFFFFF" : "#000000";
+        String hoverHex = dark ? "#1C1C1C" : "#EDEDED";
+        String pressBgHex = dark ? "#FFFFFF" : "#000000";
+        String pressFgHex = dark ? "#000000" : "#FFFFFF";
+
         button.setBackground(ThemeManager.bg());
         button.setForeground(ThemeManager.fg());
         button.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
+        button.putClientProperty(FlatClientProperties.STYLE,
+                "background:" + bgHex
+                        + "; foreground:" + fgHex
+                        + "; hoverBackground:" + hoverHex
+                        + "; hoverForeground:" + fgHex
+                        + "; pressedBackground:" + pressBgHex
+                        + "; pressedForeground:" + pressFgHex
+                        + "; focusedBackground:" + bgHex
+                        + "; focusedForeground:" + fgHex);
         button.setBorder(BorderFactory.createCompoundBorder(
                 BorderFactory.createLineBorder(ThemeManager.border(), 1),
                 BorderFactory.createEmptyBorder(5, 14, 5, 14)
