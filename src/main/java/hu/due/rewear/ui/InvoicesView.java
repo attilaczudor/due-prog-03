@@ -114,6 +114,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JButton applyStatusBtn = new JButton();
     private final JButton previewDocBtn = new JButton();
     private final JButton sendReminderBtn = new JButton();
+    private final JButton receiptBtn = new JButton();
     private final JButton creditNoteBtn = new JButton();
     private final JButton pnlReportBtn = new JButton();
     private final JButton exportCsvBtn = new JButton();
@@ -197,6 +198,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         actionBar.add(applyStatusBtn);
         actionBar.add(previewDocBtn);
         actionBar.add(sendReminderBtn);
+        actionBar.add(receiptBtn);
         actionBar.add(creditNoteBtn);
         actionBar.add(pnlReportBtn);
         actionBar.add(exportCsvBtn);
@@ -250,6 +252,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         applyStatusBtn.addActionListener(e -> handleStatusUpdate());
         previewDocBtn.addActionListener(e -> openSelectedInvoicePreview());
         sendReminderBtn.addActionListener(e -> handleSendPaymentReminder());
+        receiptBtn.addActionListener(e -> handleReceiptVault());
         creditNoteBtn.addActionListener(e -> handleIssueCreditNote());
         pnlReportBtn.addActionListener(e -> handlePreviewPnlReport());
         exportCsvBtn.addActionListener(e -> handleExportCsv());
@@ -338,6 +341,13 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 && inv.category() != InvoiceCategory.CREDIT_NOTE
                 && inv.status() != InvoiceStatus.CANCELLED;
         creditNoteBtn.setEnabled(canCreditNote);
+        receiptBtn.setEnabled(hasSel);
+        if (hasSel) {
+            I18nManager i18n = ctx.getI18n();
+            receiptBtn.setText((inv.hasAttachment()
+                    ? "[PDF] " + i18n.t("invoice.receipt.view")
+                    : i18n.t("invoice.receipt.attach")).toUpperCase(Locale.ROOT));
+        }
         if (inv != null) {
             for (int i = 0; i < statusCombo.getItemCount(); i++) {
                 if (statusCombo.getItemAt(i).status() == inv.status()) {
@@ -373,6 +383,61 @@ public final class InvoicesView extends JPanel implements NavigableView {
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleReceiptVault() {
+        Invoice inv = getSelectedInvoice();
+        if (inv == null) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        var existingPath = ctx.getReceiptVaultService().resolveAttachment(inv);
+        if (existingPath.isPresent()) {
+            String[] choices = {
+                    i18n.t("invoice.receipt.open"),
+                    i18n.t("invoice.receipt.replace"),
+                    i18n.t("invoice.receipt.remove"),
+                    i18n.t("common.cancel")
+            };
+            int picked = JOptionPane.showOptionDialog(this,
+                    inv.invoiceNumber() + " — " + existingPath.get().getFileName(),
+                    i18n.t("invoice.receipt.view"),
+                    JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, choices, choices[0]);
+            try {
+                if (picked == 0 && Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
+                    Desktop.getDesktop().open(existingPath.get().toFile());
+                } else if (picked == 1) {
+                    chooseAndAttachReceipt(inv);
+                } else if (picked == 2) {
+                    ctx.getReceiptVaultService().removeAttachment(inv.id());
+                    refreshDataSelecting(inv.id());
+                    JOptionPane.showMessageDialog(this, i18n.t("invoice.receipt.removed"),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+                }
+            } catch (Exception ex) {
+                JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+            }
+        } else {
+            chooseAndAttachReceipt(inv);
+        }
+    }
+
+    private void chooseAndAttachReceipt(Invoice inv) {
+        I18nManager i18n = ctx.getI18n();
+        JFileChooser chooser = new JFileChooser();
+        chooser.setDialogTitle(i18n.t("invoice.receipt.attach"));
+        chooser.setFileFilter(new FileNameExtensionFilter("Receipt (PDF, PNG, JPG)", "pdf", "png", "jpg", "jpeg"));
+        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+            return;
+        }
+        try {
+            Invoice updated = ctx.getReceiptVaultService().attachReceipt(inv.id(), chooser.getSelectedFile().toPath());
+            refreshDataSelecting(updated.id());
+            JOptionPane.showMessageDialog(this, i18n.t("invoice.receipt.attached", updated.attachmentPath()),
+                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -693,6 +758,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         applyStatusBtn.setText(i18n.t("invoice.status_update").toUpperCase(Locale.ROOT));
         previewDocBtn.setText(i18n.t("invoice.preview_btn").toUpperCase(Locale.ROOT));
         sendReminderBtn.setText(i18n.t("invoice.reminder.btn").toUpperCase(Locale.ROOT));
+        receiptBtn.setText(i18n.t("invoice.receipt.attach").toUpperCase(Locale.ROOT));
         creditNoteBtn.setText(i18n.t("invoice.credit_note.btn").toUpperCase(Locale.ROOT));
         pnlReportBtn.setText(i18n.t("invoice.report.btn").toUpperCase(Locale.ROOT));
         exportCsvBtn.setText(i18n.t("common.export.csv").toUpperCase(Locale.ROOT));
@@ -741,7 +807,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(newOutgoingBtn);
         BrutalistStyle.stylePrimaryButton(previewDocBtn);
         BrutalistStyle.styleSecondaryButtons(
-                newIncomingBtn, applyStatusBtn, sendReminderBtn, creditNoteBtn, pnlReportBtn, exportCsvBtn, refreshBtn);
+                newIncomingBtn, applyStatusBtn, sendReminderBtn, receiptBtn, creditNoteBtn, pnlReportBtn, exportCsvBtn, refreshBtn);
         BrutalistStyle.styleTable(table);
 
         settingsPanel.applyTheme();

@@ -23,8 +23,10 @@ import hu.due.rewear.service.InvoicePdfExporter;
 import hu.due.rewear.service.InvoiceService;
 import hu.due.rewear.service.LabelPdfExporter;
 import hu.due.rewear.service.OrderService;
+import hu.due.rewear.service.PartnerStatementService;
 import hu.due.rewear.service.ProductCodeService;
 import hu.due.rewear.service.QrCodeService;
+import hu.due.rewear.service.ReceiptVaultService;
 import hu.due.rewear.service.ScannerService;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.TicketLabelPainter;
@@ -73,6 +75,8 @@ public final class AppContext {
     private final DeliveryNotePdfExporter deliveryNotePdfExporter;
     private final InvoicePdfExporter invoicePdfExporter;
     private final FinancialReportPdfExporter financialReportPdfExporter;
+    private final PartnerStatementService partnerStatementService;
+    private final ReceiptVaultService receiptVaultService;
     private final BackupService backupService;
 
     public AppContext() {
@@ -114,6 +118,11 @@ public final class AppContext {
         this.deliveryNotePdfExporter = new DeliveryNotePdfExporter(i18n, qrCodeService);
         this.invoicePdfExporter = new InvoicePdfExporter(i18n, qrCodeService, settingsDao::getCompanyProfile);
         this.financialReportPdfExporter = new FinancialReportPdfExporter(i18n, settingsDao::getCompanyProfile);
+        this.partnerStatementService = new PartnerStatementService(i18n, settingsDao::getCompanyProfile);
+        Path receiptsDir = databaseManager.getDatabasePath().getParent() != null
+                ? databaseManager.getDatabasePath().getParent().resolve("receipts")
+                : AppPaths.defaultReceiptsDir();
+        this.receiptVaultService = new ReceiptVaultService(receiptsDir, invoiceDao);
         this.backupService = new BackupService(databaseManager);
 
         invoiceService.syncOverdueStatuses();
@@ -252,6 +261,14 @@ public final class AppContext {
 
     public FinancialReportPdfExporter getFinancialReportPdfExporter() {
         return financialReportPdfExporter;
+    }
+
+    public PartnerStatementService getPartnerStatementService() {
+        return partnerStatementService;
+    }
+
+    public ReceiptVaultService getReceiptVaultService() {
+        return receiptVaultService;
     }
 
     public BackupService getBackupService() {

@@ -218,6 +218,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     gross_amount REAL NOT NULL DEFAULT 0 CHECK (gross_amount >= 0),
     currency TEXT NOT NULL DEFAULT 'EUR',
     exchange_rate REAL NOT NULL DEFAULT 400.0 CHECK (exchange_rate > 0),
+    attachment_path TEXT,
     created_by INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,

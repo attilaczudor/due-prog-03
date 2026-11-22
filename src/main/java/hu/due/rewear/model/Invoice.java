@@ -32,10 +32,15 @@ public record Invoice(
         BigDecimal grossAmount,
         String currency,
         BigDecimal exchangeRate,
+        String attachmentPath,
         long createdBy,
         String createdByName,
         LocalDateTime createdAt
 ) {
+    public boolean hasAttachment() {
+        return attachmentPath != null && !attachmentPath.isBlank();
+    }
+
     public String effectiveCurrencyCode() {
         return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase(Locale.ROOT) : "EUR";
     }

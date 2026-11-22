@@ -83,6 +83,14 @@ public final class AdminView extends JPanel implements NavigableView {
     private final JButton loadI18nBtn = new JButton();
     private final JButton resetI18nBtn = new JButton();
 
+    // Tab 4: System & Packages
+    private final JPanel runtimeCard = new JPanel();
+    private final JLabel runtimeCardTitle = new JLabel();
+    private final JLabel runtimeInfoLabel = new JLabel();
+    private final JLabel packagesTitle = new JLabel();
+    private final DefaultTableModel packagesModel = BrutalistStyle.nonEditableTableModel();
+    private final JTable packagesTable = new JTable(packagesModel);
+
     private List<User> users = List.of();
     private List<StockMovement> allMovements = List.of();
 
@@ -162,9 +170,29 @@ public final class AdminView extends JPanel implements NavigableView {
         maintPanel.add(i18nCard);
         maintPanel.add(Box.createVerticalGlue());
 
+        // Tab 4: System & Packages
+        JPanel systemPanel = new JPanel(new BorderLayout(0, 12));
+        systemPanel.setBorder(BorderFactory.createEmptyBorder(12, 4, 4, 4));
+
+        runtimeCard.setLayout(new BoxLayout(runtimeCard, BoxLayout.Y_AXIS));
+        runtimeCardTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13.5f));
+        runtimeInfoLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
+        runtimeCard.add(runtimeCardTitle);
+        runtimeCard.add(Box.createVerticalStrut(6));
+        runtimeCard.add(runtimeInfoLabel);
+        systemPanel.add(runtimeCard, BorderLayout.NORTH);
+
+        JPanel pkgWrap = new JPanel(new BorderLayout(0, 6));
+        packagesTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        pkgWrap.add(packagesTitle, BorderLayout.NORTH);
+        BrutalistStyle.styleTable(packagesTable);
+        pkgWrap.add(new JScrollPane(packagesTable), BorderLayout.CENTER);
+        systemPanel.add(pkgWrap, BorderLayout.CENTER);
+
         tabs.addTab("", usersPanel);
         tabs.addTab("", auditPanel);
         tabs.addTab("", maintPanel);
+        tabs.addTab("", systemPanel);
         add(tabs, BorderLayout.CENTER);
     }
 
@@ -390,6 +418,7 @@ public final class AdminView extends JPanel implements NavigableView {
         ctx.getI18n().loadBundledDefault();
         ctx.getI18n().setLanguage(ctx.getPreferences().getLanguage());
         updateMaintenanceInfo();
+        updateSystemDiagnostics();
     }
 
     private void updateMaintenanceInfo() {
@@ -464,6 +493,50 @@ public final class AdminView extends JPanel implements NavigableView {
         }
 
         updateMaintenanceInfo();
+        updateSystemDiagnostics();
+    }
+
+    private void updateSystemDiagnostics() {
+        Runtime rt = Runtime.getRuntime();
+        long usedMb = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
+        long maxMb = rt.maxMemory() / (1024 * 1024);
+        Path dbPath = ctx.getDatabaseManager().getDatabasePath();
+        long dbKb = 0;
+        try {
+            if (java.nio.file.Files.exists(dbPath)) {
+                dbKb = java.nio.file.Files.size(dbPath) / 1024;
+            }
+        } catch (Exception ignored) {
+            // Ignore transient size read error
+        }
+        long receiptCount = ctx.getReceiptVaultService().countVaultFiles();
+        String theme = ThemeManager.isDarkMode() ? "DARK" : "LIGHT";
+
+        runtimeInfoLabel.setText("<html>"
+                + "<b>Java:</b> " + System.getProperty("java.version") + " (" + System.getProperty("java.vendor") + ")"
+                + " &nbsp;|&nbsp; <b>OS:</b> " + System.getProperty("os.name") + " " + System.getProperty("os.arch")
+                + " &nbsp;|&nbsp; <b>Heap:</b> " + usedMb + " / " + maxMb + " MB<br>"
+                + "<b>SQLite DB:</b> " + dbPath + " (" + dbKb + " KB)"
+                + " &nbsp;|&nbsp; <b>Receipts Vault:</b> " + ctx.getReceiptVaultService().getReceiptsDir()
+                + " (" + receiptCount + " file(s))<br>"
+                + "<b>UI:</b> Brutalist Monochrome (" + theme + ") &nbsp;|&nbsp; <b>Active Language:</b> "
+                + ctx.getI18n().getActiveLanguage().toUpperCase(java.util.Locale.ROOT)
+                + "</html>");
+
+        packagesModel.setRowCount(0);
+        Object[][] deps = {
+                {"Java Runtime", System.getProperty("java.version"), "Desktop JVM (Target: Java 17)"},
+                {"FlatLaf", "3.5.4", "Brutalist Monochrome Light/Dark Swing Look & Feel"},
+                {"SQLite JDBC (xerial)", "3.47.1.0", "Embedded Zero-Server 3NF Relational Database"},
+                {"ZXing Core + JavaSE", "3.5.3", "QR Code Encoding & Image/Camera Decoding"},
+                {"OpenPDF (LibrePDF)", "2.0.3", "A4 Invoices, Delivery Notes, Statements & Label PDFs"},
+                {"XChart", "3.8.8", "Dashboard Monochrome Pie & Bar Analytics"},
+                {"jBCrypt", "0.4", "Salted Password Hashing & Authentication"},
+                {"SLF4J + Logback", "2.0.16 / 1.5.12", "Structured Application & Audit Logging"}
+        };
+        for (Object[] row : deps) {
+            packagesModel.addRow(row);
+        }
     }
 
     @Override
@@ -472,6 +545,15 @@ public final class AdminView extends JPanel implements NavigableView {
         tabs.setTitleAt(0, i18n.t("admin.tab.users").toUpperCase());
         tabs.setTitleAt(1, i18n.t("admin.tab.audit").toUpperCase());
         tabs.setTitleAt(2, i18n.t("admin.tab.maintenance").toUpperCase());
+        tabs.setTitleAt(3, i18n.t("admin.tab.system").toUpperCase());
+
+        runtimeCardTitle.setText(i18n.t("admin.system.runtime").toUpperCase());
+        packagesTitle.setText(i18n.t("admin.system.packages").toUpperCase());
+        packagesModel.setColumnIdentifiers(new Object[]{
+                i18n.t("admin.system.component").toUpperCase(),
+                i18n.t("admin.system.version").toUpperCase(),
+                i18n.t("admin.system.purpose").toUpperCase()
+        });
 
         addUserBtn.setText("+ " + i18n.t("common.add").toUpperCase());
         editUserBtn.setText(i18n.t("common.edit").toUpperCase());
@@ -520,7 +602,9 @@ public final class AdminView extends JPanel implements NavigableView {
                 restoreDbBtn, exportI18nBtn, resetI18nBtn);
         BrutalistStyle.applyBoxCard(dbCard, 14, 16);
         BrutalistStyle.applyBoxCard(i18nCard, 14, 16);
+        BrutalistStyle.applyBoxCard(runtimeCard, 14, 16);
         BrutalistStyle.styleTable(usersTable);
         BrutalistStyle.styleTable(auditTable);
+        BrutalistStyle.styleTable(packagesTable);
     }
 }

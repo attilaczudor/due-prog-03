@@ -381,3 +381,21 @@ invoice.report.pnl_section,Per-Currency Profit & Loss Summary (Native Ledgers),D
 dashboard.valuation.title,Live Warehouse Stock Valuation,Élő raktári készletérték
 dashboard.overdue_alert,! {0} overdue invoice(s),! {0} lejárt számla
 inventory.bulk_relocate.done,Relocated {0} package(s) to {1}.,{0} csomag áthelyezve ide: {1}.
+invoice.receipt.attach,Attach Receipt,Bizonylat csatolása
+invoice.receipt.view,Receipt Attached,Bizonylat megnyitása
+invoice.receipt.open,Open Receipt,Megnyitás
+invoice.receipt.replace,Replace File,Fájl cseréje
+invoice.receipt.remove,Remove Receipt,Törlés
+invoice.receipt.attached,Receipt attached: {0},Bizonylat csatolva: {0}
+invoice.receipt.removed,Receipt attachment removed.,Bizonylat csatolmány eltávolítva.
+partners.statement.btn,Statement / Aging PDF,Egyenlegközlő / Korosítás PDF
+partners.statement.pdf_title,Partner Account Statement & Aging,Partner egyenlegközlő és korosítás
+partners.statement.aging_section,Multi-Currency Open Balance Aging,Devizánkénti nyitott egyenleg korosítás
+partners.statement.current,Current,Nem lejárt
+partners.statement.total_open,Total Open,Összes nyitott
+admin.tab.system,System & Packages,Rendszer és csomagok
+admin.system.runtime,Runtime Environment & Portable Storage,Futtatókörnyezet és hordozható tárhely
+admin.system.packages,Bundled Libraries & Dependencies,Csomagolt könyvtárak és függőségek
+admin.system.component,Component,Komponens
+admin.system.version,Version,Verzió
+admin.system.purpose,Purpose,Szerepkör

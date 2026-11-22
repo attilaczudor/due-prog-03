@@ -100,10 +100,11 @@ public final class SchemaInitializer {
                     """);
         }
 
-        // 3. Add partner_type & country_code to customers, tax_type_code to invoices if missing
+        // 3. Add partner_type & country_code to customers, tax_type_code & attachment_path to invoices if missing
         addColumnIfMissing(conn, "customers", "partner_type", "TEXT NOT NULL DEFAULT 'CUSTOMER'");
         addColumnIfMissing(conn, "customers", "country_code", "TEXT NOT NULL DEFAULT 'HU'");
         addColumnIfMissing(conn, "invoices", "tax_type_code", "TEXT");
+        addColumnIfMissing(conn, "invoices", "attachment_path", "TEXT");
 
         // 4. Infer country_code for existing non-Hungarian customers & backfill tax_type_code on existing invoices
         try (Statement stmt = conn.createStatement()) {

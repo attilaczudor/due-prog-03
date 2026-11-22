@@ -8,7 +8,9 @@ import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.Order;
+import hu.due.rewear.model.PartnerAgingStatement;
 import hu.due.rewear.model.PartnerType;
+import hu.due.rewear.service.DocumentPageSource;
 import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
@@ -24,6 +26,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.FlowLayout;
@@ -31,9 +34,12 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.Window;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * B2B Business Partners management view supporting Buyers (Customers), Providers (Suppliers we pay),
@@ -49,6 +55,7 @@ public final class CustomersView extends JPanel implements NavigableView {
 
     private final JButton addBtn = new JButton();
     private final JButton editBtn = new JButton();
+    private final JButton statementBtn = new JButton();
     private final JButton refreshBtn = new JButton();
 
     private final JButton filterAllBtn = new JButton();
@@ -88,6 +95,7 @@ public final class CustomersView extends JPanel implements NavigableView {
         JPanel toolbar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
         toolbar.add(addBtn);
         toolbar.add(editBtn);
+        toolbar.add(statementBtn);
         toolbar.add(refreshBtn);
         toolbar.add(new JLabel("   |   "));
         toolbar.add(filterAllBtn);
@@ -117,6 +125,7 @@ public final class CustomersView extends JPanel implements NavigableView {
             Customer c = getSelectedCustomer();
             if (c != null) openCustomerDialog(c);
         });
+        statementBtn.addActionListener(e -> handlePreviewPartnerStatement());
         refreshBtn.addActionListener(e -> refreshData());
 
         filterAllBtn.addActionListener(e -> { filterMode = FilterMode.ALL; styleFilterButtons(); refreshData(); });
@@ -236,6 +245,23 @@ public final class CustomersView extends JPanel implements NavigableView {
         }
     }
 
+    private void handlePreviewPartnerStatement() {
+        Customer sel = getSelectedCustomer();
+        if (sel == null) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        ctx.getInvoiceService().syncOverdueStatuses();
+        List<Invoice> invs = ctx.getInvoiceDao().findByPartner(sel.id(), sel.name());
+        Map<String, Integer> decByCur = ctx.getFinanceConfigDao().decimalPlacesMap();
+        PartnerAgingStatement statement = ctx.getPartnerStatementService()
+                .computeStatement(sel, invs, decByCur, LocalDate.now());
+        DocumentPageSource doc = ctx.getPartnerStatementService().createPageSource(statement, invs, decByCur);
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        DocumentPreviewDialog.showDocuments(owner, ctx, List.of(doc), sel.email(),
+                i18n.t("partners.statement.pdf_title") + " — " + sel.name());
+    }
+
     private void loadHistoryForSelectedPartner() {
         historyModel.setRowCount(0);
         Customer sel = getSelectedCustomer();
@@ -283,8 +309,7 @@ public final class CustomersView extends JPanel implements NavigableView {
 
     public void applyBrutalistTheme() {
         BrutalistStyle.stylePrimaryButton(addBtn);
-        BrutalistStyle.styleSecondaryButton(editBtn);
-        BrutalistStyle.styleSecondaryButton(refreshBtn);
+        BrutalistStyle.styleSecondaryButtons(editBtn, statementBtn, refreshBtn);
         styleFilterButtons();
         BrutalistStyle.styleTable(customerTable);
         BrutalistStyle.styleTable(historyTable);
@@ -338,6 +363,7 @@ public final class CustomersView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         addBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
         editBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
+        statementBtn.setText(i18n.t("partners.statement.btn").toUpperCase(Locale.ROOT));
         refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
         filterAllBtn.setText(i18n.t("partners.filter.all").toUpperCase(Locale.ROOT));
         filterBuyersBtn.setText(i18n.t("partners.filter.buyers").toUpperCase(Locale.ROOT));

@@ -55,4 +55,9 @@ public final class AppPaths {
     public static Path defaultPreferencesPath() {
         return resolveDataDir().resolve("app.properties");
     }
+
+    /** Portable directory storing attached supplier/expense receipts ({@code ./data/receipts/}). */
+    public static Path defaultReceiptsDir() {
+        return resolveDataDir().resolve("receipts");
+    }
 }

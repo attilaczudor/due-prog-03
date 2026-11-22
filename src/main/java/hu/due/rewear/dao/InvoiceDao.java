@@ -34,7 +34,7 @@ public final class InvoiceDao {
                    o.order_number, i.customer_id, i.partner_name, i.partner_tax_number,
                    i.partner_address, i.partner_email, i.status, i.issue_date, i.due_date,
                    i.paid_date, i.net_amount, i.vat_rate, i.tax_type_code, i.vat_amount, i.gross_amount,
-                   i.currency, i.exchange_rate, i.created_by, u.full_name AS created_by_name, i.created_at
+                   i.currency, i.exchange_rate, i.attachment_path, i.created_by, u.full_name AS created_by_name, i.created_at
             FROM invoices i
             LEFT JOIN orders o ON o.id = i.order_id
             JOIN users u ON u.id = i.created_by
@@ -392,6 +392,19 @@ public final class InvoiceDao {
         }
     }
 
+    /** Stores or clears the portable relative attachment path for an invoice's scanned receipt. */
+    public void updateAttachmentPath(long invoiceId, String relativePath) {
+        String sql = "UPDATE invoices SET attachment_path = ? WHERE id = ?";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, emptyToNull(relativePath));
+            ps.setLong(2, invoiceId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to update invoice attachment path: " + invoiceId, e);
+        }
+    }
+
     public void deleteById(long invoiceId) {
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement("DELETE FROM invoices WHERE id = ?")) {
@@ -431,6 +444,7 @@ public final class InvoiceDao {
                 bd(rs.getDouble("gross_amount")),
                 rs.getString("currency"),
                 bd(rs.getDouble("exchange_rate")),
+                rs.getString("attachment_path"),
                 rs.getLong("created_by"),
                 rs.getString("created_by_name"),
                 DaoDateUtil.parse(rs.getString("created_at"))
