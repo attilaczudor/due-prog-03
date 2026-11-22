@@ -6,6 +6,7 @@ import com.lowagie.text.Image;
 import com.lowagie.text.PageSize;
 import com.lowagie.text.pdf.PdfWriter;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.InvoiceDirection;
@@ -26,6 +27,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Locale;
+import java.util.function.Supplier;
 
 /**
  * Generates Brutalist Monochrome A4 PDF Invoices (Outgoing & Incoming) using OpenPDF
@@ -39,10 +41,19 @@ public final class InvoicePdfExporter {
 
     private final I18nManager i18n;
     private final QrCodeService qrService;
+    private final Supplier<CompanyProfile> companyProfileSupplier;
 
     public InvoicePdfExporter(I18nManager i18n, QrCodeService qrService) {
+        this(i18n, qrService, CompanyProfile::defaults);
+    }
+
+    public InvoicePdfExporter(I18nManager i18n, QrCodeService qrService,
+                              Supplier<CompanyProfile> companyProfileSupplier) {
         this.i18n = i18n;
         this.qrService = qrService;
+        this.companyProfileSupplier = companyProfileSupplier != null
+                ? companyProfileSupplier
+                : CompanyProfile::defaults;
     }
 
     public DocumentPageSource createPageSource(Invoice invoice, List<InvoiceItem> items) {
@@ -194,8 +205,9 @@ public final class InvoicePdfExporter {
             g.setColor(Color.BLACK);
             g.setStroke(new BasicStroke(1f));
             g.drawRect(Math.round(margin), Math.round(y), Math.round(colW), Math.round(boxH));
+            String invCur = inv.effectiveCurrencyCode();
             if (isOutgoing) {
-                paintCompanyBlock(g, leftHeader, margin + 8, y + 14);
+                paintCompanyBlock(g, leftHeader, invCur, margin + 8, y + 14);
             } else {
                 paintPartnerBlock(g, leftHeader, inv, margin + 8, y + 14);
             }
@@ -206,7 +218,7 @@ public final class InvoicePdfExporter {
             if (isOutgoing) {
                 paintPartnerBlock(g, rightHeader, inv, rx + 8, y + 14);
             } else {
-                paintCompanyBlock(g, rightHeader, rx + 8, y + 14);
+                paintCompanyBlock(g, rightHeader, invCur, rx + 8, y + 14);
             }
 
             // Right QR code
@@ -343,18 +355,22 @@ public final class InvoicePdfExporter {
         g.drawString(footer, margin, pageH - 22f);
     }
 
-    private void paintCompanyBlock(Graphics2D g, String header, float x, float y) {
+    private void paintCompanyBlock(Graphics2D g, String header, String currencyCode, float x, float y) {
+        CompanyProfile company = companyProfileSupplier.get();
+        if (company == null) {
+            company = CompanyProfile.defaults();
+        }
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 8));
         g.setColor(new Color(0x555555));
         g.drawString(header, x, y);
         g.setColor(Color.BLACK);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
-        g.drawString("ReWear Logistics Kft.", x, y + 16);
+        g.drawString(FormatUtil.truncate(company.name(), 28), x, y + 16);
         g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 8));
-        g.drawString("2400 Dunaújváros, Táncsics Mihály u. 1/A", x, y + 32);
-        g.drawString("TAX / ADÓSZÁM: HU-27891042-2-07", x, y + 46);
-        g.drawString("EMAIL: billing@rewear-wms.hu", x, y + 60);
-        g.drawString("IBAN: HU42 1177 3061 0023 4567 0000 0000", x, y + 74);
+        g.drawString(FormatUtil.truncate(company.address(), 34), x, y + 32);
+        g.drawString("TAX: " + FormatUtil.truncate(company.taxNumber(), 28), x, y + 46);
+        g.drawString("EMAIL: " + FormatUtil.truncate(company.email(), 28), x, y + 60);
+        g.drawString("IBAN (" + currencyCode + "): " + FormatUtil.truncate(company.ibanForCurrency(currencyCode), 28), x, y + 74);
     }
 
     private void paintPartnerBlock(Graphics2D g, String header, Invoice inv, float x, float y) {

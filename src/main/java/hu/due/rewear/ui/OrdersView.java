@@ -3,6 +3,7 @@ package hu.due.rewear.ui;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.InventoryPackage;
@@ -28,6 +29,7 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -37,8 +39,12 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
@@ -74,6 +80,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final JTextField scanQrField = new JTextField(26);
     private final JButton scanAddBtn = new JButton();
     private final JButton pickStockBtn = new JButton();
+    private final JButton editPriceBtn = new JButton();
     private final JButton removeItemBtn = new JButton();
 
     private final JLabel itemsTitleLabel = new JLabel();
@@ -137,6 +144,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         scanBarPanel.add(scanQrField);
         scanBarPanel.add(scanAddBtn);
         scanBarPanel.add(pickStockBtn);
+        scanBarPanel.add(editPriceBtn);
         scanBarPanel.add(removeItemBtn);
 
         JPanel rightNorth = new JPanel(new BorderLayout(0, 8));
@@ -178,7 +186,16 @@ public final class OrdersView extends JPanel implements NavigableView {
         scanQrField.addActionListener(e -> handleScanAdd());
         scanAddBtn.addActionListener(e -> handleScanAdd());
         pickStockBtn.addActionListener(e -> handlePickFromStock());
+        editPriceBtn.addActionListener(e -> handleEditItemPrice());
         removeItemBtn.addActionListener(e -> handleRemoveItem());
+        itemsTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e) && editPriceBtn.isEnabled()) {
+                    handleEditItemPrice();
+                }
+            }
+        });
 
         applyStatusBtn.addActionListener(e -> handleApplyStatus());
         previewDocsBtn.addActionListener(e -> handlePreviewDocuments());
@@ -342,6 +359,39 @@ public final class OrdersView extends JPanel implements NavigableView {
         });
     }
 
+    private void handleEditItemPrice() {
+        Order order = getSelectedOrder();
+        int row = itemsTable.getSelectedRow();
+        if (order == null || row < 0 || row >= currentItems.size()) {
+            return;
+        }
+        if (order.status() != OrderStatus.DRAFT && order.status() != OrderStatus.PACKING) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        OrderItem item = currentItems.get(row);
+        String cur = order.effectiveCurrencyCode();
+        int dec = order.currencyDecimals();
+        String initial = CurrencyDef.formatNumeric(item.pricePerKg(), dec);
+        String prompt = i18n.t("orders.edit_price.prompt", cur, item.packageQrCode(), FormatUtil.stripZeros(item.weightKg()));
+
+        Object input = JOptionPane.showInputDialog(this, prompt,
+                i18n.t("orders.edit_price"), JOptionPane.PLAIN_MESSAGE, null, null, initial);
+        if (input == null) {
+            return;
+        }
+        try {
+            BigDecimal newPrice = CurrencyCode.parseAmount(input.toString());
+            if (newPrice.compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException(i18n.t("validation.prices_non_negative"));
+            }
+            ctx.getOrderService().updateOrderItemPrice(order.id(), item.id(), newPrice);
+            refreshDataSelecting(order.id());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     private void handleRemoveItem() {
         Order order = getSelectedOrder();
         int row = itemsTable.getSelectedRow();
@@ -500,6 +550,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         scanQrField.setEnabled(editable);
         scanAddBtn.setEnabled(editable);
         pickStockBtn.setEnabled(editable);
+        editPriceBtn.setEnabled(editable);
         removeItemBtn.setEnabled(editable);
         orderCurrencyCombo.setEnabled(editable);
         statusDropdown.setEnabled(hasOrder);
@@ -529,7 +580,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(scanBarPanel, 8, 10);
         BrutalistStyle.stylePrimaryButton(newOrderBtn);
         BrutalistStyle.stylePrimaryButton(previewDocsBtn);
-        BrutalistStyle.styleSecondaryButtons(refreshBtn, scanAddBtn, pickStockBtn, removeItemBtn, applyStatusBtn);
+        BrutalistStyle.styleSecondaryButtons(refreshBtn, scanAddBtn, pickStockBtn, editPriceBtn, removeItemBtn, applyStatusBtn);
         BrutalistStyle.styleTable(ordersTable);
         BrutalistStyle.styleTable(itemsTable);
     }
@@ -587,8 +638,9 @@ public final class OrdersView extends JPanel implements NavigableView {
         scanLabel.setText(i18n.t("orders.add_by_scan").toUpperCase() + ":");
         scanQrField.putClientProperty("JTextField.placeholderText", i18n.t("orders.scan_placeholder"));
         scanAddBtn.setText(i18n.t("common.add").toUpperCase());
-        pickStockBtn.setText(i18n.t("orders.add_from_stock").toUpperCase());
-        removeItemBtn.setText(i18n.t("orders.remove_item").toUpperCase());
+        pickStockBtn.setText(i18n.t("orders.add_from_stock").toUpperCase(Locale.ROOT));
+        editPriceBtn.setText(i18n.t("orders.edit_price").toUpperCase(Locale.ROOT));
+        removeItemBtn.setText(i18n.t("orders.remove_item").toUpperCase(Locale.ROOT));
         itemsTitleLabel.setText(i18n.t("orders.items_title").toUpperCase());
         statusSelectLabel.setText(i18n.t("orders.status.label").toUpperCase() + ":");
         statusDropdown.removeAllItems();

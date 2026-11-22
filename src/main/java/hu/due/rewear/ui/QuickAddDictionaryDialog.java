@@ -65,6 +65,7 @@ public final class QuickAddDictionaryDialog extends JDialog {
         setTitle(i18n.t("intake.quick_add.title", i18n.t(kind.getLabelKey())));
         setResizable(false);
         buildUi();
+        BrutalistStyle.installEscapeToClose(this);
         pack();
         setLocationRelativeTo(owner);
     }

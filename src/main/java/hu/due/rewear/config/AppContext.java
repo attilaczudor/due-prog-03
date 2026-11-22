@@ -110,9 +110,10 @@ public final class AppContext {
         this.labelPdfExporter = new LabelPdfExporter(ticketLabelPainter);
         this.csvExportService = new CsvExportService(i18n);
         this.deliveryNotePdfExporter = new DeliveryNotePdfExporter(i18n, qrCodeService);
-        this.invoicePdfExporter = new InvoicePdfExporter(i18n, qrCodeService);
+        this.invoicePdfExporter = new InvoicePdfExporter(i18n, qrCodeService, settingsDao::getCompanyProfile);
         this.backupService = new BackupService(databaseManager);
 
+        invoiceService.syncOverdueStatuses();
         initLocalizationFromPreferences();
     }
 

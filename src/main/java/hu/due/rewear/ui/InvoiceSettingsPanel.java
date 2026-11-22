@@ -3,6 +3,7 @@ package hu.due.rewear.ui;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.TaxType;
@@ -27,18 +28,41 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.math.BigDecimal;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 /**
  * Tab 2 of {@link InvoicesView}: dedicated Invoice Settings panel for managing
- * configurable VAT / Tax Types ({@code tax_types}) and operating Currencies ({@code currencies}).
+ * the editable Seller Company Profile &amp; per-currency Bank IBANs ({@code app_settings}),
+ * configurable VAT / Tax Types ({@code tax_types}), and operating Currencies ({@code currencies}).
  * Notifies the host view whenever configuration changes so ledger buttons and dropdowns stay in sync.
  */
 final class InvoiceSettingsPanel extends JPanel {
 
     private final AppContext ctx;
     private final Runnable onConfigChanged;
+
+    // Company Profile & Per-Currency Bank IBANs section
+    private final JPanel companyCard = new JPanel(new BorderLayout(0, 8));
+    private final JLabel companySectionTitle = new JLabel();
+    private final JLabel companyNameLbl = new JLabel();
+    private final JLabel companyTaxLbl = new JLabel();
+    private final JLabel companyAddressLbl = new JLabel();
+    private final JLabel companyEmailLbl = new JLabel();
+    private final JLabel ibanCurrencyLbl = new JLabel();
+    private final JLabel ibanValueLbl = new JLabel();
+    private final JTextField companyNameField = new JTextField(22);
+    private final JTextField companyTaxField = new JTextField(18);
+    private final JTextField companyAddressField = new JTextField(24);
+    private final JTextField companyEmailField = new JTextField(20);
+    private final JComboBox<String> ibanCurrencyCombo = new JComboBox<>();
+    private final JTextField ibanField = new JTextField(26);
+    private final JButton saveCompanyBtn = new JButton();
+    private final Map<String, String> draftIbans = new LinkedHashMap<>();
+    private String activeIbanCurrency = "HUF";
+    private boolean loadingCompany = false;
 
     // Tax Types section
     private final JPanel taxCard = new JPanel(new BorderLayout(0, 8));
@@ -82,6 +106,42 @@ final class InvoiceSettingsPanel extends JPanel {
     }
 
     private void buildUi() {
+        // North Card: Seller Company Profile & Per-Currency Bank IBANs
+        JPanel compHeader = new JPanel(new BorderLayout(8, 0));
+        compHeader.setOpaque(false);
+        companySectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        compHeader.add(companySectionTitle, BorderLayout.WEST);
+        compHeader.add(saveCompanyBtn, BorderLayout.EAST);
+        companyCard.add(compHeader, BorderLayout.NORTH);
+
+        JPanel compGrid = new JPanel(new GridBagLayout());
+        compGrid.setOpaque(false);
+        GridBagConstraints cg = new GridBagConstraints();
+        cg.insets = new Insets(3, 4, 3, 8);
+        cg.fill = GridBagConstraints.HORIZONTAL;
+        cg.anchor = GridBagConstraints.WEST;
+
+        // Row 0: Company Name | Tax Number
+        cg.gridx = 0; cg.gridy = 0; cg.weightx = 0; compGrid.add(companyNameLbl, cg);
+        cg.gridx = 1; cg.weightx = 0.5; compGrid.add(companyNameField, cg);
+        cg.gridx = 2; cg.weightx = 0; compGrid.add(companyTaxLbl, cg);
+        cg.gridx = 3; cg.weightx = 0.5; compGrid.add(companyTaxField, cg);
+
+        // Row 1: Address | Email
+        cg.gridx = 0; cg.gridy = 1; cg.weightx = 0; compGrid.add(companyAddressLbl, cg);
+        cg.gridx = 1; cg.weightx = 0.5; compGrid.add(companyAddressField, cg);
+        cg.gridx = 2; cg.weightx = 0; compGrid.add(companyEmailLbl, cg);
+        cg.gridx = 3; cg.weightx = 0.5; compGrid.add(companyEmailField, cg);
+
+        // Row 2: Bank Account Currency selector | IBAN
+        cg.gridx = 0; cg.gridy = 2; cg.weightx = 0; compGrid.add(ibanCurrencyLbl, cg);
+        cg.gridx = 1; cg.weightx = 0.5; compGrid.add(ibanCurrencyCombo, cg);
+        cg.gridx = 2; cg.weightx = 0; compGrid.add(ibanValueLbl, cg);
+        cg.gridx = 3; cg.weightx = 0.5; compGrid.add(ibanField, cg);
+
+        companyCard.add(compGrid, BorderLayout.CENTER);
+        add(companyCard, BorderLayout.NORTH);
+
         // Top Card: VAT / Tax Types
         JPanel taxHeader = new JPanel(new BorderLayout(8, 0));
         taxHeader.setOpaque(false);
@@ -122,11 +182,25 @@ final class InvoiceSettingsPanel extends JPanel {
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, taxCard, currencyCard);
         split.setResizeWeight(0.55);
-        split.setDividerLocation(310);
+        split.setDividerLocation(240);
         add(split, BorderLayout.CENTER);
     }
 
     private void wireEvents() {
+        ibanCurrencyCombo.addActionListener(e -> {
+            if (loadingCompany) return;
+            // Save typed IBAN for previous currency into draft map before switching
+            if (activeIbanCurrency != null && !activeIbanCurrency.isBlank()) {
+                draftIbans.put(activeIbanCurrency, ibanField.getText().trim());
+            }
+            Object sel = ibanCurrencyCombo.getSelectedItem();
+            if (sel != null) {
+                activeIbanCurrency = sel.toString();
+                ibanField.setText(draftIbans.getOrDefault(activeIbanCurrency, ""));
+            }
+        });
+        saveCompanyBtn.addActionListener(e -> handleSaveCompanyProfile());
+
         addTaxBtn.addActionListener(e -> openTaxDialog(null));
         editTaxBtn.addActionListener(e -> {
             int r = taxTable.getSelectedRow();
@@ -322,6 +396,35 @@ final class InvoiceSettingsPanel extends JPanel {
         }
     }
 
+    // --- Company Profile Persistence ---
+
+    private void handleSaveCompanyProfile() {
+        I18nManager i18n = ctx.getI18n();
+        try {
+            String name = companyNameField.getText().trim();
+            if (name.isEmpty()) {
+                throw new IllegalArgumentException(i18n.t("validation.company_required"));
+            }
+            if (activeIbanCurrency != null && !activeIbanCurrency.isBlank()) {
+                draftIbans.put(activeIbanCurrency, ibanField.getText().trim());
+            }
+            CompanyProfile existing = ctx.getSettingsDao().getCompanyProfile();
+            CompanyProfile updated = new CompanyProfile(
+                    name,
+                    companyAddressField.getText().trim(),
+                    companyTaxField.getText().trim(),
+                    companyEmailField.getText().trim(),
+                    existing.phone(),
+                    draftIbans
+            );
+            ctx.getSettingsDao().saveCompanyProfile(updated);
+            JOptionPane.showMessageDialog(this, i18n.t("invoice.settings.company_saved"),
+                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
     // --- Refresh, i18n & Theme ---
 
     void refreshTables() {
@@ -354,10 +457,51 @@ final class InvoiceSettingsPanel extends JPanel {
                     c.active() ? yes : no
             });
         }
+
+        // Load Seller Company Profile & per-currency IBANs
+        loadingCompany = true;
+        try {
+            CompanyProfile profile = ctx.getSettingsDao().getCompanyProfile();
+            companyNameField.setText(profile.name());
+            companyTaxField.setText(profile.taxNumber());
+            companyAddressField.setText(profile.address());
+            companyEmailField.setText(profile.email());
+            draftIbans.clear();
+            draftIbans.putAll(profile.ibansByCurrency());
+
+            String prevCur = activeIbanCurrency;
+            ibanCurrencyCombo.removeAllItems();
+            for (CurrencyDef c : allCurrencies) {
+                if (c.active()) {
+                    ibanCurrencyCombo.addItem(c.code());
+                }
+            }
+            if (ibanCurrencyCombo.getItemCount() == 0) {
+                ibanCurrencyCombo.addItem("HUF");
+                ibanCurrencyCombo.addItem("EUR");
+            }
+            if (prevCur != null) {
+                ibanCurrencyCombo.setSelectedItem(prevCur);
+            }
+            Object sel = ibanCurrencyCombo.getSelectedItem();
+            activeIbanCurrency = sel != null ? sel.toString() : "HUF";
+            ibanField.setText(draftIbans.getOrDefault(activeIbanCurrency, ""));
+        } finally {
+            loadingCompany = false;
+        }
     }
 
     void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
+        companySectionTitle.setText(i18n.t("invoice.settings.company").toUpperCase(Locale.ROOT));
+        companyNameLbl.setText(i18n.t("customers.company") + " *:");
+        companyTaxLbl.setText(i18n.t("invoice.tax_number") + ":");
+        companyAddressLbl.setText(i18n.t("invoice.address") + ":");
+        companyEmailLbl.setText(i18n.t("invoice.email") + ":");
+        ibanCurrencyLbl.setText(i18n.t("invoice.settings.iban_currency") + ":");
+        ibanValueLbl.setText(i18n.t("invoice.settings.iban") + ":");
+        saveCompanyBtn.setText(i18n.t("common.save").toUpperCase(Locale.ROOT));
+
         taxSectionTitle.setText(i18n.t("invoice.settings.taxes").toUpperCase(Locale.ROOT));
         addTaxBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
         editTaxBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
@@ -393,10 +537,13 @@ final class InvoiceSettingsPanel extends JPanel {
 
     void applyTheme() {
         setBackground(ThemeManager.bg());
+        BrutalistStyle.applyBoxCard(companyCard, 10, 12);
         BrutalistStyle.applyBoxCard(taxCard, 10, 12);
         BrutalistStyle.applyBoxCard(currencyCard, 10, 12);
+        companySectionTitle.setForeground(ThemeManager.fg());
         taxSectionTitle.setForeground(ThemeManager.fg());
         currencySectionTitle.setForeground(ThemeManager.fg());
+        BrutalistStyle.stylePrimaryButton(saveCompanyBtn);
 
         BrutalistStyle.stylePrimaryButton(addTaxBtn);
         BrutalistStyle.styleSecondaryButton(editTaxBtn);

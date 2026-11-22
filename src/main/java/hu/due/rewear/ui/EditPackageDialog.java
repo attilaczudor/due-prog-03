@@ -98,6 +98,7 @@ public final class EditPackageDialog extends JDialog {
         wireLivePreview();
         updateLiveQr();
 
+        BrutalistStyle.installEscapeToClose(this);
         pack();
         setLocationRelativeTo(owner);
     }

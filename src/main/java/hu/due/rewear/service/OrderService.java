@@ -140,6 +140,38 @@ public final class OrderService {
         return orderDao.findById(orderId).orElseThrow();
     }
 
+    /**
+     * Updates the negotiated unit price per kg for a single allocated package on an open
+     * ({@code DRAFT} / {@code PACKING}) order and atomically recalculates the line &amp; order totals.
+     */
+    public Order updateOrderItemPrice(long orderId, long orderItemId, BigDecimal newPricePerKg) {
+        if (newPricePerKg == null || newPricePerKg.compareTo(BigDecimal.ZERO) < 0) {
+            throw new IllegalArgumentException("Price per kg must be >= 0");
+        }
+        Order order = orderDao.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (order.status() != OrderStatus.DRAFT && order.status() != OrderStatus.PACKING) {
+            throw new IllegalStateException("Cannot edit prices on order in status: " + order.status());
+        }
+        OrderItem target = orderItemDao.findByOrderId(orderId).stream()
+                .filter(i -> i.id() == orderItemId)
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException("Order item not found: " + orderItemId));
+
+        int decimals = order.currencyDecimals();
+        BigDecimal roundedUnit = CurrencyDef.roundForScale(newPricePerKg, decimals);
+        BigDecimal lineTotal = CurrencyDef.roundForScale(target.weightKg().multiply(roundedUnit), decimals);
+
+        db.runInTransaction(conn -> {
+            orderItemDao.updateItemPricing(conn, orderItemId, roundedUnit, lineTotal);
+            recalculateTotals(conn, orderId, decimals);
+        });
+
+        LOG.info("Updated item {} on order {} to {} {}/kg", target.packageQrCode(),
+                order.orderNumber(), roundedUnit, order.effectiveCurrencyCode());
+        return orderDao.findById(orderId).orElseThrow();
+    }
+
     public Order removeItemFromOrder(long orderId, long orderItemId, long userId) {
         Order order = orderDao.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));

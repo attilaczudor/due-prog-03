@@ -3,18 +3,24 @@ package hu.due.rewear.ui;
 import com.formdev.flatlaf.FlatClientProperties;
 import hu.due.rewear.config.ThemeManager;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
+import javax.swing.JDialog;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JRootPane;
 import javax.swing.JTable;
+import javax.swing.KeyStroke;
 import javax.swing.border.Border;
 import javax.swing.table.DefaultTableModel;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 
 /**
  * Shared styling helpers implementing the stark Brutalist Monochrome visual language:
@@ -201,5 +207,24 @@ public final class BrutalistStyle {
         gbc.gridx = 1;
         gbc.weightx = 1.0;
         form.add(input, gbc);
+    }
+
+    /** Binds the {@code Escape} key anywhere inside {@code dialog} to call {@link JDialog#dispose()}. */
+    public static void installEscapeToClose(JDialog dialog) {
+        if (dialog == null) {
+            return;
+        }
+        JRootPane rootPane = dialog.getRootPane();
+        if (rootPane == null) {
+            return;
+        }
+        rootPane.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "rewear.closeDialog");
+        rootPane.getActionMap().put("rewear.closeDialog", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                dialog.dispose();
+            }
+        });
     }
 }

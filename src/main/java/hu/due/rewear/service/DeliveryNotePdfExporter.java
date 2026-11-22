@@ -1,10 +1,5 @@
 package hu.due.rewear.service;
 
-import com.lowagie.text.Document;
-import com.lowagie.text.DocumentException;
-import com.lowagie.text.Image;
-import com.lowagie.text.PageSize;
-import com.lowagie.text.pdf.PdfWriter;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
@@ -21,8 +16,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
-import java.io.OutputStream;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -34,7 +27,6 @@ import java.util.Locale;
  */
 public final class DeliveryNotePdfExporter {
 
-    private static final double EXPORT_DPI = 250.0;
     private static final int ROWS_PER_FIRST_PAGE = 18;
     private static final int ROWS_PER_NEXT_PAGE = 28;
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
@@ -89,59 +81,7 @@ public final class DeliveryNotePdfExporter {
         if (order == null) {
             throw new IllegalArgumentException("Order is required");
         }
-        if (targetPdf.getParent() != null) {
-            Files.createDirectories(targetPdf.getParent());
-        }
-
-        float pageW = PageSize.A4.getWidth();
-        float pageH = PageSize.A4.getHeight();
-        double scale = EXPORT_DPI / 72.0;
-        int imgW = (int) Math.round(pageW * scale);
-        int imgH = (int) Math.round(pageH * scale);
-
-        int totalItems = items == null ? 0 : items.size();
-        int totalPages = computePageCount(totalItems);
-
-        Document document = new Document(PageSize.A4, 0, 0, 0, 0);
-        try (OutputStream out = Files.newOutputStream(targetPdf)) {
-            PdfWriter.getInstance(document, out);
-            document.open();
-            try {
-                int cursor = 0;
-                for (int page = 0; page < totalPages; page++) {
-                    if (page > 0) {
-                        document.newPage();
-                    }
-                    int count = page == 0
-                            ? Math.min(ROWS_PER_FIRST_PAGE, totalItems - cursor)
-                            : Math.min(ROWS_PER_NEXT_PAGE, totalItems - cursor);
-                    List<OrderItem> slice = count > 0 ? items.subList(cursor, cursor + count) : List.of();
-                    boolean isLastPage = (page == totalPages - 1);
-
-                    BufferedImage raster = new BufferedImage(imgW, imgH, BufferedImage.TYPE_INT_RGB);
-                    Graphics2D g2 = raster.createGraphics();
-                    try {
-                        g2.scale(scale, scale);
-                        paintPage(g2, pageW, pageH, order, customer, slice, cursor, page + 1, totalPages, isLastPage);
-                    } finally {
-                        g2.dispose();
-                    }
-
-                    Image pdfImg = Image.getInstance(raster, null);
-                    pdfImg.setAbsolutePosition(0, 0);
-                    pdfImg.scaleAbsolute(pageW, pageH);
-                    document.add(pdfImg);
-
-                    cursor += count;
-                }
-            } finally {
-                if (document.isOpen()) {
-                    document.close();
-                }
-            }
-        } catch (DocumentException e) {
-            throw new IOException("Failed to export delivery note PDF: " + e.getMessage(), e);
-        }
+        InvoicePdfExporter.exportCombined(List.of(createPageSource(order, customer, items)), targetPdf);
     }
 
     private static int computePageCount(int totalItems) {

@@ -356,3 +356,15 @@ validation.prices_non_negative,Prices must be 0 or greater.,Az árak nem lehetne
 validation.invalid_package_weights,Tare weight must be >= 0 and max weight must be > 0.,"A tára súly >= 0, a max. súly pedig > 0 kell legyen."
 validation.location_fields_required,All fields are required and capacity must be > 0.,"Minden mező kitöltése kötelező, és a kapacitás > 0 kell legyen."
 orders.no_active_buyers,No active buyers available.,Nincs aktív vevő (ügyfél) a rendszerben.
+invoice.settings.company,Seller Company Profile & Bank Accounts (IBAN),Eladói cégadatok és bankszámlaszámok (IBAN)
+invoice.settings.company_saved,Company profile and bank accounts saved.,A cégadatok és bankszámlaszámok elmentve.
+invoice.settings.iban_currency,Bank Account Currency,Bankszámla deviza
+invoice.settings.iban,IBAN / Account No.,IBAN / Bankszámlaszám
+invoice.reminder.btn,Send Reminder,Fizetési emlékeztető
+invoice.reminder.subject,Payment Reminder — Invoice {0} ({1}),Fizetési emlékeztető — {0} számla ({1})
+invoice.reminder.body,"Dear {0}, please settle invoice {1} ({2}, due {3}) in {4} to IBAN {5}. Best regards, {6}","Tisztelt {0}! Tisztelettel emlékeztetjük a(z) {1} számú, {2} összegű számla kiegyenlítésére (határidő: {3}, deviza: {4}, IBAN: {5}). Üdvözlettel: {6}"
+invoice.reminder.no_email,No email address is recorded on this invoice.,Ehhez a számlához nincs e-mail cím rögzítve.
+invoice.reminder.opened,Payment reminder draft opened in your email client.,A fizetési emlékeztető piszkozat megnyílt az e-mail kliensben.
+orders.edit_price,Edit Item Price,Tételár módosítása
+orders.edit_price.prompt,Negotiated unit price ({0}/kg) for {1} ({2} kg):,Egyedi egységár ({0}/kg) a(z) {1} csomaghoz ({2} kg):
+status.refreshed,Refreshed,Frissítve

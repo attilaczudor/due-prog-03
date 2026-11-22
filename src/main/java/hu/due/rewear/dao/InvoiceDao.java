@@ -351,6 +351,22 @@ public final class InvoiceDao {
         }
     }
 
+    /**
+     * Automatically transitions all {@code ISSUED} invoices whose ISO {@code due_date} is strictly
+     * before {@code asOfDate} to {@code OVERDUE}, returning the number of updated rows.
+     */
+    public int markPastDueAsOverdue(LocalDate asOfDate) {
+        LocalDate ref = asOfDate != null ? asOfDate : LocalDate.now();
+        String sql = "UPDATE invoices SET status = 'OVERDUE' WHERE status = 'ISSUED' AND due_date < ?";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, ref.toString());
+            return ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to mark past-due invoices as overdue", e);
+        }
+    }
+
     public void deleteById(long invoiceId) {
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement("DELETE FROM invoices WHERE id = ?")) {

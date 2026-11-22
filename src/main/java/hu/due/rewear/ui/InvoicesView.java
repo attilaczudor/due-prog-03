@@ -36,6 +36,7 @@ import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.Component;
 import java.awt.Cursor;
+import java.awt.Desktop;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.GridLayout;
@@ -45,6 +46,7 @@ import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
+import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -111,6 +113,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JComboBox<StatusChoice> statusCombo = new JComboBox<>();
     private final JButton applyStatusBtn = new JButton();
     private final JButton previewDocBtn = new JButton();
+    private final JButton sendReminderBtn = new JButton();
     private final JButton exportCsvBtn = new JButton();
 
     private final DefaultTableModel tableModel = BrutalistStyle.nonEditableTableModel();
@@ -191,6 +194,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         actionBar.add(statusCombo);
         actionBar.add(applyStatusBtn);
         actionBar.add(previewDocBtn);
+        actionBar.add(sendReminderBtn);
         actionBar.add(exportCsvBtn);
         northStack.add(actionBar);
 
@@ -241,6 +245,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
         applyStatusBtn.addActionListener(e -> handleStatusUpdate());
         previewDocBtn.addActionListener(e -> openSelectedInvoicePreview());
+        sendReminderBtn.addActionListener(e -> handleSendPaymentReminder());
         exportCsvBtn.addActionListener(e -> handleExportCsv());
 
         table.getSelectionModel().addListSelectionListener(e -> {
@@ -319,6 +324,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
         statusCombo.setEnabled(hasSel);
         applyStatusBtn.setEnabled(hasSel);
         previewDocBtn.setEnabled(hasSel);
+        boolean canRemind = inv != null
+                && inv.direction() == InvoiceDirection.OUTGOING
+                && (inv.status() == InvoiceStatus.ISSUED || inv.status() == InvoiceStatus.OVERDUE);
+        sendReminderBtn.setEnabled(canRemind);
         if (inv != null) {
             for (int i = 0; i < statusCombo.getItemCount(); i++) {
                 if (statusCombo.getItemAt(i).status() == inv.status()) {
@@ -326,6 +335,34 @@ public final class InvoicesView extends JPanel implements NavigableView {
                     break;
                 }
             }
+        }
+    }
+
+    private void handleSendPaymentReminder() {
+        Invoice inv = getSelectedInvoice();
+        if (inv == null) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        if (inv.partnerEmail() == null || inv.partnerEmail().isBlank()) {
+            JOptionPane.showMessageDialog(this, i18n.t("invoice.reminder.no_email"),
+                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        try {
+            var company = ctx.getSettingsDao().getCompanyProfile();
+            String mailto = ctx.getInvoiceService().buildPaymentReminderMailtoUri(inv, company, i18n);
+            if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.MAIL)) {
+                Desktop.getDesktop().mail(URI.create(mailto));
+                JOptionPane.showMessageDialog(this, i18n.t("invoice.reminder.opened"),
+                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+            } else {
+                JOptionPane.showMessageDialog(this, mailto,
+                        i18n.t("invoice.reminder.btn"), JOptionPane.INFORMATION_MESSAGE);
+            }
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -582,6 +619,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     @Override
     public void refreshData() {
+        ctx.getInvoiceService().syncOverdueStatuses();
         settingsPanel.refreshTables();
         rebuildCurrencyLedgerBar();
         allInvoices = ctx.getInvoiceDao().findAll();
@@ -605,6 +643,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         newIncomingBtn.setText("+ " + i18n.t("invoice.new_incoming").toUpperCase(Locale.ROOT));
         applyStatusBtn.setText(i18n.t("invoice.status_update").toUpperCase(Locale.ROOT));
         previewDocBtn.setText(i18n.t("invoice.preview_btn").toUpperCase(Locale.ROOT));
+        sendReminderBtn.setText(i18n.t("invoice.reminder.btn").toUpperCase(Locale.ROOT));
         exportCsvBtn.setText(i18n.t("common.export.csv").toUpperCase(Locale.ROOT));
 
         populateFilterCombos();
@@ -649,11 +688,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
         BrutalistStyle.applyBoxCard(filterCard, 6, 8);
         BrutalistStyle.stylePrimaryButton(newOutgoingBtn);
-        BrutalistStyle.styleSecondaryButton(newIncomingBtn);
-        BrutalistStyle.styleSecondaryButton(applyStatusBtn);
         BrutalistStyle.stylePrimaryButton(previewDocBtn);
-        BrutalistStyle.styleSecondaryButton(exportCsvBtn);
-        BrutalistStyle.styleSecondaryButton(refreshBtn);
+        BrutalistStyle.styleSecondaryButtons(newIncomingBtn, applyStatusBtn, sendReminderBtn, exportCsvBtn, refreshBtn);
         BrutalistStyle.styleTable(table);
 
         settingsPanel.applyTheme();
@@ -687,9 +723,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
             lbl.setHorizontalAlignment(SwingConstants.CENTER);
             lbl.setFont(ThemeManager.monoFont(Font.BOLD, 10.5f));
             if (value instanceof InvoiceStatus st) {
-                lbl.setText("[ " + ctx.getI18n().t("status.invoice." + st.name()).toUpperCase(Locale.ROOT) + " ]");
+                String label = ctx.getI18n().t("status.invoice." + st.name()).toUpperCase(Locale.ROOT);
+                lbl.setText(st == InvoiceStatus.OVERDUE ? "[ ! " + label + " ]" : "[ " + label + " ]");
                 if (!isSelected) {
-                    boolean solid = st == InvoiceStatus.PAID;
+                    boolean solid = st == InvoiceStatus.PAID || st == InvoiceStatus.OVERDUE;
                     lbl.setBackground(solid ? ThemeManager.fg() : ThemeManager.surface());
                     lbl.setForeground(solid ? ThemeManager.bg() : ThemeManager.fg());
                 }

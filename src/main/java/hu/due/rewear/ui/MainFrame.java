@@ -8,16 +8,20 @@ import hu.due.rewear.i18n.LanguageChangeListener;
 import hu.due.rewear.model.User;
 import hu.due.rewear.service.SessionContext;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
+import javax.swing.JRootPane;
 import javax.swing.JSeparator;
 import javax.swing.JToggleButton;
+import javax.swing.KeyStroke;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -25,9 +29,14 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Toolkit;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
@@ -99,6 +108,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerDefaultViews();
         applyTranslations();
         applyBrutalistChrome();
+        installKeyboardShortcuts();
 
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
@@ -362,6 +372,49 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         navButtons.put(viewKey, btn);
         container.add(btn);
         container.add(Box.createVerticalStrut(5));
+    }
+
+    private void installKeyboardShortcuts() {
+        JRootPane rp = getRootPane();
+        int menuMask = Toolkit.getDefaultToolkit().getMenuShortcutKeyMaskEx();
+        var inputMap = rp.getInputMap(JComponent.WHEN_IN_FOCUSED_WINDOW);
+        var actionMap = rp.getActionMap();
+
+        // Cmd/Ctrl + 1..9 (and 0 for 10th) switches directly between permitted sidebar views
+        int[] digitKeys = {
+                KeyEvent.VK_1, KeyEvent.VK_2, KeyEvent.VK_3, KeyEvent.VK_4, KeyEvent.VK_5,
+                KeyEvent.VK_6, KeyEvent.VK_7, KeyEvent.VK_8, KeyEvent.VK_9, KeyEvent.VK_0
+        };
+        for (int idx = 0; idx < digitKeys.length; idx++) {
+            final int slot = idx;
+            String actionKey = "rewear.nav." + slot;
+            inputMap.put(KeyStroke.getKeyStroke(digitKeys[idx], menuMask), actionKey);
+            actionMap.put(actionKey, new AbstractAction() {
+                @Override
+                public void actionPerformed(ActionEvent e) {
+                    List<String> keys = new ArrayList<>(navButtons.keySet());
+                    if (slot < keys.size()) {
+                        navigateTo(keys.get(slot));
+                    }
+                }
+            });
+        }
+
+        // F5 and Cmd/Ctrl + R refresh the active workspace view
+        Runnable refreshAction = () -> {
+            if (currentViewKey != null && views.containsKey(currentViewKey)) {
+                views.get(currentViewKey).refreshData();
+                setStatusMessage(ctx.getI18n().t("status.refreshed"));
+            }
+        };
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "rewear.refresh");
+        inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_R, menuMask), "rewear.refresh");
+        actionMap.put("rewear.refresh", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                refreshAction.run();
+            }
+        });
     }
 
     private void registerDefaultViews() {

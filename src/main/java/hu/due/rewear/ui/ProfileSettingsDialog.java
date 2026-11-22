@@ -141,6 +141,7 @@ public final class ProfileSettingsDialog extends JDialog
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
 
+        BrutalistStyle.installEscapeToClose(this);
         pack();
         setLocationRelativeTo(owner);
     }

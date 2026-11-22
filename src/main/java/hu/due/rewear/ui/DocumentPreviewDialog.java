@@ -124,6 +124,7 @@ public final class DocumentPreviewDialog extends JDialog {
         updatePageControls();
 
         pack();
+        BrutalistStyle.installEscapeToClose(this);
         setLocationRelativeTo(owner);
     }
 

@@ -6,6 +6,8 @@ import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
+import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
@@ -23,6 +25,8 @@ import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
@@ -295,6 +299,51 @@ public final class InvoiceService {
         invoiceDao.updateStatus(invoiceId, targetStatus, paidDate);
         LOG.info("Invoice {} status changed {} -> {}", existing.invoiceNumber(), existing.status(), targetStatus);
         return invoiceDao.findById(invoiceId).orElseThrow();
+    }
+
+    /** Automatically flags all past-due {@code ISSUED} invoices as {@code OVERDUE} relative to today. */
+    public int syncOverdueStatuses() {
+        return syncOverdueStatuses(LocalDate.now());
+    }
+
+    /** Deterministic overload flagging {@code ISSUED} invoices with {@code due_date < asOfDate} as {@code OVERDUE}. */
+    public int syncOverdueStatuses(LocalDate asOfDate) {
+        int updated = invoiceDao.markPastDueAsOverdue(asOfDate);
+        if (updated > 0) {
+            LOG.info("Marked {} past-due invoice(s) as OVERDUE (as of {})", updated, asOfDate);
+        }
+        return updated;
+    }
+
+    /**
+     * Builds an RFC-6068 {@code mailto:} URI pre-filled with a localized payment reminder containing
+     * the invoice number, native-currency gross amount, due date, and the seller's matching currency IBAN.
+     */
+    public String buildPaymentReminderMailtoUri(Invoice inv, CompanyProfile company, I18nManager i18n) {
+        String cur = inv.effectiveCurrencyCode();
+        int dec = financeConfigDao.decimalPlacesFor(cur);
+        String amountStr = CurrencyDef.formatAmount(inv.grossAmount(), cur, dec);
+        CompanyProfile effectiveCompany = company != null ? company : CompanyProfile.defaults();
+        String iban = effectiveCompany.ibanForCurrency(cur);
+        String recipient = inv.partnerEmail() != null ? inv.partnerEmail().trim() : "";
+
+        String subject = i18n.t("invoice.reminder.subject", inv.invoiceNumber(), amountStr);
+        String body = i18n.t("invoice.reminder.body",
+                inv.partnerName(),
+                inv.invoiceNumber(),
+                amountStr,
+                inv.dueDate().toString(),
+                cur,
+                iban,
+                effectiveCompany.name());
+
+        return "mailto:" + recipient
+                + "?subject=" + encodeMailParam(subject)
+                + "&body=" + encodeMailParam(body);
+    }
+
+    private static String encodeMailParam(String raw) {
+        return URLEncoder.encode(raw != null ? raw : "", StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     public List<InvoiceItem> findItems(long invoiceId) {

@@ -91,6 +91,7 @@ public final class PrintPreviewDialog extends JDialog {
         rebuildPrintable();
 
         pack();
+        BrutalistStyle.installEscapeToClose(this);
         setLocationRelativeTo(owner);
     }
 
