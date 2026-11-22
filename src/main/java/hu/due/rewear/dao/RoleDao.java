@@ -13,6 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for RBAC role definitions ({@code roles} table: SUPER_ADMIN, ADMIN, MANAGER, OPERATOR).
+ */
 public final class RoleDao {
 
     private final DatabaseManager db;

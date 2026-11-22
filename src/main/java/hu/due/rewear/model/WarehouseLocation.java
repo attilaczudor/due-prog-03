@@ -2,6 +2,9 @@ package hu.due.rewear.model;
 
 import java.math.BigDecimal;
 
+/**
+ * Physical storage bay/shelf location ({@code ZONE-AISLE-SHELF}) with maximum capacity and live used weight in kg.
+ */
 public record WarehouseLocation(
         long id,
         String code,

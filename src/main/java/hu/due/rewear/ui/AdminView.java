@@ -60,13 +60,13 @@ public final class AdminView extends JPanel implements NavigableView {
     private final JButton editUserBtn = new JButton();
     private final JButton resetPwBtn = new JButton();
     private final JButton refreshUsersBtn = new JButton();
-    private final DefaultTableModel usersModel = nonEditableModel();
+    private final DefaultTableModel usersModel = BrutalistStyle.nonEditableTableModel();
     private final JTable usersTable = new JTable(usersModel);
 
     // Tab 2: Audit Log
     private final JButton refreshAuditBtn = new JButton();
     private final JButton exportAuditBtn = new JButton();
-    private final DefaultTableModel auditModel = nonEditableModel();
+    private final DefaultTableModel auditModel = BrutalistStyle.nonEditableTableModel();
     private final JTable auditTable = new JTable(auditModel);
 
     // Tab 3: Maintenance
@@ -97,12 +97,6 @@ public final class AdminView extends JPanel implements NavigableView {
         applyTranslations();
         applyTheme();
         refreshData();
-    }
-
-    private static DefaultTableModel nonEditableModel() {
-        return new DefaultTableModel() {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
     }
 
     private void buildUi() {

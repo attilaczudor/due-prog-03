@@ -2,6 +2,10 @@ package hu.due.rewear.model;
 
 import java.math.BigDecimal;
 
+/**
+ * Packaging container lookup ({@code PACKAGETYPE} QR segment, e.g. Compressed Bale, Clear Bag, Box, Pallet)
+ * defining tare weight and maximum recommended weight capacity.
+ */
 public record PackageType(
         long id,
         String code,

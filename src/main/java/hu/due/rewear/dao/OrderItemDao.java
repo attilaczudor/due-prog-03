@@ -13,6 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for physical packages allocated to customer orders ({@code order_items} join table).
+ * Tracks per-package unit pricing (in the order's currency) and enforces single-order allocation per bale.
+ */
 public final class OrderItemDao {
 
     private final DatabaseManager db;

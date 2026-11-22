@@ -16,6 +16,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for B2B business partners ({@code customers} table), covering
+ * Buyers ({@code CUSTOMER}), Providers/Suppliers we pay ({@code SUPPLIER}), and dual-role partners ({@code BOTH}),
+ * including ISO country codes (for automatic VAT resolution) and preferred operating currencies.
+ */
 public final class CustomerDao {
 
     private static final String SELECT_COLS =

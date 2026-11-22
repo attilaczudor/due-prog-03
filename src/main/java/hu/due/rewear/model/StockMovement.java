@@ -2,6 +2,9 @@ package hu.due.rewear.model;
 
 import java.time.LocalDateTime;
 
+/**
+ * Immutable warehouse audit log record capturing a single physical movement or status change on a package.
+ */
 public record StockMovement(
         long id,
         long packageId,

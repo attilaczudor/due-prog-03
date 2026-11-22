@@ -14,6 +14,10 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Data Access Object for the immutable warehouse audit trail ({@code stock_movements} table).
+ * Records every intake, relocation, QR verification scan, order reservation/release, shipment, and discard event.
+ */
 public final class StockMovementDao {
 
     private static final String BASE_SELECT = """

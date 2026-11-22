@@ -13,6 +13,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for physical warehouse rack/shelf locations ({@code warehouse_locations} table),
+ * including live aggregated weight occupancy queries against {@code IN_STOCK} and {@code RESERVED} packages.
+ */
 public final class WarehouseLocationDao {
 
     private static final String BASE_SELECT = """

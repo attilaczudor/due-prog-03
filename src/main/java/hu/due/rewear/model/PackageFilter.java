@@ -1,5 +1,8 @@
 package hu.due.rewear.model;
 
+/**
+ * Multi-criteria filter parameter object used by {@link hu.due.rewear.dao.InventoryPackageDao#findByFilter}.
+ */
 public record PackageFilter(
         String qrSearch,
         PackageStatus status,

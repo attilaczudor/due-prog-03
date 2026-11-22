@@ -11,6 +11,7 @@ import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.ui.LogoAssets;
+import hu.due.rewear.util.FormatUtil;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -21,7 +22,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -234,7 +234,7 @@ public final class InvoicePdfExporter {
             String refVal = inv.orderNumber() != null
                     ? inv.orderNumber()
                     : i18n.t("invoice.category." + inv.category().name());
-            paintMetaCell(g, (inv.orderNumber() != null ? i18n.t("orders.number") : i18n.t("invoice.category")).toUpperCase(Locale.ROOT),
+            paintMetaCell(g, (inv.orderNumber() != null ? i18n.t("orders.order_number") : i18n.t("invoice.category")).toUpperCase(Locale.ROOT),
                     refVal, margin + col4 * 3 + 8, y + 13);
 
             y += metaH + 14;
@@ -392,17 +392,10 @@ public final class InvoicePdfExporter {
     }
 
     private static String stripZeros(BigDecimal v) {
-        if (v == null) return "0";
-        BigDecimal s = v.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
-    }
-
-    private static String formatMoney(BigDecimal v) {
-        return (v == null ? BigDecimal.ZERO : v).setScale(2, RoundingMode.HALF_UP).toPlainString();
+        return FormatUtil.stripZeros(v);
     }
 
     private static String truncate(String s, int max) {
-        if (s == null) return "";
-        return s.length() <= max ? s : s.substring(0, max - 2) + "..";
+        return FormatUtil.truncate(s, max);
     }
 }

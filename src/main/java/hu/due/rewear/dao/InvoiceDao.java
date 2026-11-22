@@ -21,6 +21,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for Outgoing (revenue) and Incoming (expense) invoices and their line items
+ * ({@code invoices} and {@code invoice_items} tables), including sequential numbering, tax type codes,
+ * native multi-currency amounts, and reversible payment status updates.
+ */
 public final class InvoiceDao {
 
     private static final String BASE_SELECT = """

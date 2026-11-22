@@ -1,5 +1,8 @@
 package hu.due.rewear.model;
 
+/**
+ * Target demographic lookup ({@code WHATFOR} QR segment, e.g. {@code L} Ladies, {@code M} Men, {@code K} Kids, {@code B} Baby).
+ */
 public record TargetGroup(
         long id,
         String code,

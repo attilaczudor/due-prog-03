@@ -46,10 +46,10 @@ public final class DictionariesView extends JPanel implements NavigableView {
     private final JButton deleteBtn = new JButton();
     private final JButton refreshBtn = new JButton();
 
-    private final DefaultTableModel targetModel = nonEditableModel();
-    private final DefaultTableModel garmentModel = nonEditableModel();
-    private final DefaultTableModel qualityModel = nonEditableModel();
-    private final DefaultTableModel packageModel = nonEditableModel();
+    private final DefaultTableModel targetModel = BrutalistStyle.nonEditableTableModel();
+    private final DefaultTableModel garmentModel = BrutalistStyle.nonEditableTableModel();
+    private final DefaultTableModel qualityModel = BrutalistStyle.nonEditableTableModel();
+    private final DefaultTableModel packageModel = BrutalistStyle.nonEditableTableModel();
 
     private final JTable targetTable = createTable(targetModel);
     private final JTable garmentTable = createTable(garmentModel);
@@ -71,12 +71,6 @@ public final class DictionariesView extends JPanel implements NavigableView {
         wireEvents();
         applyTranslations();
         refreshData();
-    }
-
-    private static DefaultTableModel nonEditableModel() {
-        return new DefaultTableModel() {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
     }
 
     private static JTable createTable(DefaultTableModel model) {

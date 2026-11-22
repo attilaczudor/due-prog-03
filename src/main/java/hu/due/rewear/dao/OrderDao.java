@@ -17,6 +17,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for B2B customer orders ({@code orders} table), supporting sequential yearly
+ * order numbers ({@code ORD-YYYY-NNNN}), per-order currency selection, total recalculation,
+ * and reversible lifecycle status transitions.
+ */
 public final class OrderDao {
 
     private static final String BASE_SELECT = """

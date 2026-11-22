@@ -55,11 +55,11 @@ public final class CustomersView extends JPanel implements NavigableView {
     private final JButton filterSuppliersBtn = new JButton();
     private FilterMode filterMode = FilterMode.ALL;
 
-    private final DefaultTableModel customerModel = nonEditableModel();
+    private final DefaultTableModel customerModel = BrutalistStyle.nonEditableTableModel();
     private final JTable customerTable = new JTable(customerModel);
 
     private final JLabel historyTitleLabel = new JLabel();
-    private final DefaultTableModel historyModel = nonEditableModel();
+    private final DefaultTableModel historyModel = BrutalistStyle.nonEditableTableModel();
     private final JTable historyTable = new JTable(historyModel);
 
     private List<Customer> customers = List.of();
@@ -83,12 +83,6 @@ public final class CustomersView extends JPanel implements NavigableView {
         applyTranslations();
         applyBrutalistTheme();
         refreshData();
-    }
-
-    private static DefaultTableModel nonEditableModel() {
-        return new DefaultTableModel() {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
     }
 
     private void buildUi() {

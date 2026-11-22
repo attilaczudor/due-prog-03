@@ -18,6 +18,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for physical sorted-clothing packages ({@code inventory_packages} table).
+ * Joins target group, garment type (with dual EUR/HUF pricing), quality grade, package type,
+ * warehouse location, and creator metadata for inventory search, QR lookup, and dashboard analytics.
+ */
 public final class InventoryPackageDao {
 
     private static final String BASE_SELECT = """

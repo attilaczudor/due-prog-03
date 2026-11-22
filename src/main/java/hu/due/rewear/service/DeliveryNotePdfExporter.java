@@ -11,6 +11,7 @@ import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.ui.LogoAssets;
+import hu.due.rewear.util.FormatUtil;
 
 import java.awt.BasicStroke;
 import java.awt.Color;
@@ -22,7 +23,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
@@ -309,17 +309,11 @@ public final class DeliveryNotePdfExporter {
     }
 
     private static String safe(String s) {
-        return s == null ? "" : s;
+        return FormatUtil.safe(s);
     }
 
     private static String stripZeros(BigDecimal val) {
-        if (val == null) return "0";
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
-    }
-
-    private static String formatMoney(BigDecimal val) {
-        return val == null ? "0.00" : val.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        return FormatUtil.stripZeros(val);
     }
 
     private static String truncate(String text, FontMetrics fm, float maxW) {

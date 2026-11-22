@@ -14,13 +14,12 @@ import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageFilter;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.service.DocumentPageSource;
-import hu.due.rewear.service.InvoiceService;
+import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JComponent;
-import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -29,7 +28,6 @@ import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
-import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -39,10 +37,7 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
-import java.io.File;
 import java.math.BigDecimal;
-import java.math.RoundingMode;
-import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -63,7 +58,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final JButton refreshBtn = new JButton();
 
     // Left: Orders list
-    private final DefaultTableModel ordersModel = nonEditableModel();
+    private final DefaultTableModel ordersModel = BrutalistStyle.nonEditableTableModel();
     private final JTable ordersTable = new JTable(ordersModel);
 
     // Right: Selected order detail + live QR scan + items + lifecycle
@@ -83,7 +78,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final JButton removeItemBtn = new JButton();
 
     private final JLabel itemsTitleLabel = new JLabel();
-    private final DefaultTableModel itemsModel = nonEditableModel();
+    private final DefaultTableModel itemsModel = BrutalistStyle.nonEditableTableModel();
     private final JTable itemsTable = new JTable(itemsModel);
 
     private final JLabel statusSelectLabel = new JLabel();
@@ -112,12 +107,6 @@ public final class OrdersView extends JPanel implements NavigableView {
         applyTranslations();
         applyBrutalistTheme();
         refreshData();
-    }
-
-    private static DefaultTableModel nonEditableModel() {
-        return new DefaultTableModel() {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
     }
 
     private void buildUi() {
@@ -532,13 +521,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     }
 
     private static String stripZeros(BigDecimal val) {
-        if (val == null) return "0";
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
-    }
-
-    private static String formatMoney(BigDecimal val) {
-        return val == null ? "0.00" : val.setScale(2, RoundingMode.HALF_UP).toPlainString();
+        return FormatUtil.stripZeros(val);
     }
 
     @Override

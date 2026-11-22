@@ -14,6 +14,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+/**
+ * Data Access Object for application user accounts ({@code users} table), handling BCrypt password hashes,
+ * split family/given names, editable {@code @handle} usernames, profile avatars, and RBAC role assignments.
+ */
 public final class UserDao {
 
     private static final String BASE_SELECT = """

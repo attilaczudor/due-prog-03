@@ -48,11 +48,12 @@ out/
 .settings/
 .vscode/
 
-# Local runtime database & generated exports/backups
+# Local runtime database, preferences & generated exports/backups
 data/*.db
 data/*.db-journal
 data/*.db-wal
 data/*.db-shm
+data/app.properties
 *.sqlite
 *.sqlite3
 exports/

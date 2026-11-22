@@ -4,6 +4,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 
+/**
+ * Outgoing (revenue) or Incoming (expense) invoice header preserving its native currency,
+ * VAT/tax type code, partner details, and reversible payment status.
+ */
 public record Invoice(
         long id,
         String invoiceNumber,

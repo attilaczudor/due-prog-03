@@ -7,10 +7,14 @@ import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.JTable;
 import javax.swing.border.Border;
+import javax.swing.table.DefaultTableModel;
+import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+import java.awt.GridBagConstraints;
 
 /**
  * Shared styling helpers implementing the stark Brutalist Monochrome visual language:
@@ -164,5 +168,26 @@ public final class BrutalistStyle {
     public static void applyBoxCard(JComponent panel, int padV, int padH) {
         panel.setBackground(ThemeManager.bg());
         panel.setBorder(boxBorder(padV, padH));
+    }
+
+    /** Creates a standard read-only Swing table model (prevents accidental inline cell editing). */
+    public static DefaultTableModel nonEditableTableModel() {
+        return new DefaultTableModel() {
+            @Override
+            public boolean isCellEditable(int row, int column) {
+                return false;
+            }
+        };
+    }
+
+    /** Adds a label + input component row to a two-column {@link java.awt.GridBagLayout} form panel. */
+    public static void addFormRow(JPanel form, GridBagConstraints gbc, int row, String label, Component input) {
+        gbc.gridx = 0;
+        gbc.gridy = row;
+        gbc.weightx = 0.0;
+        form.add(new JLabel(label), gbc);
+        gbc.gridx = 1;
+        gbc.weightx = 1.0;
+        form.add(input, gbc);
     }
 }

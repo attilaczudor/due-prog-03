@@ -3,6 +3,9 @@ package hu.due.rewear.model;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * B2B customer sales order with reversible dispatch lifecycle ({@link OrderStatus}) and native currency code.
+ */
 public record Order(
         long id,
         String orderNumber,

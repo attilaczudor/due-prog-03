@@ -1,5 +1,8 @@
 package hu.due.rewear.model;
 
+/**
+ * Accounting category classifying outgoing revenue streams and incoming warehouse expenses.
+ */
 public enum InvoiceCategory {
     WHOLESALE_SALES(InvoiceDirection.OUTGOING),
     OTHER_INCOME(InvoiceDirection.OUTGOING),

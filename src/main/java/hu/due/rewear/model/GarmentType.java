@@ -2,6 +2,10 @@ package hu.due.rewear.model;
 
 import java.math.BigDecimal;
 
+/**
+ * Product / garment category lookup ({@code TYPE} QR segment, e.g. {@code TSH}, {@code JNS}, {@code JKT})
+ * carrying independent default wholesale prices in both EUR/kg and HUF/kg.
+ */
 public record GarmentType(
         long id,
         String code,

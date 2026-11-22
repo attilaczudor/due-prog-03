@@ -26,7 +26,6 @@ import javax.swing.SwingUtilities;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableCellRenderer;
 import java.awt.BorderLayout;
-import java.awt.Color;
 import java.awt.Component;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -239,9 +238,7 @@ public final class LocationsView extends JPanel implements NavigableView {
     }
 
     private static String stripZeros(BigDecimal val) {
-        if (val == null) return "0";
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
+        return hu.due.rewear.util.FormatUtil.stripZeros(val);
     }
 
     @Override

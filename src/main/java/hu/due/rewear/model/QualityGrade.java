@@ -2,6 +2,10 @@ package hu.due.rewear.model;
 
 import java.math.BigDecimal;
 
+/**
+ * Textile sorting quality grade lookup ({@code QUALITY} QR segment, e.g. Cream/Extra, Grade A/B/C)
+ * with fallback dual-currency EUR/kg and HUF/kg pricing.
+ */
 public record QualityGrade(
         long id,
         String code,
