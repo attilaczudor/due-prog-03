@@ -151,10 +151,29 @@ public final class InvoiceDao {
         }
     }
 
+    /** Counts invoices currently in {@code OVERDUE} status for Dashboard and finance alerts. */
+    public int countOverdue() {
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement("SELECT COUNT(*) FROM invoices WHERE status = 'OVERDUE'");
+             ResultSet rs = ps.executeQuery()) {
+            return rs.next() ? rs.getInt(1) : 0;
+        } catch (SQLException e) {
+            throw new DaoException("Failed to count overdue invoices", e);
+        }
+    }
+
     public String generateNextInvoiceNumber(Connection conn, InvoiceDirection direction) throws SQLException {
         int year = LocalDate.now().getYear();
         String dirTag = direction == InvoiceDirection.OUTGOING ? "OUT" : "IN";
-        String prefix = "INV-" + dirTag + "-" + year + "-";
+        return nextSequentialNumber(conn, "INV-" + dirTag + "-" + year + "-");
+    }
+
+    /** Generates the next sequential yearly credit note number ({@code CN-YYYY-NNNN}). */
+    public String generateNextCreditNoteNumber(Connection conn) throws SQLException {
+        return nextSequentialNumber(conn, "CN-" + LocalDate.now().getYear() + "-");
+    }
+
+    private static String nextSequentialNumber(Connection conn, String prefix) throws SQLException {
         String sql = "SELECT invoice_number FROM invoices WHERE invoice_number LIKE ? ORDER BY invoice_number DESC LIMIT 1";
         int nextSeq = 1;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -339,15 +358,21 @@ public final class InvoiceDao {
     }
 
     public void updateStatus(long invoiceId, InvoiceStatus status, LocalDate paidDate) {
+        try (Connection conn = db.getConnection()) {
+            updateStatus(conn, invoiceId, status, paidDate);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to update invoice status: " + invoiceId, e);
+        }
+    }
+
+    /** Transaction-aware overload reusing the caller's active SQLite {@link Connection}. */
+    public void updateStatus(Connection conn, long invoiceId, InvoiceStatus status, LocalDate paidDate) throws SQLException {
         String sql = "UPDATE invoices SET status = ?, paid_date = ? WHERE id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setString(2, paidDate != null ? paidDate.toString() : null);
             ps.setLong(3, invoiceId);
             ps.executeUpdate();
-        } catch (SQLException e) {
-            throw new DaoException("Failed to update invoice status: " + invoiceId, e);
         }
     }
 

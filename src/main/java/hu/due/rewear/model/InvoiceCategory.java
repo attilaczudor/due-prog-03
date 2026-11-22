@@ -11,7 +11,8 @@ public enum InvoiceCategory {
     WAREHOUSE_RENT(InvoiceDirection.INCOMING),
     UTILITIES(InvoiceDirection.INCOMING),
     PACKAGING_SUPPLIES(InvoiceDirection.INCOMING),
-    OTHER_EXPENSE(InvoiceDirection.INCOMING);
+    OTHER_EXPENSE(InvoiceDirection.INCOMING),
+    CREDIT_NOTE(InvoiceDirection.INCOMING);
 
     private final InvoiceDirection defaultDirection;
 

@@ -44,6 +44,10 @@ public final class InvoiceService {
     private static final Logger LOG = LoggerFactory.getLogger(InvoiceService.class);
     public static final BigDecimal DEFAULT_VAT_RATE = new BigDecimal("27.00");
 
+    /** Immutable line item input for multi-line manual invoice creation. */
+    public record InvoiceLineInput(String description, BigDecimal quantity, String unit, BigDecimal unitPrice) {
+    }
+
     private final DatabaseManager db;
     private final InvoiceDao invoiceDao;
     private final OrderDao orderDao;
@@ -242,14 +246,61 @@ public final class InvoiceService {
                                        LocalDate dueDate,
                                        InvoiceStatus status,
                                        long userId) {
+        String desc = (itemDescription != null && !itemDescription.isBlank())
+                ? itemDescription.trim() : category.name();
+        return createMultiLineManualInvoice(direction, category, optionalInvoiceNumber, partnerId,
+                partnerName, partnerTaxNumber, partnerAddress, partnerEmail,
+                List.of(new InvoiceLineInput(desc, quantity, unit, unitPrice)),
+                vatRate, taxTypeCode, currencyCode, issueDate, dueDate, status, userId);
+    }
+
+    /**
+     * Atomically creates a manual invoice with one or more line items (e.g. product bales + freight + pallet fees),
+     * computing native-currency Net, VAT, and Gross totals from the rounded sum of all lines.
+     */
+    public Invoice createMultiLineManualInvoice(InvoiceDirection direction,
+                                                InvoiceCategory category,
+                                                String optionalInvoiceNumber,
+                                                Long partnerId,
+                                                String partnerName,
+                                                String partnerTaxNumber,
+                                                String partnerAddress,
+                                                String partnerEmail,
+                                                List<InvoiceLineInput> lines,
+                                                TaxType taxType,
+                                                String currencyCode,
+                                                LocalDate issueDate,
+                                                LocalDate dueDate,
+                                                InvoiceStatus status,
+                                                long userId) {
+        BigDecimal vatRate = taxType != null ? taxType.ratePercent() : DEFAULT_VAT_RATE;
+        String taxCode = taxType != null ? taxType.code() : "HU-27";
+        return createMultiLineManualInvoice(direction, category, optionalInvoiceNumber, partnerId,
+                partnerName, partnerTaxNumber, partnerAddress, partnerEmail, lines,
+                vatRate, taxCode, currencyCode, issueDate, dueDate, status, userId);
+    }
+
+    public Invoice createMultiLineManualInvoice(InvoiceDirection direction,
+                                                InvoiceCategory category,
+                                                String optionalInvoiceNumber,
+                                                Long partnerId,
+                                                String partnerName,
+                                                String partnerTaxNumber,
+                                                String partnerAddress,
+                                                String partnerEmail,
+                                                List<InvoiceLineInput> lines,
+                                                BigDecimal vatRate,
+                                                String taxTypeCode,
+                                                String currencyCode,
+                                                LocalDate issueDate,
+                                                LocalDate dueDate,
+                                                InvoiceStatus status,
+                                                long userId) {
         if (partnerName == null || partnerName.isBlank()) {
             throw new IllegalArgumentException("Partner name is required.");
         }
-        if (quantity == null || quantity.compareTo(BigDecimal.ZERO) <= 0) {
-            throw new IllegalArgumentException("Quantity must be positive.");
-        }
-        if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
-            throw new IllegalArgumentException("Unit price must be >= 0.");
+        if (lines == null || lines.isEmpty()) {
+            throw new IllegalArgumentException("At least one invoice line item is required.");
         }
         String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR";
         int decimals = financeConfigDao.decimalPlacesFor(cur);
@@ -259,8 +310,25 @@ public final class InvoiceService {
                 ? taxTypeCode.trim().toUpperCase(Locale.ROOT)
                 : (effectiveVat.compareTo(BigDecimal.ZERO) == 0 ? "EU-0" : "HU-27");
 
-        BigDecimal roundedUnit = CurrencyDef.roundForScale(unitPrice, decimals);
-        BigDecimal net = CurrencyDef.roundForScale(quantity.multiply(roundedUnit), decimals);
+        record ComputedLine(String desc, BigDecimal qty, String unit, BigDecimal unitPrice, BigDecimal lineNet) {}
+        java.util.List<ComputedLine> computed = new java.util.ArrayList<>(lines.size());
+        BigDecimal net = BigDecimal.ZERO;
+        for (InvoiceLineInput line : lines) {
+            if (line == null || line.quantity() == null || line.quantity().compareTo(BigDecimal.ZERO) <= 0) {
+                throw new IllegalArgumentException("Quantity must be positive.");
+            }
+            if (line.unitPrice() == null || line.unitPrice().compareTo(BigDecimal.ZERO) < 0) {
+                throw new IllegalArgumentException("Unit price must be >= 0.");
+            }
+            String desc = (line.description() != null && !line.description().isBlank())
+                    ? line.description().trim() : category.name();
+            String unit = (line.unit() != null && !line.unit().isBlank()) ? line.unit().trim() : "db";
+            BigDecimal rUnit = CurrencyDef.roundForScale(line.unitPrice(), decimals);
+            BigDecimal lineNet = CurrencyDef.roundForScale(line.quantity().multiply(rUnit), decimals);
+            net = net.add(lineNet);
+            computed.add(new ComputedLine(desc, line.quantity(), unit, rUnit, lineNet));
+        }
+        net = CurrencyDef.roundForScale(net, decimals);
         BigDecimal vat = CurrencyDef.roundForScale(
                 net.multiply(effectiveVat).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
         BigDecimal gross = CurrencyDef.roundForScale(net.add(vat), decimals);
@@ -269,24 +337,82 @@ public final class InvoiceService {
         LocalDate effDue = dueDate != null ? dueDate : effIssue.plusDays(14);
         InvoiceStatus effStatus = status != null ? status : InvoiceStatus.ISSUED;
         LocalDate paidDate = effStatus == InvoiceStatus.PAID ? effIssue : null;
-        String desc = (itemDescription != null && !itemDescription.isBlank())
-                ? itemDescription.trim() : category.name();
 
+        final BigDecimal finalNet = net;
         long invoiceId = db.executeInTransaction(conn -> {
             String invNo = (optionalInvoiceNumber != null && !optionalInvoiceNumber.isBlank())
                     ? optionalInvoiceNumber.trim()
                     : invoiceDao.generateNextInvoiceNumber(conn, direction);
             long id = invoiceDao.insert(conn, invNo, direction, category, null, partnerId,
                     partnerName.trim(), partnerTaxNumber, partnerAddress, partnerEmail,
-                    effStatus, effIssue, effDue, paidDate, net, effectiveVat, effectiveTaxCode, vat, gross,
+                    effStatus, effIssue, effDue, paidDate, finalNet, effectiveVat, effectiveTaxCode, vat, gross,
                     cur, CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, LocalDateTime.now());
-            invoiceDao.insertItem(conn, id, desc, quantity, unit != null ? unit : "db", roundedUnit, net);
+            for (ComputedLine cl : computed) {
+                invoiceDao.insertItem(conn, id, cl.desc(), cl.qty(), cl.unit(), cl.unitPrice(), cl.lineNet());
+            }
             return id;
         });
 
         Invoice created = invoiceDao.findById(invoiceId).orElseThrow();
-        LOG.info("Created {} invoice {} ({} / {})", direction, created.invoiceNumber(),
-                CurrencyDef.formatAmount(created.grossAmount(), cur, decimals), effectiveTaxCode);
+        LOG.info("Created {} invoice {} ({} line(s), {} / {})", direction, created.invoiceNumber(),
+                computed.size(), CurrencyDef.formatAmount(created.grossAmount(), cur, decimals), effectiveTaxCode);
+        return created;
+    }
+
+    /**
+     * Issues an auditable Credit Note ({@code CN-YYYY-NNNN} / Sztornó számla) reversing {@code originalInvoiceId}.
+     * <ul>
+     *   <li>If the original invoice was already {@code PAID}, it stays {@code PAID} for cashflow audit history and
+     *       the credit note is booked in the opposite cashflow direction ({@code PAID}) so the currency ledger nets to zero.</li>
+     *   <li>If the original invoice was unpaid ({@code DRAFT}/{@code ISSUED}/{@code OVERDUE}), the original is marked
+     *       {@code CANCELLED} and the credit note is stored as {@code CANCELLED} (printable/emailable without distorting P&amp;L).</li>
+     * </ul>
+     */
+    public Invoice issueCreditNote(long originalInvoiceId, long userId) {
+        Invoice orig = invoiceDao.findById(originalInvoiceId)
+                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + originalInvoiceId));
+        if (orig.category() == InvoiceCategory.CREDIT_NOTE) {
+            throw new IllegalStateException("Cannot issue a credit note for an existing credit note.");
+        }
+        if (orig.status() == InvoiceStatus.CANCELLED) {
+            throw new IllegalStateException("Invoice " + orig.invoiceNumber() + " is already cancelled.");
+        }
+        List<InvoiceItem> origItems = invoiceDao.findItemsByInvoiceId(originalInvoiceId);
+        boolean wasPaid = orig.status() == InvoiceStatus.PAID;
+        InvoiceDirection cnDir = wasPaid
+                ? (orig.direction() == InvoiceDirection.OUTGOING ? InvoiceDirection.INCOMING : InvoiceDirection.OUTGOING)
+                : orig.direction();
+        InvoiceStatus cnStatus = wasPaid ? InvoiceStatus.PAID : InvoiceStatus.CANCELLED;
+        LocalDate today = LocalDate.now();
+        LocalDate paidDate = wasPaid ? today : null;
+
+        long cnId = db.executeInTransaction(conn -> {
+            if (!wasPaid) {
+                invoiceDao.updateStatus(conn, originalInvoiceId, InvoiceStatus.CANCELLED, null);
+            }
+            String cnNo = invoiceDao.generateNextCreditNoteNumber(conn);
+            long id = invoiceDao.insert(conn, cnNo, cnDir, InvoiceCategory.CREDIT_NOTE,
+                    orig.orderId(), orig.customerId(),
+                    orig.partnerName(), orig.partnerTaxNumber(), orig.partnerAddress(), orig.partnerEmail(),
+                    cnStatus, today, today, paidDate,
+                    orig.netAmount(), orig.vatRate(), orig.effectiveTaxTypeCode(),
+                    orig.vatAmount(), orig.grossAmount(), orig.effectiveCurrencyCode(),
+                    orig.exchangeRate(), userId, LocalDateTime.now());
+            String refPrefix = "CREDIT NOTE [Ref: " + orig.invoiceNumber() + "] — ";
+            if (origItems.isEmpty()) {
+                invoiceDao.insertItem(conn, id, refPrefix + orig.category().name(),
+                        BigDecimal.ONE, "db", orig.netAmount(), orig.netAmount());
+            } else {
+                for (InvoiceItem item : origItems) {
+                    invoiceDao.insertItem(conn, id, refPrefix + item.description(),
+                            item.quantity(), item.unit(), item.unitPrice(), item.lineNet());
+                }
+            }
+            return id;
+        });
+
+        Invoice created = invoiceDao.findById(cnId).orElseThrow();
+        LOG.info("Issued credit note {} reversing {} (wasPaid={})", created.invoiceNumber(), orig.invoiceNumber(), wasPaid);
         return created;
     }
 

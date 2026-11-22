@@ -431,8 +431,10 @@ public final class InventoryView extends JPanel implements NavigableView {
     }
 
     private void handleRelocate() {
-        InventoryPackage pkg = requireSingleSelection();
-        if (pkg == null) {
+        List<InventoryPackage> selected = getSelectedPackages();
+        if (selected.isEmpty()) {
+            JOptionPane.showMessageDialog(this, ctx.getI18n().t("inventory.select_one"),
+                    ctx.getI18n().t("common.warning"), JOptionPane.WARNING_MESSAGE);
             return;
         }
         I18nManager i18n = ctx.getI18n();
@@ -441,7 +443,8 @@ public final class InventoryView extends JPanel implements NavigableView {
                 .map(l -> l.code() + " (" + FormatUtil.stripZeros(l.usedWeightKg()) + "/" + FormatUtil.stripZeros(l.maxCapacityKg()) + " kg)")
                 .toArray();
         Object chosen = JOptionPane.showInputDialog(this, i18n.t("scanner.relocate.prompt"),
-                i18n.t("scanner.action.relocate"), JOptionPane.PLAIN_MESSAGE, null, options,
+                i18n.t("scanner.action.relocate") + (selected.size() > 1 ? " (" + selected.size() + ")" : ""),
+                JOptionPane.PLAIN_MESSAGE, null, options,
                 options.length > 0 ? options[0] : null);
         if (chosen == null) {
             return;
@@ -449,8 +452,17 @@ public final class InventoryView extends JPanel implements NavigableView {
         String code = chosen.toString().split(" ")[0];
         locations.stream().filter(l -> l.code().equals(code)).findFirst().ifPresent(loc -> {
             try {
-                ctx.getInventoryService().relocatePackage(pkg.id(), loc.id(), "Relocated from Inventory Browser",
-                        ctx.getSession().requireCurrentUser().id());
+                long userId = ctx.getSession().requireCurrentUser().id();
+                if (selected.size() == 1) {
+                    ctx.getInventoryService().relocatePackage(selected.get(0).id(), loc.id(),
+                            "Relocated from Inventory Browser", userId);
+                } else {
+                    List<Long> ids = selected.stream().map(InventoryPackage::id).toList();
+                    int moved = ctx.getInventoryService().relocatePackages(ids, loc.id(),
+                            "Bulk relocated from Inventory Browser", userId);
+                    JOptionPane.showMessageDialog(this, i18n.t("inventory.bulk_relocate.done", moved, loc.code()),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+                }
                 refreshData();
             } catch (Exception ex) {
                 JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -459,12 +471,15 @@ public final class InventoryView extends JPanel implements NavigableView {
     }
 
     private void handleSinglePrint() {
-        InventoryPackage pkg = requireSingleSelection();
-        if (pkg == null) {
+        List<InventoryPackage> selected = getSelectedPackages();
+        if (selected.isEmpty()) {
+            JOptionPane.showMessageDialog(this, ctx.getI18n().t("inventory.select_one"),
+                    ctx.getI18n().t("common.warning"), JOptionPane.WARNING_MESSAGE);
             return;
         }
         Window owner = SwingUtilities.getWindowAncestor(this);
-        PrintPreviewDialog.showPreview(owner, ctx, List.of(pkg), LabelPreset.THERMAL_100X150);
+        LabelPreset preset = selected.size() > 1 ? LabelPreset.A4_4UP : LabelPreset.THERMAL_100X150;
+        PrintPreviewDialog.showPreview(owner, ctx, selected, preset);
     }
 
     private void handleBatchPrint() {

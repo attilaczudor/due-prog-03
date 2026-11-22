@@ -9,6 +9,7 @@ import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Invoice;
+import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.ui.LogoAssets;
@@ -183,8 +184,11 @@ public final class InvoicePdfExporter {
 
         g.setColor(Color.WHITE);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 13));
-        String title = i18n.t("invoice.pdf.title").toUpperCase(Locale.ROOT)
-                + " // " + i18n.t("invoice.direction." + inv.direction().name()).toUpperCase(Locale.ROOT);
+        boolean isCreditNote = inv.category() == InvoiceCategory.CREDIT_NOTE;
+        String title = isCreditNote
+                ? i18n.t("invoice.credit_note.pdf_title").toUpperCase(Locale.ROOT)
+                : i18n.t("invoice.pdf.title").toUpperCase(Locale.ROOT)
+                        + " // " + i18n.t("invoice.direction." + inv.direction().name()).toUpperCase(Locale.ROOT);
         g.drawString(title, margin + 46, y + 27);
 
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 11));
@@ -323,18 +327,19 @@ public final class InvoicePdfExporter {
                 g.setColor(Color.BLACK);
             }
 
+            String signPrefix = isCreditNote ? "-" : "";
             g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));
             drawSummaryRow(g, i18n.t("invoice.net_amount").toUpperCase(Locale.ROOT) + ":",
-                    CurrencyDef.formatAmount(inv.netAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 18);
+                    signPrefix + CurrencyDef.formatAmount(inv.netAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 18);
             drawSummaryRow(g, i18n.t("invoice.vat").toUpperCase(Locale.ROOT)
                             + " (" + inv.effectiveTaxTypeCode() + " " + FormatUtil.stripZeros(inv.vatRate()) + "%):",
-                    CurrencyDef.formatAmount(inv.vatAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 36);
+                    signPrefix + CurrencyDef.formatAmount(inv.vatAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 36);
 
             g.fillRect(Math.round(sx), Math.round(y + 46), Math.round(sumW), 28);
             g.setColor(Color.WHITE);
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
             drawSummaryRow(g, i18n.t("invoice.gross_amount").toUpperCase(Locale.ROOT) + ":",
-                    CurrencyDef.formatAmount(inv.grossAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 64);
+                    signPrefix + CurrencyDef.formatAmount(inv.grossAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 64);
 
             // Signature lines
             float sigY = Math.min(pageH - 70f, y + sumH + 54f);

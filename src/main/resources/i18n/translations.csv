@@ -368,3 +368,16 @@ invoice.reminder.opened,Payment reminder draft opened in your email client.,A fi
 orders.edit_price,Edit Item Price,Tételár módosítása
 orders.edit_price.prompt,Negotiated unit price ({0}/kg) for {1} ({2} kg):,Egyedi egységár ({0}/kg) a(z) {1} csomaghoz ({2} kg):
 status.refreshed,Refreshed,Frissítve
+invoice.category.CREDIT_NOTE,Credit Note (Reversal),Sztornó számla (Helyesbítés)
+invoice.credit_note.btn,Credit Note,Sztornó számla
+invoice.credit_note.pdf_title,CREDIT NOTE // REVERSAL,SZTORNÓ SZÁMLA // HELYESBÍTÉS
+invoice.credit_note.confirm,Issue an auditable Credit Note reversing invoice {0}?,Kiállít egy sztornó számlát a(z) {0} számla helyesbítésére?
+invoice.credit_note.created,Credit Note {0} issued for {1}.,A(z) {0} sztornó számla kiállítva a(z) {1} számlához.
+invoice.lines.add,+ Add Line,+ Tétel hozzáadása
+invoice.lines.remove,Remove Line,Tétel törlése
+invoice.report.btn,P&L PDF Report,Pénzügyi PDF riport
+invoice.report.pdf_title,Financial P&L & Stock Valuation Report,Pénzügyi eredménykimutatás és készletérték riport
+invoice.report.pnl_section,Per-Currency Profit & Loss Summary (Native Ledgers),Devizánkénti eredményösszesítő (Külön főkönyvek)
+dashboard.valuation.title,Live Warehouse Stock Valuation,Élő raktári készletérték
+dashboard.overdue_alert,! {0} overdue invoice(s),! {0} lejárt számla
+inventory.bulk_relocate.done,Relocated {0} package(s) to {1}.,{0} csomag áthelyezve ide: {1}.

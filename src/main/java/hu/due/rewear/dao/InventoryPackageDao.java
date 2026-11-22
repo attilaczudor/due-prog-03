@@ -5,6 +5,7 @@ import hu.due.rewear.model.CategoryWeightStat;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.PackageFilter;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.model.StockValuation;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -267,6 +268,38 @@ public final class InventoryPackageDao {
             }
         } catch (SQLException e) {
             throw new DaoException("Failed to sum package weight by status", e);
+        }
+    }
+
+    /**
+     * Computes live warehouse stock valuation (in both EUR and HUF) across all {@code IN_STOCK}
+     * and {@code RESERVED} packages in a single SQL query.
+     */
+    public StockValuation sumInStockValuation() {
+        String sql = """
+                SELECT COUNT(ip.id) AS pkg_count,
+                       COALESCE(SUM(ip.weight_kg), 0) AS total_kg,
+                       COALESCE(SUM(ip.weight_kg * CASE WHEN gt.price_eur_per_kg > 0 THEN gt.price_eur_per_kg ELSE qg.default_price_per_kg END), 0) AS total_eur,
+                       COALESCE(SUM(ip.weight_kg * CASE WHEN gt.price_huf_per_kg > 0 THEN gt.price_huf_per_kg ELSE qg.default_price_huf_per_kg END), 0) AS total_huf
+                FROM inventory_packages ip
+                JOIN garment_types gt ON gt.id = ip.garment_type_id
+                JOIN quality_grades qg ON qg.id = ip.quality_grade_id
+                WHERE ip.status IN ('IN_STOCK', 'RESERVED')
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return new StockValuation(
+                        rs.getInt("pkg_count"),
+                        BigDecimal.valueOf(rs.getDouble("total_kg")),
+                        BigDecimal.valueOf(rs.getDouble("total_eur")),
+                        BigDecimal.valueOf(rs.getDouble("total_huf"))
+                );
+            }
+            return StockValuation.zero();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to compute stock valuation", e);
         }
     }
 

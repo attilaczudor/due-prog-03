@@ -4,9 +4,10 @@ import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CategoryWeightStat;
+import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.InventoryPackage;
-import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.StockMovement;
+import hu.due.rewear.model.StockValuation;
 import hu.due.rewear.util.FormatUtil;
 import org.knowm.xchart.CategoryChart;
 import org.knowm.xchart.CategoryChartBuilder;
@@ -66,6 +67,9 @@ public final class DashboardView extends JPanel implements NavigableView {
     private final JLabel kpiValue3 = new JLabel("0");
     private final JLabel kpiValue4 = new JLabel("0");
 
+    private final JLabel kpiSub2 = new JLabel(" ");
+    private final JLabel kpiSub4 = new JLabel(" ");
+
     private final JPanel chartsGrid = new JPanel(new GridLayout(1, 2, 14, 0));
     private final JPanel qualityChartHost = new JPanel(new BorderLayout());
     private final JPanel garmentChartHost = new JPanel(new BorderLayout());
@@ -90,10 +94,10 @@ public final class DashboardView extends JPanel implements NavigableView {
     private void buildUi() {
         // Top KPI Grid
         JPanel kpiGrid = new JPanel(new GridLayout(1, 4, 12, 0));
-        configureKpiCard(kpiCard1, kpiTitle1, kpiValue1);
-        configureKpiCard(kpiCard2, kpiTitle2, kpiValue2);
-        configureKpiCard(kpiCard3, kpiTitle3, kpiValue3);
-        configureKpiCard(kpiCard4, kpiTitle4, kpiValue4);
+        configureKpiCard(kpiCard1, kpiTitle1, kpiValue1, null);
+        configureKpiCard(kpiCard2, kpiTitle2, kpiValue2, kpiSub2);
+        configureKpiCard(kpiCard3, kpiTitle3, kpiValue3, null);
+        configureKpiCard(kpiCard4, kpiTitle4, kpiValue4, kpiSub4);
         kpiGrid.add(kpiCard1);
         kpiGrid.add(kpiCard2);
         kpiGrid.add(kpiCard3);
@@ -149,13 +153,18 @@ public final class DashboardView extends JPanel implements NavigableView {
         }
     }
 
-    private static void configureKpiCard(JPanel card, JLabel title, JLabel value) {
+    private static void configureKpiCard(JPanel card, JLabel title, JLabel value, JLabel sub) {
         card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
         title.setFont(ThemeManager.monoFont(Font.BOLD, 11f));
         value.setFont(ThemeManager.monoFont(Font.BOLD, 24f));
         card.add(title);
         card.add(Box.createVerticalStrut(6));
         card.add(value);
+        if (sub != null) {
+            sub.setFont(ThemeManager.monoFont(Font.PLAIN, 10.5f));
+            card.add(Box.createVerticalStrut(4));
+            card.add(sub);
+        }
     }
 
     private void rebuildCharts() {
@@ -258,17 +267,19 @@ public final class DashboardView extends JPanel implements NavigableView {
     @Override
     public void refreshData() {
         I18nManager i18n = ctx.getI18n();
-        int inStockCount = ctx.getPackageDao().countByStatus(PackageStatus.IN_STOCK)
-                + ctx.getPackageDao().countByStatus(PackageStatus.RESERVED);
-        BigDecimal inStockWeight = ctx.getPackageDao().sumWeightByStatus(PackageStatus.IN_STOCK)
-                .add(ctx.getPackageDao().sumWeightByStatus(PackageStatus.RESERVED));
+        ctx.getInvoiceService().syncOverdueStatuses();
+        StockValuation val = ctx.getPackageDao().sumInStockValuation();
         int todayIntake = ctx.getPackageDao().countCreatedOnDate(LocalDate.now());
         int openOrders = ctx.getOrderDao().countOpenOrders();
+        int overdueCount = ctx.getInvoiceDao().countOverdue();
 
-        kpiValue1.setText(Integer.toString(inStockCount));
-        kpiValue2.setText(FormatUtil.stripZeros(inStockWeight) + " " + i18n.t("common.kg"));
+        kpiValue1.setText(Integer.toString(val.packageCount()));
+        kpiValue2.setText(FormatUtil.stripZeros(val.totalWeightKg()) + " " + i18n.t("common.kg"));
+        kpiSub2.setText(CurrencyDef.formatAmount(val.totalEur(), "EUR", 2)
+                + "  |  " + CurrencyDef.formatAmount(val.totalHuf(), "HUF", 0));
         kpiValue3.setText(Integer.toString(todayIntake));
         kpiValue4.setText(Integer.toString(openOrders));
+        kpiSub4.setText(overdueCount > 0 ? i18n.t("dashboard.overdue_alert", overdueCount) : " ");
 
         rebuildCharts();
 
@@ -324,6 +335,8 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiValue2.setForeground(ThemeManager.fg());
         kpiValue3.setForeground(ThemeManager.fg());
         kpiValue4.setForeground(ThemeManager.fg());
+        kpiSub2.setForeground(ThemeManager.muted());
+        kpiSub4.setForeground(ThemeManager.fg());
         recentTitleLabel.setForeground(ThemeManager.fg());
 
         BrutalistStyle.styleSecondaryButton(refreshBtn);

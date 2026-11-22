@@ -114,6 +114,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JButton applyStatusBtn = new JButton();
     private final JButton previewDocBtn = new JButton();
     private final JButton sendReminderBtn = new JButton();
+    private final JButton creditNoteBtn = new JButton();
+    private final JButton pnlReportBtn = new JButton();
     private final JButton exportCsvBtn = new JButton();
 
     private final DefaultTableModel tableModel = BrutalistStyle.nonEditableTableModel();
@@ -195,6 +197,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
         actionBar.add(applyStatusBtn);
         actionBar.add(previewDocBtn);
         actionBar.add(sendReminderBtn);
+        actionBar.add(creditNoteBtn);
+        actionBar.add(pnlReportBtn);
         actionBar.add(exportCsvBtn);
         northStack.add(actionBar);
 
@@ -246,6 +250,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
         applyStatusBtn.addActionListener(e -> handleStatusUpdate());
         previewDocBtn.addActionListener(e -> openSelectedInvoicePreview());
         sendReminderBtn.addActionListener(e -> handleSendPaymentReminder());
+        creditNoteBtn.addActionListener(e -> handleIssueCreditNote());
+        pnlReportBtn.addActionListener(e -> handlePreviewPnlReport());
         exportCsvBtn.addActionListener(e -> handleExportCsv());
 
         table.getSelectionModel().addListSelectionListener(e -> {
@@ -328,6 +334,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 && inv.direction() == InvoiceDirection.OUTGOING
                 && (inv.status() == InvoiceStatus.ISSUED || inv.status() == InvoiceStatus.OVERDUE);
         sendReminderBtn.setEnabled(canRemind);
+        boolean canCreditNote = inv != null
+                && inv.category() != InvoiceCategory.CREDIT_NOTE
+                && inv.status() != InvoiceStatus.CANCELLED;
+        creditNoteBtn.setEnabled(canCreditNote);
         if (inv != null) {
             for (int i = 0; i < statusCombo.getItemCount(); i++) {
                 if (statusCombo.getItemAt(i).status() == inv.status()) {
@@ -364,6 +374,45 @@ public final class InvoicesView extends JPanel implements NavigableView {
             JOptionPane.showMessageDialog(this, ex.getMessage(),
                     i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void handleIssueCreditNote() {
+        Invoice inv = getSelectedInvoice();
+        if (inv == null) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        if (JOptionPane.showConfirmDialog(this, i18n.t("invoice.credit_note.confirm", inv.invoiceNumber()),
+                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+            return;
+        }
+        try {
+            long userId = ctx.getSession().requireCurrentUser().id();
+            Invoice cn = ctx.getInvoiceService().issueCreditNote(inv.id(), userId);
+            refreshDataSelecting(cn.id());
+            JOptionPane.showMessageDialog(this,
+                    i18n.t("invoice.credit_note.created", cn.invoiceNumber(), inv.invoiceNumber()),
+                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handlePreviewPnlReport() {
+        I18nManager i18n = ctx.getI18n();
+        FinancialSummary summary = ctx.getInvoiceService().computeSummary(filteredInvoices);
+        var valuation = ctx.getPackageDao().sumInStockValuation();
+        Map<String, Integer> decByCur = ctx.getFinanceConfigDao().decimalPlacesMap();
+        String scope = selectedLedgerCurrency != null
+                ? selectedLedgerCurrency
+                : i18n.t("common.all").toUpperCase(Locale.ROOT);
+        DocumentPageSource report = ctx.getFinancialReportPdfExporter().createPageSource(
+                scope, summary, valuation, filteredInvoices, decByCur);
+        Window owner = SwingUtilities.getWindowAncestor(this);
+        DocumentPreviewDialog.showDocuments(owner, ctx, List.of(report),
+                ctx.getSettingsDao().getCompanyProfile().email(),
+                i18n.t("invoice.report.pdf_title"));
     }
 
     private void handleStatusUpdate() {
@@ -644,6 +693,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
         applyStatusBtn.setText(i18n.t("invoice.status_update").toUpperCase(Locale.ROOT));
         previewDocBtn.setText(i18n.t("invoice.preview_btn").toUpperCase(Locale.ROOT));
         sendReminderBtn.setText(i18n.t("invoice.reminder.btn").toUpperCase(Locale.ROOT));
+        creditNoteBtn.setText(i18n.t("invoice.credit_note.btn").toUpperCase(Locale.ROOT));
+        pnlReportBtn.setText(i18n.t("invoice.report.btn").toUpperCase(Locale.ROOT));
         exportCsvBtn.setText(i18n.t("common.export.csv").toUpperCase(Locale.ROOT));
 
         populateFilterCombos();
@@ -689,7 +740,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(filterCard, 6, 8);
         BrutalistStyle.stylePrimaryButton(newOutgoingBtn);
         BrutalistStyle.stylePrimaryButton(previewDocBtn);
-        BrutalistStyle.styleSecondaryButtons(newIncomingBtn, applyStatusBtn, sendReminderBtn, exportCsvBtn, refreshBtn);
+        BrutalistStyle.styleSecondaryButtons(
+                newIncomingBtn, applyStatusBtn, sendReminderBtn, creditNoteBtn, pnlReportBtn, exportCsvBtn, refreshBtn);
         BrutalistStyle.styleTable(table);
 
         settingsPanel.applyTheme();

@@ -12,26 +12,40 @@ import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.TaxType;
+import hu.due.rewear.service.InvoiceService;
 import hu.due.rewear.util.FormatUtil;
 
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
 import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.ListSelectionModel;
+import javax.swing.table.DefaultTableModel;
+import java.awt.BorderLayout;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 
 /**
  * Factory for the Outgoing Invoice (revenue) and Incoming Expense creation modals used by {@link InvoicesView}.
- * Supports order auto-fill (with country-based VAT lookup), saved provider auto-fill, and manual entry.
+ * Supports order auto-fill (with country-based VAT lookup), saved provider auto-fill,
+ * and multi-line manual item entry with live Net / VAT / Gross total calculation.
  */
 final class InvoiceFormDialogs {
 
@@ -56,10 +70,148 @@ final class InvoiceFormDialogs {
         }
     }
 
+    /** Encapsulates the interactive multi-line items editor table + live totals footer. */
+    private static final class LineItemsEditor {
+        final JPanel panel = new JPanel(new BorderLayout(0, 6));
+        final DefaultTableModel model;
+        final JTable table;
+        final JButton addLineBtn;
+        final JButton removeLineBtn;
+        final JLabel totalsLabel = new JLabel(" ");
+        private boolean locked = false;
+
+        LineItemsEditor(I18nManager i18n, String defaultUnit, Runnable onChange) {
+            this.model = new DefaultTableModel(new Object[]{
+                    i18n.t("invoice.item.description") + " *",
+                    i18n.t("invoice.item.qty") + " *",
+                    i18n.t("invoice.item.unit"),
+                    i18n.t("invoice.item.unit_price") + " *"
+            }, 0) {
+                @Override
+                public boolean isCellEditable(int row, int col) {
+                    return !locked;
+                }
+            };
+            this.table = new JTable(model);
+            BrutalistStyle.styleTable(table);
+            table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+            table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
+            table.getColumnModel().getColumn(0).setPreferredWidth(230);
+            table.getColumnModel().getColumn(1).setPreferredWidth(65);
+            table.getColumnModel().getColumn(2).setPreferredWidth(55);
+            table.getColumnModel().getColumn(3).setPreferredWidth(95);
+
+            addLineBtn = new JButton(i18n.t("invoice.lines.add").toUpperCase(Locale.ROOT));
+            removeLineBtn = new JButton(i18n.t("invoice.lines.remove").toUpperCase(Locale.ROOT));
+            BrutalistStyle.styleSecondaryButtons(addLineBtn, removeLineBtn);
+
+            addLineBtn.addActionListener(e -> {
+                stopEditing();
+                model.addRow(new Object[]{"", "1", defaultUnit, "0"});
+                int last = model.getRowCount() - 1;
+                table.setRowSelectionInterval(last, last);
+                onChange.run();
+            });
+            removeLineBtn.addActionListener(e -> {
+                stopEditing();
+                int r = table.getSelectedRow();
+                if (r >= 0 && model.getRowCount() > 1) {
+                    model.removeRow(r);
+                    onChange.run();
+                }
+            });
+            model.addTableModelListener(e -> onChange.run());
+
+            // Seed one starter editable row
+            model.addRow(new Object[]{"", "1", defaultUnit, "0"});
+
+            JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 6, 0));
+            topBar.setOpaque(false);
+            topBar.add(addLineBtn);
+            topBar.add(removeLineBtn);
+            panel.add(topBar, BorderLayout.NORTH);
+
+            JScrollPane sp = new JScrollPane(table);
+            sp.setPreferredSize(new Dimension(520, 128));
+            panel.add(sp, BorderLayout.CENTER);
+
+            totalsLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
+            totalsLabel.setForeground(ThemeManager.fg());
+            totalsLabel.setBorder(BorderFactory.createEmptyBorder(2, 2, 0, 2));
+            panel.add(totalsLabel, BorderLayout.SOUTH);
+        }
+
+        void setLocked(boolean lock) {
+            stopEditing();
+            this.locked = lock;
+            addLineBtn.setEnabled(!lock);
+            removeLineBtn.setEnabled(!lock);
+        }
+
+        void stopEditing() {
+            if (table.isEditing() && table.getCellEditor() != null) {
+                table.getCellEditor().stopCellEditing();
+            }
+        }
+
+        void updateTotalsPreview(AppContext ctx, I18nManager i18n, String currencyCode, TaxType tax) {
+            int dec = ctx.getFinanceConfigDao().decimalPlacesFor(currencyCode);
+            BigDecimal net = BigDecimal.ZERO;
+            for (int i = 0; i < model.getRowCount(); i++) {
+                try {
+                    BigDecimal qty = CurrencyCode.parseAmount(strAt(i, 1));
+                    BigDecimal price = CurrencyCode.parseAmount(strAt(i, 3));
+                    if (qty.compareTo(BigDecimal.ZERO) > 0 && price.compareTo(BigDecimal.ZERO) >= 0) {
+                        net = net.add(CurrencyDef.roundForScale(qty.multiply(price), dec));
+                    }
+                } catch (Exception ignored) {
+                    // Ignore incomplete numbers while typing
+                }
+            }
+            net = CurrencyDef.roundForScale(net, dec);
+            BigDecimal vatRate = tax != null ? tax.ratePercent() : InvoiceService.DEFAULT_VAT_RATE;
+            BigDecimal vat = CurrencyDef.roundForScale(
+                    net.multiply(vatRate).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), dec);
+            BigDecimal gross = CurrencyDef.roundForScale(net.add(vat), dec);
+            totalsLabel.setText(
+                    i18n.t("invoice.net_amount").toUpperCase(Locale.ROOT) + ": " + CurrencyDef.formatAmount(net, currencyCode, dec)
+                            + "   |   " + i18n.t("invoice.vat").toUpperCase(Locale.ROOT) + " (" + FormatUtil.stripZeros(vatRate) + "%): "
+                            + CurrencyDef.formatAmount(vat, currencyCode, dec)
+                            + "   |   " + i18n.t("invoice.gross_amount").toUpperCase(Locale.ROOT) + ": "
+                            + CurrencyDef.formatAmount(gross, currencyCode, dec));
+        }
+
+        List<InvoiceService.InvoiceLineInput> parseLines(I18nManager i18n) {
+            stopEditing();
+            List<InvoiceService.InvoiceLineInput> result = new ArrayList<>();
+            for (int i = 0; i < model.getRowCount(); i++) {
+                String desc = strAt(i, 0).trim();
+                String qtyStr = strAt(i, 1).trim();
+                String unit = strAt(i, 2).trim();
+                String priceStr = strAt(i, 3).trim();
+                if (desc.isEmpty() && (priceStr.isEmpty() || "0".equals(priceStr)) && model.getRowCount() > 1) {
+                    continue;
+                }
+                BigDecimal qty = CurrencyCode.parseAmount(qtyStr);
+                BigDecimal price = CurrencyCode.parseAmount(priceStr);
+                if (price.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new IllegalArgumentException(i18n.t("validation.prices_non_negative"));
+                }
+                result.add(new InvoiceService.InvoiceLineInput(desc, qty, unit.isEmpty() ? "db" : unit, price));
+            }
+            return result;
+        }
+
+        private String strAt(int row, int col) {
+            Object v = model.getValueAt(row, col);
+            return v == null ? "" : v.toString();
+        }
+    }
+
     private InvoiceFormDialogs() {
     }
 
-    /** Opens the modal for creating a new Outgoing (revenue) invoice from an order or manually. */
+    /** Opens the modal for creating a new Outgoing (revenue) invoice from an order or manually (multi-line). */
     static Optional<Invoice> showNewOutgoingDialog(Component parent, AppContext ctx, String defaultCurrency) {
         I18nManager i18n = ctx.getI18n();
         String lang = i18n.getActiveLanguage();
@@ -80,18 +232,21 @@ final class InvoiceFormDialogs {
         JTextField taxF = new JTextField(24);
         JTextField addressF = new JTextField(24);
         JTextField emailF = new JTextField(24);
-        JTextField descF = new JTextField(24);
-        JTextField qtyF = new JTextField("1", 10);
-        JTextField unitF = new JTextField("kg", 8);
-        JTextField priceF = new JTextField("0", 10);
-        JLabel priceLabel = new JLabel(i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:");
+        JTextField[] autoFields = {partnerF, taxF, addressF, emailF};
 
-        curCombo.addActionListener(e -> priceLabel.setText(
-                i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:"));
+        final LineItemsEditor[] editorRef = new LineItemsEditor[1];
+        Runnable recalc = () -> {
+            if (editorRef[0] == null) return;
+            String c = curCombo.getSelectedItem() != null ? curCombo.getSelectedItem().toString() : initCur;
+            TaxType t = taxCombo.getSelectedItem() instanceof TaxChoice tc ? tc.tax() : null;
+            editorRef[0].updateTotalsPreview(ctx, i18n, c, t);
+        };
+        LineItemsEditor lineEditor = new LineItemsEditor(i18n, "kg", recalc);
+        editorRef[0] = lineEditor;
+        curCombo.addActionListener(e -> recalc.run());
+        taxCombo.addActionListener(e -> recalc.run());
 
-        JTextField[] autoFields = {partnerF, taxF, addressF, emailF, descF, qtyF, unitF, priceF};
-
-        // Auto-populate customer, line summary, weight, average unit price, currency, and country VAT when an order is selected
+        // Auto-populate customer, line items, currency, and country VAT when an order is selected
         orderPicker.addActionListener(e -> {
             if (orderPicker.getSelectedItem() instanceof Order ord) {
                 String ordCur = ord.effectiveCurrencyCode();
@@ -105,25 +260,16 @@ final class InvoiceFormDialogs {
                 addressF.setText(cust != null ? FormatUtil.safe(cust.address()) : "");
                 emailF.setText(cust != null ? FormatUtil.safe(cust.email()) : "");
 
+                lineEditor.setLocked(true);
+                lineEditor.model.setRowCount(0);
                 var ordItems = ctx.getOrderItemDao().findByOrderId(ord.id());
-                if (ordItems.size() == 1) {
-                    var item = ordItems.get(0);
-                    descF.setText(item.packageQrCode() + " (" + item.localizedSummary(lang) + ")");
-                } else {
-                    descF.setText(ord.orderNumber() + " — " + ordItems.size() + " "
-                            + ("hu".equalsIgnoreCase(lang) ? "csomag" : "package(s)")
-                            + " (" + CurrencyDef.formatAmount(ord.totalPrice(), ordCur, dec) + ")");
-                }
-
-                BigDecimal weight = ord.totalWeightKg() != null ? ord.totalWeightKg() : BigDecimal.ZERO;
-                qtyF.setText(FormatUtil.stripZeros(weight));
-                unitF.setText("kg");
-
-                if (weight.compareTo(BigDecimal.ZERO) > 0 && ord.totalPrice() != null) {
-                    BigDecimal avgPerKg = ord.totalPrice().divide(weight, dec, RoundingMode.HALF_UP);
-                    priceF.setText(CurrencyDef.roundForScale(avgPerKg, dec).toPlainString());
-                } else {
-                    priceF.setText(CurrencyDef.roundForScale(BigDecimal.ZERO, dec).toPlainString());
+                for (var item : ordItems) {
+                    lineEditor.model.addRow(new Object[]{
+                            item.packageQrCode() + " (" + item.localizedSummary(lang) + ")",
+                            FormatUtil.stripZeros(item.weightKg()),
+                            "kg",
+                            CurrencyDef.roundForScale(item.pricePerKg(), dec).toPlainString()
+                    });
                 }
 
                 TaxType autoTax = ctx.getInvoiceDao().findByOrderId(ord.id())
@@ -136,6 +282,7 @@ final class InvoiceFormDialogs {
                     f.setBackground(ThemeManager.surface());
                     f.setForeground(ThemeManager.fg());
                 }
+                recalc.run();
             } else {
                 curCombo.setEnabled(true);
                 curCombo.setSelectedItem(initCur);
@@ -144,18 +291,19 @@ final class InvoiceFormDialogs {
                 taxF.setText("");
                 addressF.setText("");
                 emailF.setText("");
-                descF.setText("");
-                qtyF.setText("1");
-                unitF.setText("kg");
-                priceF.setText("0");
                 for (JTextField f : autoFields) {
                     f.setEditable(true);
                     f.setBackground(ThemeManager.bg());
                     f.setForeground(ThemeManager.fg());
                 }
+                lineEditor.setLocked(false);
+                lineEditor.model.setRowCount(0);
+                lineEditor.model.addRow(new Object[]{"", "1", "kg", "0"});
+                recalc.run();
             }
         });
 
+        JPanel root = new JPanel(new BorderLayout(0, 10));
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 4, 4, 6);
@@ -167,15 +315,13 @@ final class InvoiceFormDialogs {
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.tax_number") + ":", taxF);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.address") + ":", addressF);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.email") + ":", emailF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.item.description") + " *:", descF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.item.qty") + " *:", qtyF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.item.unit") + ":", unitF);
-        gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; form.add(priceLabel, gbc);
-        gbc.gridx = 1; gbc.weightx = 1; form.add(priceF, gbc);
-        r++;
         BrutalistStyle.addFormRow(form, gbc, r, i18n.t("invoice.tax_type") + " *:", taxCombo);
 
-        if (JOptionPane.showConfirmDialog(parent, form, i18n.t("invoice.new_outgoing"),
+        root.add(form, BorderLayout.NORTH);
+        root.add(lineEditor.panel, BorderLayout.CENTER);
+        recalc.run();
+
+        if (JOptionPane.showConfirmDialog(parent, root, i18n.t("invoice.new_outgoing"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
             return Optional.empty();
         }
@@ -188,12 +334,11 @@ final class InvoiceFormDialogs {
                 created = ctx.getInvoiceService().ensureInvoiceForOrder(chosenOrder.id(), chosenTax, userId);
             } else {
                 String chosenCur = curCombo.getSelectedItem() != null ? curCombo.getSelectedItem().toString() : "EUR";
-                BigDecimal qty = CurrencyCode.parseAmount(qtyF.getText());
-                BigDecimal unitPrice = CurrencyCode.parseAmount(priceF.getText());
-                created = ctx.getInvoiceService().createManualInvoice(
+                List<InvoiceService.InvoiceLineInput> lines = lineEditor.parseLines(i18n);
+                created = ctx.getInvoiceService().createMultiLineManualInvoice(
                         InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, null, null,
                         partnerF.getText(), taxF.getText(), addressF.getText(), emailF.getText(),
-                        descF.getText(), qty, unitF.getText(), unitPrice, chosenTax, chosenCur,
+                        lines, chosenTax, chosenCur,
                         LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
             }
             return Optional.of(created);
@@ -203,7 +348,7 @@ final class InvoiceFormDialogs {
         }
     }
 
-    /** Opens the modal for recording a new Incoming (expense/supplier) invoice. */
+    /** Opens the modal for recording a new multi-line Incoming (expense/supplier) invoice. */
     static Optional<Invoice> showNewIncomingDialog(Component parent, AppContext ctx, String defaultCurrency) {
         I18nManager i18n = ctx.getI18n();
         String lang = i18n.getActiveLanguage();
@@ -217,7 +362,7 @@ final class InvoiceFormDialogs {
 
         JComboBox<CategoryChoice> catCombo = new JComboBox<>();
         for (InvoiceCategory cat : InvoiceCategory.values()) {
-            if (cat.defaultDirection() == InvoiceDirection.INCOMING) {
+            if (cat.defaultDirection() == InvoiceDirection.INCOMING && cat != InvoiceCategory.CREDIT_NOTE) {
                 catCombo.addItem(new CategoryChoice(cat, i18n.t("invoice.category." + cat.name())));
             }
         }
@@ -231,13 +376,18 @@ final class InvoiceFormDialogs {
         JTextField taxF = new JTextField(24);
         JTextField addressF = new JTextField(24);
         JTextField emailF = new JTextField(24);
-        JTextField descF = new JTextField(24);
-        JTextField qtyF = new JTextField("1", 10);
-        JTextField unitF = new JTextField("db", 8);
-        JTextField priceF = new JTextField("0", 10);
-        JLabel priceLabel = new JLabel(i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:");
-        curCombo.addActionListener(e -> priceLabel.setText(
-                i18n.t("invoice.item.unit_price") + " (" + curCombo.getSelectedItem() + ") *:"));
+
+        final LineItemsEditor[] editorRef = new LineItemsEditor[1];
+        Runnable recalc = () -> {
+            if (editorRef[0] == null) return;
+            String c = curCombo.getSelectedItem() != null ? curCombo.getSelectedItem().toString() : initCur;
+            TaxType t = taxCombo.getSelectedItem() instanceof TaxChoice tc ? tc.tax() : null;
+            editorRef[0].updateTotalsPreview(ctx, i18n, c, t);
+        };
+        LineItemsEditor lineEditor = new LineItemsEditor(i18n, "db", recalc);
+        editorRef[0] = lineEditor;
+        curCombo.addActionListener(e -> recalc.run());
+        taxCombo.addActionListener(e -> recalc.run());
 
         // Auto-fill supplier identity, preferred currency, and country VAT rule when picking a saved provider
         supplierPicker.addActionListener(e -> {
@@ -248,6 +398,7 @@ final class InvoiceFormDialogs {
                 emailF.setText(FormatUtil.safe(sup.email()));
                 curCombo.setSelectedItem(sup.effectiveCurrencyCode());
                 selectTaxInCombo(taxCombo, ctx.getInvoiceService().resolveDefaultTaxForCustomer(sup));
+                recalc.run();
             }
         });
 
@@ -256,6 +407,7 @@ final class InvoiceFormDialogs {
             initStatusCombo.addItem(new StatusChoice(st, i18n.t("status.invoice." + st.name())));
         }
 
+        JPanel root = new JPanel(new BorderLayout(0, 10));
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 4, 4, 6);
@@ -269,16 +421,14 @@ final class InvoiceFormDialogs {
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.tax_number") + ":", taxF);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.address") + ":", addressF);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.email") + ":", emailF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.item.description") + " *:", descF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.item.qty") + " *:", qtyF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.item.unit") + ":", unitF);
-        gbc.gridx = 0; gbc.gridy = r; gbc.weightx = 0; form.add(priceLabel, gbc);
-        gbc.gridx = 1; gbc.weightx = 1; form.add(priceF, gbc);
-        r++;
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.tax_type") + " *:", taxCombo);
         BrutalistStyle.addFormRow(form, gbc, r, i18n.t("common.status") + ":", initStatusCombo);
 
-        if (JOptionPane.showConfirmDialog(parent, form, i18n.t("invoice.new_incoming"),
+        root.add(form, BorderLayout.NORTH);
+        root.add(lineEditor.panel, BorderLayout.CENTER);
+        recalc.run();
+
+        if (JOptionPane.showConfirmDialog(parent, root, i18n.t("invoice.new_incoming"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
             return Optional.empty();
         }
@@ -290,15 +440,14 @@ final class InvoiceFormDialogs {
             String chosenCur = curCombo.getSelectedItem() != null ? curCombo.getSelectedItem().toString() : "EUR";
             Long partnerId = supplierPicker.getSelectedItem() instanceof Customer sup ? sup.id() : null;
 
-            BigDecimal qty = CurrencyCode.parseAmount(qtyF.getText());
-            BigDecimal price = CurrencyCode.parseAmount(priceF.getText());
-            Invoice created = ctx.getInvoiceService().createManualInvoice(
+            List<InvoiceService.InvoiceLineInput> lines = lineEditor.parseLines(i18n);
+            Invoice created = ctx.getInvoiceService().createMultiLineManualInvoice(
                     InvoiceDirection.INCOMING,
                     catItem != null ? catItem.category() : InvoiceCategory.OTHER_EXPENSE,
                     invNoF.getText(),
                     partnerId,
                     partnerF.getText(), taxF.getText(), addressF.getText(), emailF.getText(),
-                    descF.getText(), qty, unitF.getText(), price, chosenTax, chosenCur,
+                    lines, chosenTax, chosenCur,
                     LocalDate.now(), LocalDate.now().plusDays(14),
                     stChoice != null ? stChoice.status() : InvoiceStatus.ISSUED,
                     ctx.getSession().requireCurrentUser().id());

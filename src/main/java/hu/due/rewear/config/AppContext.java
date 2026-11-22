@@ -17,6 +17,7 @@ import hu.due.rewear.service.AuthService;
 import hu.due.rewear.service.BackupService;
 import hu.due.rewear.service.CsvExportService;
 import hu.due.rewear.service.DeliveryNotePdfExporter;
+import hu.due.rewear.service.FinancialReportPdfExporter;
 import hu.due.rewear.service.InventoryService;
 import hu.due.rewear.service.InvoicePdfExporter;
 import hu.due.rewear.service.InvoiceService;
@@ -71,6 +72,7 @@ public final class AppContext {
     private final CsvExportService csvExportService;
     private final DeliveryNotePdfExporter deliveryNotePdfExporter;
     private final InvoicePdfExporter invoicePdfExporter;
+    private final FinancialReportPdfExporter financialReportPdfExporter;
     private final BackupService backupService;
 
     public AppContext() {
@@ -111,6 +113,7 @@ public final class AppContext {
         this.csvExportService = new CsvExportService(i18n);
         this.deliveryNotePdfExporter = new DeliveryNotePdfExporter(i18n, qrCodeService);
         this.invoicePdfExporter = new InvoicePdfExporter(i18n, qrCodeService, settingsDao::getCompanyProfile);
+        this.financialReportPdfExporter = new FinancialReportPdfExporter(i18n, settingsDao::getCompanyProfile);
         this.backupService = new BackupService(databaseManager);
 
         invoiceService.syncOverdueStatuses();
@@ -245,6 +248,10 @@ public final class AppContext {
 
     public InvoicePdfExporter getInvoicePdfExporter() {
         return invoicePdfExporter;
+    }
+
+    public FinancialReportPdfExporter getFinancialReportPdfExporter() {
+        return financialReportPdfExporter;
     }
 
     public BackupService getBackupService() {

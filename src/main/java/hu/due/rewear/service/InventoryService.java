@@ -196,6 +196,38 @@ public final class InventoryService {
         return packageDao.findById(packageId).orElseThrow();
     }
 
+    /**
+     * Atomically relocates multiple selected packages to {@code newLocationId} inside a single
+     * SQLite transaction, rejecting the batch if any package is already {@code SHIPPED} or {@code DISCARDED}.
+     */
+    public int relocatePackages(List<Long> packageIds, long newLocationId, String note, long userId) {
+        if (packageIds == null || packageIds.isEmpty()) {
+            return 0;
+        }
+        LocalDateTime now = LocalDateTime.now();
+        String auditNote = note != null && !note.isBlank() ? note.trim() : "Bulk relocated via warehouse app";
+        return db.executeInTransaction(conn -> {
+            int moved = 0;
+            for (Long packageId : packageIds) {
+                if (packageId == null) continue;
+                InventoryPackage pkg = packageDao.findById(conn, packageId)
+                        .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
+                if (pkg.status() == PackageStatus.SHIPPED || pkg.status() == PackageStatus.DISCARDED) {
+                    throw new IllegalStateException("Cannot relocate package " + pkg.qrCode()
+                            + " with status: " + pkg.status());
+                }
+                if (pkg.locationId() == newLocationId) {
+                    continue;
+                }
+                packageDao.updateLocation(conn, packageId, newLocationId, now);
+                movementDao.insert(conn, packageId, MovementType.RELOCATE,
+                        pkg.locationId(), newLocationId, userId, auditNote, now);
+                moved++;
+            }
+            return moved;
+        });
+    }
+
     public void verifyStocktake(long packageId, String note, long userId) {
         InventoryPackage pkg = packageDao.findById(packageId)
                 .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
