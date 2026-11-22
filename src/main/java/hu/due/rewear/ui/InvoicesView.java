@@ -525,15 +525,18 @@ public final class InvoicesView extends JPanel implements NavigableView {
         chooser.setSelectedFile(new File("rewear-invoices.csv"));
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
-            Path target = file.getName().toLowerCase().endsWith(".csv")
+            Path target = file.getName().toLowerCase(Locale.ROOT).endsWith(".csv")
                     ? file.toPath() : Path.of(file.getAbsolutePath() + ".csv");
-            try {
-                ctx.getCsvExportService().exportInvoices(filteredInvoices, target);
-                JOptionPane.showMessageDialog(this, i18n.t("print.exported", target.toAbsolutePath()),
-                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-            }
+            List<Invoice> snapshot = List.copyOf(filteredInvoices);
+            AsyncUiRunner.run(this,
+                    () -> {
+                        ctx.getCsvExportService().exportInvoices(snapshot, target);
+                        return target;
+                    },
+                    saved -> JOptionPane.showMessageDialog(this, i18n.t("print.exported", saved.toAbsolutePath()),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE),
+                    ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
+                            i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
         }
     }
 

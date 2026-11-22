@@ -332,16 +332,18 @@ public final class DocumentPreviewDialog extends JDialog {
 
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
-            Path target = file.getName().toLowerCase().endsWith(".pdf")
+            Path target = file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")
                     ? file.toPath() : Path.of(file.getAbsolutePath() + ".pdf");
-            try {
-                InvoicePdfExporter.exportCombined(selected, target);
-                JOptionPane.showMessageDialog(this, i18n.t("print.exported", target.toAbsolutePath()),
-                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(),
-                        i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-            }
+            List<DocumentPageSource> snapshot = List.copyOf(selected);
+            AsyncUiRunner.run(this,
+                    () -> {
+                        InvoicePdfExporter.exportCombined(snapshot, target);
+                        return target;
+                    },
+                    saved -> JOptionPane.showMessageDialog(this, i18n.t("print.exported", saved.toAbsolutePath()),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE),
+                    ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
+                            i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
         }
     }
 
@@ -429,21 +431,27 @@ public final class DocumentPreviewDialog extends JDialog {
             return;
         }
 
-        // Export each selected document cleanly into ./exports/ next to the app
+        // Export each selected document cleanly into ./exports/ off the EDT so 250 DPI PDF renders stay responsive
         Path exportDir = AppPaths.resolveAppBaseDir().resolve("exports");
-        List<Path> exportedFiles = new ArrayList<>();
-        try {
-            Files.createDirectories(exportDir);
-            for (DocumentPageSource src : selected) {
-                Path out = exportDir.resolve(src.getDefaultFileName());
-                InvoicePdfExporter.exportCombined(List.of(src), out);
-                exportedFiles.add(out);
-            }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(),
-                    i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-            return;
-        }
+        List<DocumentPageSource> snapshot = List.copyOf(selected);
+        AsyncUiRunner.run(this,
+                () -> {
+                    Files.createDirectories(exportDir);
+                    List<Path> exported = new ArrayList<>();
+                    for (DocumentPageSource src : snapshot) {
+                        Path out = exportDir.resolve(src.getDefaultFileName());
+                        InvoicePdfExporter.exportCombined(List.of(src), out);
+                        exported.add(out);
+                    }
+                    return exported;
+                },
+                exportedFiles -> showEmailComposerDialog(snapshot, exportDir, exportedFiles),
+                ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
+                        i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
+    }
+
+    private void showEmailComposerDialog(List<DocumentPageSource> selected, Path exportDir, List<Path> exportedFiles) {
+        I18nManager i18n = ctx.getI18n();
 
         JTextField toField = new JTextField(defaultEmail, 28);
         JTextField subjectField = new JTextField(defaultSubject, 28);

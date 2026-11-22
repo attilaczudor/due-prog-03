@@ -311,16 +311,20 @@ public final class PrintPreviewDialog extends JDialog {
 
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
-            Path target = file.getName().toLowerCase().endsWith(".pdf")
+            Path target = file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".pdf")
                     ? file.toPath()
                     : Path.of(file.getAbsolutePath() + ".pdf");
-            try {
-                ctx.getLabelPdfExporter().exportToPdf(packages, activePreset, target);
-                JOptionPane.showMessageDialog(this, i18n.t("print.exported", target.toAbsolutePath()),
-                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-            }
+            List<InventoryPackage> pkgSnapshot = List.copyOf(packages);
+            LabelPreset presetSnapshot = activePreset;
+            AsyncUiRunner.run(this,
+                    () -> {
+                        ctx.getLabelPdfExporter().exportToPdf(pkgSnapshot, presetSnapshot, target);
+                        return target;
+                    },
+                    saved -> JOptionPane.showMessageDialog(this, i18n.t("print.exported", saved.toAbsolutePath()),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE),
+                    ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
+                            i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
         }
     }
 

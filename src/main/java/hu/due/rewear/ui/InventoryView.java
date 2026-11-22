@@ -312,31 +312,36 @@ public final class InventoryView extends JPanel implements NavigableView {
                 selectedValue(packageFilter),
                 selectedValue(locationFilter)
         );
-        currentRows = ctx.getPackageDao().findByFilter(filter);
+        AsyncUiRunner.runLatest("inventory.load", this,
+                () -> ctx.getPackageDao().findByFilter(filter),
+                rows -> {
+                    currentRows = rows;
+                    tableModel.setRowCount(0);
+                    BigDecimal totalWeight = BigDecimal.ZERO;
+                    for (InventoryPackage p : currentRows) {
+                        totalWeight = totalWeight.add(p.weightKg());
+                        tableModel.addRow(new Object[]{
+                                p.qrCode(),
+                                p.targetGroupCode() + " — " + p.localizedTargetGroup(lang),
+                                p.garmentTypeCode() + " — " + p.localizedGarmentType(lang),
+                                p.qualityGradeCode() + " — " + p.localizedQualityGrade(lang),
+                                p.packageTypeCode() + " — " + p.localizedPackageType(lang),
+                                FormatUtil.stripZeros(p.weightKg()),
+                                p.locationCode(),
+                                p.status(),
+                                p.createdAt() != null ? DT_FMT.format(p.createdAt()) : ""
+                        });
+                    }
 
-        tableModel.setRowCount(0);
-        BigDecimal totalWeight = BigDecimal.ZERO;
-        for (InventoryPackage p : currentRows) {
-            totalWeight = totalWeight.add(p.weightKg());
-            tableModel.addRow(new Object[]{
-                    p.qrCode(),
-                    p.targetGroupCode() + " — " + p.localizedTargetGroup(lang),
-                    p.garmentTypeCode() + " — " + p.localizedGarmentType(lang),
-                    p.qualityGradeCode() + " — " + p.localizedQualityGrade(lang),
-                    p.packageTypeCode() + " — " + p.localizedPackageType(lang),
-                    FormatUtil.stripZeros(p.weightKg()),
-                    p.locationCode(),
-                    p.status(),
-                    p.createdAt() != null ? DT_FMT.format(p.createdAt()) : ""
-            });
-        }
+                    if (table.getColumnCount() >= 8) {
+                        table.getColumnModel().getColumn(0).setPreferredWidth(235);
+                        table.getColumnModel().getColumn(7).setCellRenderer(new StatusCellRenderer());
+                    }
 
-        if (table.getColumnCount() >= 8) {
-            table.getColumnModel().getColumn(0).setPreferredWidth(235);
-            table.getColumnModel().getColumn(7).setCellRenderer(new StatusCellRenderer());
-        }
-
-        summaryLabel.setText(i18n.t("inventory.summary", currentRows.size(), FormatUtil.stripZeros(totalWeight)));
+                    summaryLabel.setText(i18n.t("inventory.summary", currentRows.size(), FormatUtil.stripZeros(totalWeight)));
+                },
+                ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
+                        i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
     }
 
     private List<InventoryPackage> getSelectedPackages() {
@@ -522,16 +527,19 @@ public final class InventoryView extends JPanel implements NavigableView {
         chooser.setSelectedFile(new File("rewear-inventory.csv"));
         if (chooser.showSaveDialog(this) == JFileChooser.APPROVE_OPTION) {
             File file = chooser.getSelectedFile();
-            Path target = file.getName().toLowerCase().endsWith(".csv")
+            Path target = file.getName().toLowerCase(java.util.Locale.ROOT).endsWith(".csv")
                     ? file.toPath()
                     : Path.of(file.getAbsolutePath() + ".csv");
-            try {
-                ctx.getCsvExportService().exportPackages(currentRows, target);
-                JOptionPane.showMessageDialog(this, i18n.t("print.exported", target.toAbsolutePath()),
-                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-            } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-            }
+            List<InventoryPackage> snapshot = List.copyOf(currentRows);
+            AsyncUiRunner.run(this,
+                    () -> {
+                        ctx.getCsvExportService().exportPackages(snapshot, target);
+                        return target;
+                    },
+                    saved -> JOptionPane.showMessageDialog(this, i18n.t("print.exported", saved.toAbsolutePath()),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE),
+                    ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
+                            i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
         }
     }
 
