@@ -11,7 +11,6 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
 
 /**
  * Data Access Object for physical packages allocated to customer orders ({@code order_items} join table).
@@ -99,25 +98,6 @@ public final class OrderItemDao {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, orderItemId);
             ps.executeUpdate();
-        }
-    }
-
-    public Optional<Long> findActiveOrderIdForPackage(long packageId) {
-        String sql = """
-                SELECT oi.order_id
-                FROM order_items oi
-                JOIN orders o ON o.id = oi.order_id
-                WHERE oi.package_id = ? AND o.status IN ('DRAFT', 'PACKING')
-                LIMIT 1
-                """;
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, packageId);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? Optional.of(rs.getLong(1)) : Optional.empty();
-            }
-        } catch (SQLException e) {
-            throw new DaoException("Failed to check active order for package: " + packageId, e);
         }
     }
 }

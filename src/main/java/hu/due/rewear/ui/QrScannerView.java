@@ -109,12 +109,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
 
     // Movement history table
     private final JLabel historyTitleLabel = new JLabel();
-    private final DefaultTableModel historyModel = new DefaultTableModel() {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-    };
+    private final DefaultTableModel historyModel = BrutalistStyle.nonEditableTableModel();
     private final JTable historyTable = new JTable(historyModel);
 
     private ScannerService.ScanResult lastResult;
@@ -673,6 +668,9 @@ public final class QrScannerView extends JPanel implements NavigableView {
         if (leftCardPanel != null) BrutalistStyle.applyBoxCard(leftCardPanel, 14, 16);
         if (rightPanelBox != null) BrutalistStyle.applyBoxCard(rightPanelBox, 14, 16);
         BrutalistStyle.stylePrimaryButton(lookupBtn);
+        BrutalistStyle.styleSecondaryButtons(
+                scanImageBtn, demoScanBtn,
+                relocateBtn, verifyBtn, reprintBtn, addToOrderBtn);
         BrutalistStyle.styleTable(historyTable);
         qrThumbLabel.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
         if (lastResult == null) {

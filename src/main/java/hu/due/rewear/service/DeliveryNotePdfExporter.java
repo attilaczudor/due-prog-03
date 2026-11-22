@@ -26,6 +26,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Generates clean, brutalist monochrome A4 PDF Delivery Notes / Packing Lists using OpenPDF.
@@ -195,7 +196,7 @@ public final class DeliveryNotePdfExporter {
 
             // Customer box
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 9));
-            g.drawString(i18n.t("orders.customer").toUpperCase(), margin + 8, y + 14);
+            g.drawString(i18n.t("orders.customer").toUpperCase(Locale.ROOT), margin + 8, y + 14);
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
             String custName = customer != null ? customer.name() : order.customerName();
             g.drawString(truncate(custName, g.getFontMetrics(), leftW - 16), margin + 8, y + 30);
@@ -212,7 +213,7 @@ public final class DeliveryNotePdfExporter {
             // Order metadata box
             float mx = margin + leftW + 16;
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 9));
-            g.drawString(i18n.t("orders.order_number").toUpperCase() + ": " + order.orderNumber(), mx, y + 16);
+            g.drawString(i18n.t("orders.order_number").toUpperCase(Locale.ROOT) + ": " + order.orderNumber(), mx, y + 16);
             g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));
             g.drawString(i18n.t("common.status") + ": " + i18n.t("status.order." + order.status().name()), mx, y + 34);
             g.drawString(i18n.t("common.created_at") + ": " + (order.createdAt() != null ? DT_FMT.format(order.createdAt()) : "-"), mx, y + 49);

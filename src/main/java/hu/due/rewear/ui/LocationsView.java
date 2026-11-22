@@ -52,16 +52,12 @@ public final class LocationsView extends JPanel implements NavigableView {
     private final JButton editBtn = new JButton();
     private final JButton refreshBtn = new JButton();
 
-    private final DefaultTableModel locModel = new DefaultTableModel() {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
+    private final DefaultTableModel locModel = BrutalistStyle.nonEditableTableModel();
     private final JTable locTable = new JTable(locModel);
 
     private final JLabel storedTitleLabel = new JLabel();
     private final JButton reprintStoredBtn = new JButton();
-    private final DefaultTableModel storedModel = new DefaultTableModel() {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
+    private final DefaultTableModel storedModel = BrutalistStyle.nonEditableTableModel();
     private final JTable storedTable = new JTable(storedModel);
 
     private List<WarehouseLocation> locations = List.of();
@@ -76,7 +72,6 @@ public final class LocationsView extends JPanel implements NavigableView {
         buildUi();
         wireEvents();
         applyTranslations();
-        refreshData();
     }
 
     private void buildUi() {
@@ -311,6 +306,7 @@ public final class LocationsView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(addBtn);
+        BrutalistStyle.styleSecondaryButtons(editBtn, refreshBtn, reprintStoredBtn);
         BrutalistStyle.styleTable(locTable);
         BrutalistStyle.styleTable(storedTable);
         locTable.repaint();

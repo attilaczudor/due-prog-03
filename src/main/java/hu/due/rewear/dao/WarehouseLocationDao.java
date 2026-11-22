@@ -12,6 +12,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Data Access Object for physical warehouse rack/shelf locations ({@code warehouse_locations} table),
@@ -73,8 +74,8 @@ public final class WarehouseLocationDao {
                 VALUES (?, ?, ?, ?, ?, 1)
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, code.trim().toUpperCase());
-            ps.setString(2, zone.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
+            ps.setString(2, zone.trim().toUpperCase(Locale.ROOT));
             ps.setString(3, aisle.trim());
             ps.setString(4, shelf.trim());
             ps.setDouble(5, maxCapacityKg.doubleValue());
@@ -97,8 +98,8 @@ public final class WarehouseLocationDao {
                 """;
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, code.trim().toUpperCase());
-            ps.setString(2, zone.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
+            ps.setString(2, zone.trim().toUpperCase(Locale.ROOT));
             ps.setString(3, aisle.trim());
             ps.setString(4, shelf.trim());
             ps.setDouble(5, maxCapacityKg.doubleValue());

@@ -105,7 +105,6 @@ public final class OrdersView extends JPanel implements NavigableView {
         wireEvents();
         applyTranslations();
         applyBrutalistTheme();
-        refreshData();
     }
 
     private void buildUi() {
@@ -529,8 +528,8 @@ public final class OrdersView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(detailHeaderPanel, 12, 14);
         BrutalistStyle.applyBoxCard(scanBarPanel, 8, 10);
         BrutalistStyle.stylePrimaryButton(newOrderBtn);
-        BrutalistStyle.styleSecondaryButton(applyStatusBtn);
         BrutalistStyle.stylePrimaryButton(previewDocsBtn);
+        BrutalistStyle.styleSecondaryButtons(refreshBtn, scanAddBtn, pickStockBtn, removeItemBtn, applyStatusBtn);
         BrutalistStyle.styleTable(ordersTable);
         BrutalistStyle.styleTable(itemsTable);
     }

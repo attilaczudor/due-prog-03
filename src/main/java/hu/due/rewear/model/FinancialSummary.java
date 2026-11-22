@@ -4,6 +4,7 @@ import java.math.BigDecimal;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Locale;
 
 /**
  * Separate per-currency P&L financial summary.
@@ -34,7 +35,7 @@ public record FinancialSummary(
     }
 
     public CurrencyTotals forCurrency(String code, int decimalPlaces) {
-        String key = (code == null || code.isBlank()) ? "EUR" : code.trim().toUpperCase();
+        String key = (code == null || code.isBlank()) ? "EUR" : code.trim().toUpperCase(Locale.ROOT);
         return byCurrency.getOrDefault(key, CurrencyTotals.empty(key, decimalPlaces));
     }
 }

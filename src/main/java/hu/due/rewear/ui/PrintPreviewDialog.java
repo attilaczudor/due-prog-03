@@ -186,6 +186,7 @@ public final class PrintPreviewDialog extends JDialog {
                 previewCanvas.repaint();
             }
         });
+        BrutalistStyle.styleSecondaryButtons(prevPageBtn, nextPageBtn);
         pager.add(prevPageBtn);
         pager.add(pageIndicatorLabel);
         pager.add(nextPageBtn);
@@ -193,15 +194,19 @@ public final class PrintPreviewDialog extends JDialog {
 
         JPanel actions = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
         JButton savePngBtn = new JButton(i18n.t("print.button.png"));
+        BrutalistStyle.styleSecondaryButton(savePngBtn);
         savePngBtn.addActionListener(e -> exportQrPng());
 
         JButton savePdfBtn = new JButton(i18n.t("print.button.pdf"));
+        BrutalistStyle.styleSecondaryButton(savePdfBtn);
         savePdfBtn.addActionListener(e -> exportLabelPdf());
 
         JButton printBtn = new JButton(i18n.t("print.button.print"));
+        BrutalistStyle.stylePrimaryButton(printBtn);
         printBtn.addActionListener(e -> sendToPrinter());
 
         JButton closeBtn = new JButton(i18n.t("common.close"));
+        BrutalistStyle.styleSecondaryButton(closeBtn);
         closeBtn.addActionListener(e -> dispose());
 
         actions.add(savePngBtn);

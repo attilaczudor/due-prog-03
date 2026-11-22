@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Data Access Object for Outgoing (revenue) and Incoming (expense) invoices and their line items
@@ -281,7 +282,7 @@ public final class InvoiceDao {
             ps.setString(16, emptyToNull(taxTypeCode));
             ps.setDouble(17, vatAmount.doubleValue());
             ps.setDouble(18, grossAmount.doubleValue());
-            ps.setString(19, currency != null && !currency.isBlank() ? currency.trim().toUpperCase() : "EUR");
+            ps.setString(19, currency != null && !currency.isBlank() ? currency.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setDouble(20, rate);
             ps.setLong(21, createdBy);
             ps.setString(22, DaoDateUtil.format(createdAt));
@@ -329,7 +330,7 @@ public final class InvoiceDao {
             ps.setString(3, emptyToNull(taxTypeCode));
             ps.setDouble(4, vatAmount.doubleValue());
             ps.setDouble(5, grossAmount.doubleValue());
-            ps.setString(6, currency != null && !currency.isBlank() ? currency.trim().toUpperCase() : "EUR");
+            ps.setString(6, currency != null && !currency.isBlank() ? currency.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setDouble(7, (exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0)
                     ? exchangeRate.doubleValue() : hu.due.rewear.model.CurrencyCode.DEFAULT_EUR_HUF_RATE.doubleValue());
             ps.setLong(8, invoiceId);

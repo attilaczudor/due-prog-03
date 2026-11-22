@@ -2,6 +2,7 @@ package hu.due.rewear.model;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 /**
  * B2B customer sales order with reversible dispatch lifecycle ({@link OrderStatus}) and native currency code.
@@ -22,7 +23,7 @@ public record Order(
         LocalDateTime shippedAt
 ) {
     public String effectiveCurrencyCode() {
-        return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase() : "EUR";
+        return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase(Locale.ROOT) : "EUR";
     }
 
     public int currencyDecimals() {

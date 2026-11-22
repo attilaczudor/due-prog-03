@@ -24,6 +24,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.Locale;
 
 /**
  * Coordinates transactional package intake, relocation, stocktake verification, and disposal.
@@ -92,7 +93,7 @@ public final class InventoryService {
                             qualityGrade.code(),
                             packageType.code(),
                             weightKg,
-                            preferredFirstHex.toUpperCase()
+                            preferredFirstHex.toUpperCase(Locale.ROOT)
                     );
                     if (!batchCodes.contains(candidate) && !packageDao.existsByQrCode(conn, candidate)) {
                         qrCode = candidate;
@@ -260,55 +261,57 @@ public final class InventoryService {
             throw new IllegalArgumentException("Weight must be positive.");
         }
 
-        InventoryPackage existing = packageDao.findById(packageId)
-                .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
+        String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
+        LocalDateTime now = LocalDateTime.now();
 
-        LocalDateTime entryTime = existing.createdAt() != null ? existing.createdAt() : LocalDateTime.now();
-        String preferredQr = codeService.buildCode(
-                entryTime,
-                targetGroup.code(),
-                garmentType.code(),
-                qualityGrade.code(),
-                packageType.code(),
-                weightKg,
-                existing.hexSuffix()
-        );
+        String finalQr = db.executeInTransaction(conn -> {
+            InventoryPackage existing = packageDao.findById(conn, packageId)
+                    .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
 
-        String finalQr;
-        if (preferredQr.equalsIgnoreCase(existing.qrCode()) || !packageDao.existsByQrCode(preferredQr)) {
-            finalQr = preferredQr;
-        } else {
-            finalQr = codeService.generateUniqueCode(
+            LocalDateTime entryTime = existing.createdAt() != null ? existing.createdAt() : now;
+            String preferredQr = codeService.buildCode(
                     entryTime,
                     targetGroup.code(),
                     garmentType.code(),
                     qualityGrade.code(),
                     packageType.code(),
                     weightKg,
-                    packageDao::existsByQrCode
+                    existing.hexSuffix()
             );
-        }
-        String finalHex = finalQr.substring(finalQr.length() - 2);
-        String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
-        LocalDateTime now = LocalDateTime.now();
 
-        boolean locationChanged = existing.locationId() != location.id();
-        boolean codeChanged = !finalQr.equalsIgnoreCase(existing.qrCode());
-        MovementType auditType = locationChanged ? MovementType.RELOCATE : MovementType.SCAN_VERIFY;
-        String auditNote = codeChanged
-                ? "Edited details (" + existing.qrCode() + " -> " + finalQr + ")"
-                : (locationChanged ? "Edited details & relocated" : "Edited package details");
+            String resolvedQr;
+            if (preferredQr.equalsIgnoreCase(existing.qrCode()) || !packageDao.existsByQrCode(conn, preferredQr)) {
+                resolvedQr = preferredQr;
+            } else {
+                resolvedQr = codeService.generateUniqueCode(
+                        entryTime,
+                        targetGroup.code(),
+                        garmentType.code(),
+                        qualityGrade.code(),
+                        packageType.code(),
+                        weightKg,
+                        candidate -> existsInTransaction(conn, candidate)
+                );
+            }
+            String finalHex = resolvedQr.substring(resolvedQr.length() - 2);
 
-        db.runInTransaction(conn -> {
+            boolean locationChanged = existing.locationId() != location.id();
+            boolean codeChanged = !resolvedQr.equalsIgnoreCase(existing.qrCode());
+            MovementType auditType = locationChanged ? MovementType.RELOCATE : MovementType.SCAN_VERIFY;
+            String auditNote = codeChanged
+                    ? "Edited details (" + existing.qrCode() + " -> " + resolvedQr + ")"
+                    : (locationChanged ? "Edited details & relocated" : "Edited package details");
+
             packageDao.updateDetails(
-                    conn, packageId, finalQr,
+                    conn, packageId, resolvedQr,
                     targetGroup.id(), garmentType.id(), qualityGrade.id(), packageType.id(),
                     location.id(), weightKg, finalHex, status, cleanNotes, now
             );
             movementDao.insert(conn, packageId, auditType, existing.locationId(), location.id(), userId, auditNote, now);
+            return resolvedQr;
         });
 
-        LOG.info("Updated package id={} ({} -> {}) by userId={}", packageId, existing.qrCode(), finalQr, userId);
+        LOG.info("Updated package id={} (qr={}) by userId={}", packageId, finalQr, userId);
         return packageDao.findById(packageId).orElseThrow();
     }
 }

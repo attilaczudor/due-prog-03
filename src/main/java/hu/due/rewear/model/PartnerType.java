@@ -1,5 +1,7 @@
 package hu.due.rewear.model;
 
+import java.util.Locale;
+
 /**
  * Classifies B2B business partners as Buyers (Customers), Providers (Suppliers/Vendors we pay), or Both.
  */
@@ -21,7 +23,7 @@ public enum PartnerType {
             return CUSTOMER;
         }
         try {
-            return PartnerType.valueOf(raw.trim().toUpperCase());
+            return PartnerType.valueOf(raw.trim().toUpperCase(Locale.ROOT));
         } catch (IllegalArgumentException e) {
             return CUSTOMER;
         }

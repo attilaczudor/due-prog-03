@@ -3,6 +3,7 @@ package hu.due.rewear.model;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 /**
  * Outgoing (revenue) or Incoming (expense) invoice header preserving its native currency,
@@ -36,7 +37,7 @@ public record Invoice(
         LocalDateTime createdAt
 ) {
     public String effectiveCurrencyCode() {
-        return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase() : "EUR";
+        return (currency != null && !currency.isBlank()) ? currency.trim().toUpperCase(Locale.ROOT) : "EUR";
     }
 
     public int currencyDecimals() {
@@ -45,7 +46,7 @@ public record Invoice(
 
     public String effectiveTaxTypeCode() {
         if (taxTypeCode != null && !taxTypeCode.isBlank()) {
-            return taxTypeCode.trim().toUpperCase();
+            return taxTypeCode.trim().toUpperCase(Locale.ROOT);
         }
         if (vatRate != null && vatRate.compareTo(BigDecimal.ZERO) == 0) {
             return "EU-0";

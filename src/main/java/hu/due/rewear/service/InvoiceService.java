@@ -29,6 +29,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Manages multi-currency Outgoing (revenue) and Incoming (expense) invoices with country-aware
@@ -246,12 +247,12 @@ public final class InvoiceService {
         if (unitPrice == null || unitPrice.compareTo(BigDecimal.ZERO) < 0) {
             throw new IllegalArgumentException("Unit price must be >= 0.");
         }
-        String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR";
+        String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR";
         int decimals = financeConfigDao.decimalPlacesFor(cur);
         BigDecimal effectiveVat = vatRate != null && vatRate.compareTo(BigDecimal.ZERO) >= 0
                 ? vatRate.setScale(2, RoundingMode.HALF_UP) : DEFAULT_VAT_RATE;
         String effectiveTaxCode = (taxTypeCode != null && !taxTypeCode.isBlank())
-                ? taxTypeCode.trim().toUpperCase()
+                ? taxTypeCode.trim().toUpperCase(Locale.ROOT)
                 : (effectiveVat.compareTo(BigDecimal.ZERO) == 0 ? "EU-0" : "HU-27");
 
         BigDecimal roundedUnit = CurrencyDef.roundForScale(unitPrice, decimals);

@@ -12,13 +12,12 @@ import java.sql.SQLException;
 import java.util.Optional;
 
 /**
- * Persists portable workspace settings inside SQLite ({@code app_settings}) so exchange rates
- * and reporting currency preferences travel alongside the database file across machines.
+ * Persists portable workspace settings inside SQLite ({@code app_settings}) so reference exchange
+ * rates and future workspace preferences travel alongside the database file across machines.
  */
 public final class SettingsDao {
 
     public static final String KEY_EUR_HUF_RATE = "fx.eur_huf";
-    public static final String KEY_REPORTING_CURRENCY = "finance.reporting_currency";
 
     private final DatabaseManager db;
 
@@ -75,15 +74,5 @@ public final class SettingsDao {
             throw new IllegalArgumentException("EUR/HUF exchange rate must be > 0.");
         }
         set(KEY_EUR_HUF_RATE, rate.setScale(2, RoundingMode.HALF_UP).toPlainString());
-    }
-
-    public CurrencyCode getReportingCurrency() {
-        return get(KEY_REPORTING_CURRENCY)
-                .map(CurrencyCode::parse)
-                .orElse(CurrencyCode.HUF);
-    }
-
-    public void setReportingCurrency(CurrencyCode currency) {
-        set(KEY_REPORTING_CURRENCY, (currency != null ? currency : CurrencyCode.HUF).name());
     }
 }

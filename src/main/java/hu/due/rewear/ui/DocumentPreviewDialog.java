@@ -229,6 +229,7 @@ public final class DocumentPreviewDialog extends JDialog {
                 canvas.repaint();
             }
         });
+        BrutalistStyle.styleSecondaryButtons(prevPageBtn, nextPageBtn);
         pager.add(prevPageBtn);
         pager.add(pageIndicatorLabel);
         pager.add(nextPageBtn);

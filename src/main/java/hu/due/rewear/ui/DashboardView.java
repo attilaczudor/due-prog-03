@@ -72,9 +72,7 @@ public final class DashboardView extends JPanel implements NavigableView {
 
     private final JLabel recentTitleLabel = new JLabel();
     private final JButton refreshBtn = new JButton();
-    private final DefaultTableModel recentModel = new DefaultTableModel() {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
+    private final DefaultTableModel recentModel = BrutalistStyle.nonEditableTableModel();
     private final JTable recentTable = new JTable(recentModel);
     private List<StockMovement> recentMovements = List.of();
 
@@ -85,9 +83,8 @@ public final class DashboardView extends JPanel implements NavigableView {
         setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
 
         buildUi();
+        applyChromeThemeOnly();
         applyTranslations();
-        applyTheme();
-        refreshData();
     }
 
     private void buildUi() {
@@ -312,8 +309,7 @@ public final class DashboardView extends JPanel implements NavigableView {
         refreshData();
     }
 
-    @Override
-    public void applyTheme() {
+    private void applyChromeThemeOnly() {
         setBackground(ThemeManager.bg());
         chartsGrid.setBackground(ThemeManager.bg());
         BrutalistStyle.applyBoxCard(kpiCard1, 14, 16);
@@ -330,9 +326,15 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiValue4.setForeground(ThemeManager.fg());
         recentTitleLabel.setForeground(ThemeManager.fg());
 
+        BrutalistStyle.styleSecondaryButton(refreshBtn);
         BrutalistStyle.applyBoxCard(qualityChartHost, 8, 8);
         BrutalistStyle.applyBoxCard(garmentChartHost, 8, 8);
         BrutalistStyle.styleTable(recentTable);
+    }
+
+    @Override
+    public void applyTheme() {
+        applyChromeThemeOnly();
         rebuildCharts();
     }
 }

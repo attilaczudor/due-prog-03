@@ -143,7 +143,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         wireEvents();
         applyTranslations();
         applyTheme();
-        refreshData();
     }
 
     private void buildInvoicesTab() {

@@ -70,7 +70,6 @@ public final class DictionariesView extends JPanel implements NavigableView {
         buildUi();
         wireEvents();
         applyTranslations();
-        refreshData();
     }
 
     private static JTable createTable(DefaultTableModel model) {
@@ -283,6 +282,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
         JButton convertBtn = new JButton(i18n.t("currency.convert_btn") + " (1 EUR = " + CurrencyCode.EUR.formatPlain(fxRate) + " HUF)");
+        BrutalistStyle.styleSecondaryButton(convertBtn);
         convertBtn.addActionListener(e -> convertEurHufFields(eurF, hufF, fxRate));
 
         JPanel form = buildBaseForm(codeF, enF, huF, null);
@@ -333,6 +333,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
         JButton convertBtn = new JButton(i18n.t("currency.convert_btn") + " (1 EUR = " + CurrencyCode.EUR.formatPlain(fxRate) + " HUF)");
+        BrutalistStyle.styleSecondaryButton(convertBtn);
         convertBtn.addActionListener(e -> convertEurHufFields(eurF, hufF, fxRate));
 
         JPanel form = buildBaseForm(codeF, enF, huF, null);
@@ -564,6 +565,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(addBtn);
+        BrutalistStyle.styleSecondaryButtons(editBtn, toggleActiveBtn, deleteBtn, refreshBtn);
         BrutalistStyle.styleTable(targetTable);
         BrutalistStyle.styleTable(garmentTable);
         BrutalistStyle.styleTable(qualityTable);

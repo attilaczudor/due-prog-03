@@ -20,6 +20,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.stream.Collectors;
+import java.util.Locale;
 
 /**
  * Executes the bundled SQLite 3NF schema DDL idempotently on application startup.
@@ -174,10 +175,9 @@ public final class SchemaInitializer {
     }
 
     private void ensureMultiCurrencySchema(Connection conn) throws SQLException {
-        // 1. Seed default FX rate & reporting currency in app_settings if missing
+        // 1. Seed default reference EUR/HUF rate in app_settings if missing (used by dictionary price converter)
         try (Statement stmt = conn.createStatement()) {
             stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('fx.eur_huf', '400.00')");
-            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('finance.reporting_currency', 'HUF')");
         }
 
         // 2. Add dual-currency columns to existing tables if upgrading from an older DB
@@ -224,10 +224,10 @@ public final class SchemaInitializer {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
             while (rs.next()) {
-                cols.add(rs.getString("name").toLowerCase());
+                cols.add(rs.getString("name").toLowerCase(Locale.ROOT));
             }
         }
-        if (!cols.contains(column.toLowerCase())) {
+        if (!cols.contains(column.toLowerCase(Locale.ROOT))) {
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
             }
@@ -296,7 +296,7 @@ public final class SchemaInitializer {
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("PRAGMA table_info(users)")) {
             while (rs.next()) {
-                existing.add(rs.getString("name").toLowerCase());
+                existing.add(rs.getString("name").toLowerCase(Locale.ROOT));
             }
         }
         try (Statement stmt = conn.createStatement()) {

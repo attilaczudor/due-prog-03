@@ -71,9 +71,7 @@ public final class EditPackageDialog extends JDialog {
     private final JLabel liveCodeLabel = new JLabel("", SwingConstants.CENTER);
     private final JLabel codeChangedHint = new JLabel(" ", SwingConstants.CENTER);
 
-    private final DefaultTableModel historyModel = new DefaultTableModel() {
-        @Override public boolean isCellEditable(int r, int c) { return false; }
-    };
+    private final DefaultTableModel historyModel = BrutalistStyle.nonEditableTableModel();
     private final JTable historyTable = new JTable(historyModel);
 
     private InventoryPackage updatedPackage;

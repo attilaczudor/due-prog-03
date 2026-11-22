@@ -17,6 +17,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Data Access Object for physical sorted-clothing packages ({@code inventory_packages} table).
@@ -64,14 +65,14 @@ public final class InventoryPackageDao {
                 """;
         String ts = DaoDateUtil.format(createdAt);
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            ps.setString(1, qrCode.trim().toUpperCase());
+            ps.setString(1, qrCode.trim().toUpperCase(Locale.ROOT));
             ps.setLong(2, targetGroupId);
             ps.setLong(3, garmentTypeId);
             ps.setLong(4, qualityGradeId);
             ps.setLong(5, packageTypeId);
             ps.setLong(6, locationId);
             ps.setDouble(7, weightKg.doubleValue());
-            ps.setString(8, hexSuffix.trim().toUpperCase());
+            ps.setString(8, hexSuffix.trim().toUpperCase(Locale.ROOT));
             ps.setString(9, status.name());
             ps.setString(10, notes);
             ps.setLong(11, createdBy);
@@ -227,14 +228,14 @@ public final class InventoryPackageDao {
                 WHERE id = ?
                 """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, qrCode.trim().toUpperCase());
+            ps.setString(1, qrCode.trim().toUpperCase(Locale.ROOT));
             ps.setLong(2, targetGroupId);
             ps.setLong(3, garmentTypeId);
             ps.setLong(4, qualityGradeId);
             ps.setLong(5, packageTypeId);
             ps.setLong(6, locationId);
             ps.setDouble(7, weightKg.doubleValue());
-            ps.setString(8, hexSuffix.trim().toUpperCase());
+            ps.setString(8, hexSuffix.trim().toUpperCase(Locale.ROOT));
             ps.setString(9, status.name());
             ps.setString(10, notes);
             ps.setString(11, DaoDateUtil.format(updatedAt));

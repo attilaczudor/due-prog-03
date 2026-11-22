@@ -14,6 +14,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Manages the four normalized QR code dictionary tables:
@@ -58,7 +59,7 @@ public final class DictionaryDao {
     public long insertTargetGroup(Connection conn, String code, String nameEn, String nameHu) throws SQLException {
         String sql = "INSERT INTO target_groups (code, name_en, name_hu, active) VALUES (?, ?, ?, 1)";
         return executeInsertWithKey(conn, sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
         });
@@ -67,7 +68,7 @@ public final class DictionaryDao {
     public void updateTargetGroup(long id, String code, String nameEn, String nameHu, boolean active) {
         String sql = "UPDATE target_groups SET code = ?, name_en = ?, name_hu = ?, active = ? WHERE id = ?";
         executeUpdate(sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setInt(4, active ? 1 : 0);
@@ -129,7 +130,7 @@ public final class DictionaryDao {
                 VALUES (?, ?, ?, ?, ?, 1)
                 """;
         return executeInsertWithKey(conn, sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setDouble(4, priceEurPerKg != null ? priceEurPerKg.doubleValue() : 0.0);
@@ -145,7 +146,7 @@ public final class DictionaryDao {
                 WHERE id = ?
                 """;
         executeUpdate(sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setDouble(4, priceEurPerKg != null ? priceEurPerKg.doubleValue() : 0.0);
@@ -212,7 +213,7 @@ public final class DictionaryDao {
                 VALUES (?, ?, ?, ?, ?, 1)
                 """;
         return executeInsertWithKey(conn, sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setDouble(4, defaultPricePerKg != null ? defaultPricePerKg.doubleValue() : 0.0);
@@ -228,7 +229,7 @@ public final class DictionaryDao {
                 WHERE id = ?
                 """;
         executeUpdate(sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setDouble(4, defaultPricePerKg != null ? defaultPricePerKg.doubleValue() : 0.0);
@@ -284,7 +285,7 @@ public final class DictionaryDao {
                 VALUES (?, ?, ?, ?, ?, 1)
                 """;
         return executeInsertWithKey(conn, sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setDouble(4, tareWeightKg.doubleValue());
@@ -300,7 +301,7 @@ public final class DictionaryDao {
                 WHERE id = ?
                 """;
         executeUpdate(sql, ps -> {
-            ps.setString(1, code.trim().toUpperCase());
+            ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
             ps.setDouble(4, tareWeightKg.doubleValue());

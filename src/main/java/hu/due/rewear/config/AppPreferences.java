@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Properties;
+import java.util.Locale;
 
 /**
  * Persists lightweight UI preferences (language, dark/light theme, external CSV translation path).
@@ -64,7 +65,7 @@ public final class AppPreferences {
 
     public void setLanguage(String languageCode) {
         if (languageCode != null && !languageCode.isBlank()) {
-            props.setProperty(KEY_LANGUAGE, languageCode.trim().toLowerCase());
+            props.setProperty(KEY_LANGUAGE, languageCode.trim().toLowerCase(Locale.ROOT));
             save();
         }
     }

@@ -82,8 +82,6 @@ public final class CustomersView extends JPanel implements NavigableView {
         buildUi();
         wireEvents();
         applyTranslations();
-        applyBrutalistTheme();
-        refreshData();
     }
 
     private void buildUi() {

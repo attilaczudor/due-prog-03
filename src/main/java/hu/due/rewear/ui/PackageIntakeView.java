@@ -111,7 +111,6 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
 
         buildUi();
         wireEvents();
-        refreshData();
         applyTranslations();
     }
 
@@ -567,6 +566,9 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
             BrutalistStyle.applyBoxCard(previewCardPanel, 18, 20);
         }
         BrutalistStyle.stylePrimaryButton(saveAndPrintBtn);
+        BrutalistStyle.styleSecondaryButtons(
+                addTargetBtn, addGarmentBtn, addQualityBtn, addPackageTypeBtn,
+                regenHexBtn, saveOnlyBtn);
         generatedCodeValue.setForeground(ThemeManager.fg());
         generatedCodeValue.setBorder(BrutalistStyle.boxBorder(8, 12));
         decodedSummaryLabel.setForeground(ThemeManager.fg());

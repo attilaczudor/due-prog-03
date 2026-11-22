@@ -112,6 +112,18 @@ public final class BrutalistStyle {
         ));
     }
 
+    /** Convenience batch overload to apply {@link #styleSecondaryButton(JButton)} across a toolbar or dialog. */
+    public static void styleSecondaryButtons(JButton... buttons) {
+        if (buttons == null) {
+            return;
+        }
+        for (JButton b : buttons) {
+            if (b != null) {
+                styleSecondaryButton(b);
+            }
+        }
+    }
+
     /** Equalizes preferred and minimum sizes across a group of buttons so they align identically. */
     public static void matchButtonSizes(JButton... buttons) {
         if (buttons == null || buttons.length == 0) {

@@ -21,6 +21,7 @@ import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 
 /**
  * Coordinates B2B customer order lifecycle and atomic, reversible stock reservation/dispatch transitions.
@@ -57,7 +58,7 @@ public final class OrderService {
 
     public Order createOrder(long customerId, String currencyCode, String notes, long userId) {
         LocalDateTime now = LocalDateTime.now();
-        String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR";
+        String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR";
         String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
         long orderId = db.executeInTransaction(conn -> {
             String orderNumber = orderDao.generateNextOrderNumber(conn);
@@ -119,7 +120,7 @@ public final class OrderService {
             throw new IllegalStateException("Cannot change currency for order in status: " + order.status());
         }
         String cur = (targetCurrencyCode != null && !targetCurrencyCode.isBlank())
-                ? targetCurrencyCode.trim().toUpperCase() : "EUR";
+                ? targetCurrencyCode.trim().toUpperCase(Locale.ROOT) : "EUR";
         if (order.effectiveCurrencyCode().equalsIgnoreCase(cur)) {
             return order;
         }

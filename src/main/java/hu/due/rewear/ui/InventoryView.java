@@ -82,12 +82,7 @@ public final class InventoryView extends JPanel implements NavigableView {
     private final JButton discardBtn = new JButton();
     private final JButton exportCsvBtn = new JButton();
 
-    private final DefaultTableModel tableModel = new DefaultTableModel() {
-        @Override
-        public boolean isCellEditable(int row, int column) {
-            return false;
-        }
-    };
+    private final DefaultTableModel tableModel = BrutalistStyle.nonEditableTableModel();
     private final JTable table = new JTable(tableModel);
     private final JLabel summaryLabel = new JLabel(" ");
 
@@ -111,7 +106,6 @@ public final class InventoryView extends JPanel implements NavigableView {
         buildUi();
         wireEvents();
         applyTranslations();
-        refreshData();
     }
 
     private void buildUi() {
@@ -400,12 +394,11 @@ public final class InventoryView extends JPanel implements NavigableView {
         header.add(new JLabel(html), BorderLayout.CENTER);
         root.add(header, BorderLayout.NORTH);
 
-        DefaultTableModel histModel = new DefaultTableModel(new Object[]{
+        DefaultTableModel histModel = BrutalistStyle.nonEditableTableModel();
+        histModel.setColumnIdentifiers(new Object[]{
                 i18n.t("common.created_at"), i18n.t("common.actions"),
                 i18n.t("intake.location"), i18n.t("scanner.field.operator")
-        }, 0) {
-            @Override public boolean isCellEditable(int row, int col) { return false; }
-        };
+        });
         for (StockMovement m : ctx.getMovementDao().findByPackageId(pkg.id())) {
             String fromTo = (m.fromLocationCode() != null ? m.fromLocationCode() : "—")
                     + " -> " + (m.toLocationCode() != null ? m.toLocationCode() : "—");
@@ -422,8 +415,10 @@ public final class InventoryView extends JPanel implements NavigableView {
 
         JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
         JButton printBtn = new JButton(i18n.t("scanner.action.reprint"));
+        BrutalistStyle.stylePrimaryButton(printBtn);
         printBtn.addActionListener(e -> PrintPreviewDialog.showPreview(dialog, ctx, List.of(pkg), LabelPreset.THERMAL_100X150));
         JButton closeBtn = new JButton(i18n.t("common.close"));
+        BrutalistStyle.styleSecondaryButton(closeBtn);
         closeBtn.addActionListener(e -> dialog.dispose());
         south.add(printBtn);
         south.add(closeBtn);
@@ -588,6 +583,9 @@ public final class InventoryView extends JPanel implements NavigableView {
             BrutalistStyle.applyBoxCard(filterBarPanel, 6, 8);
         }
         BrutalistStyle.stylePrimaryButton(batchPrintBtn);
+        BrutalistStyle.styleSecondaryButtons(
+                searchBtn, clearBtn, refreshBtn,
+                detailsBtn, editBtn, relocateBtn, printSingleBtn, discardBtn, exportCsvBtn);
         BrutalistStyle.styleTable(table);
         table.repaint();
     }

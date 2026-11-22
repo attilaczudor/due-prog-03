@@ -1,6 +1,7 @@
 package hu.due.rewear.model;
 
 import java.time.LocalDateTime;
+import java.util.Locale;
 
 /**
  * B2B Business Partner: can be a Buyer (CUSTOMER), a Provider/Vendor we pay (SUPPLIER), or BOTH.
@@ -29,7 +30,7 @@ public record Customer(
 
     public String effectiveCurrencyCode() {
         return (preferredCurrency != null && !preferredCurrency.isBlank())
-                ? preferredCurrency.trim().toUpperCase() : "EUR";
+                ? preferredCurrency.trim().toUpperCase(Locale.ROOT) : "EUR";
     }
 
     @Override

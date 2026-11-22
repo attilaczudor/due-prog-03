@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Data Access Object for B2B business partners ({@code customers} table), covering
@@ -124,7 +125,7 @@ public final class CustomerDao {
             ps.setString(7, taxNumber);
             ps.setString(8, CountryDirectory.normalizeCode(countryCode));
             ps.setString(9, preferredCurrency != null && !preferredCurrency.isBlank()
-                    ? preferredCurrency.trim().toUpperCase() : "EUR");
+                    ? preferredCurrency.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setString(10, DaoDateUtil.format(createdAt));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
@@ -161,7 +162,7 @@ public final class CustomerDao {
             ps.setString(7, taxNumber);
             ps.setString(8, CountryDirectory.normalizeCode(countryCode));
             ps.setString(9, preferredCurrency != null && !preferredCurrency.isBlank()
-                    ? preferredCurrency.trim().toUpperCase() : "EUR");
+                    ? preferredCurrency.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setInt(10, active ? 1 : 0);
             ps.setLong(11, id);
             ps.executeUpdate();

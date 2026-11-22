@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Locale;
 
 /**
  * Data Access Object for B2B customer orders ({@code orders} table), supporting sequential yearly
@@ -159,7 +160,7 @@ public final class OrderDao {
             ps.setString(1, orderNumber);
             ps.setLong(2, customerId);
             ps.setString(3, status.name());
-            ps.setString(4, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR");
+            ps.setString(4, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setDouble(5, totalWeightKg.doubleValue());
             ps.setDouble(6, totalPrice.doubleValue());
             ps.setString(7, notes);
@@ -179,7 +180,7 @@ public final class OrderDao {
     public void updateCurrency(Connection conn, long orderId, String currencyCode) throws SQLException {
         String sql = "UPDATE orders SET currency = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase() : "EUR");
+            ps.setString(1, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setLong(2, orderId);
             ps.executeUpdate();
         }
@@ -212,7 +213,7 @@ public final class OrderDao {
                 rs.getLong("customer_id"),
                 rs.getString("customer_name"),
                 OrderStatus.valueOf(rs.getString("status")),
-                rs.getString("currency") != null ? rs.getString("currency").trim().toUpperCase() : "EUR",
+                rs.getString("currency") != null ? rs.getString("currency").trim().toUpperCase(Locale.ROOT) : "EUR",
                 BigDecimal.valueOf(rs.getDouble("total_weight_kg")),
                 BigDecimal.valueOf(rs.getDouble("total_price")),
                 rs.getString("notes"),

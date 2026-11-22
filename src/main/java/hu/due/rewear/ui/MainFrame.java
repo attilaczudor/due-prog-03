@@ -30,6 +30,7 @@ import java.awt.event.MouseEvent;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.Supplier;
 
 /**
  * Main ReWear WMS application window styled in stark Brutalist Monochrome (Light & Dark),
@@ -57,6 +58,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel contentHost = new JPanel(cardLayout);
+    private final Map<String, Supplier<NavigableView>> viewFactories = new LinkedHashMap<>();
     private final Map<String, NavigableView> views = new LinkedHashMap<>();
     private final Map<String, JToggleButton> navButtons = new LinkedHashMap<>();
     private ButtonGroup navGroup = new ButtonGroup();
@@ -95,9 +97,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         buildUi();
         registerDefaultViews();
-        refreshUserProfileCard();
         applyTranslations();
-        applySidebarState();
         applyBrutalistChrome();
 
         ctx.getI18n().addListener(this);
@@ -365,16 +365,21 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     }
 
     private void registerDefaultViews() {
-        registerView(new DashboardView(ctx));
-        registerView(new PackageIntakeView(ctx));
-        registerView(new QrScannerView(ctx));
-        registerView(new InventoryView(ctx));
-        registerView(new LocationsView(ctx));
-        registerView(new DictionariesView(ctx));
-        registerView(new CustomersView(ctx));
-        registerView(new OrdersView(ctx));
-        registerView(new InvoicesView(ctx));
-        registerView(new AdminView(ctx));
+        // Lazy factories: views are instantiated on first navigation so login only loads DashboardView
+        registerViewFactory(VIEW_DASHBOARD, () -> new DashboardView(ctx));
+        registerViewFactory(VIEW_INTAKE, () -> new PackageIntakeView(ctx));
+        registerViewFactory(VIEW_SCANNER, () -> new QrScannerView(ctx));
+        registerViewFactory(VIEW_INVENTORY, () -> new InventoryView(ctx));
+        registerViewFactory(VIEW_LOCATIONS, () -> new LocationsView(ctx));
+        registerViewFactory(VIEW_DICTIONARIES, () -> new DictionariesView(ctx));
+        registerViewFactory(VIEW_CUSTOMERS, () -> new CustomersView(ctx));
+        registerViewFactory(VIEW_ORDERS, () -> new OrdersView(ctx));
+        registerViewFactory(VIEW_INVOICES, () -> new InvoicesView(ctx));
+        registerViewFactory(VIEW_ADMIN, () -> new AdminView(ctx));
+    }
+
+    private void registerViewFactory(String viewKey, Supplier<NavigableView> factory) {
+        viewFactories.put(viewKey, factory);
     }
 
     public void registerView(NavigableView view) {
@@ -384,8 +389,15 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     public void navigateTo(String viewKey) {
         NavigableView view = views.get(viewKey);
+        boolean newlyCreated = false;
         if (view == null) {
-            return;
+            Supplier<NavigableView> factory = viewFactories.get(viewKey);
+            if (factory == null) {
+                return;
+            }
+            view = factory.get();
+            registerView(view);
+            newlyCreated = true;
         }
         currentViewKey = viewKey;
         JToggleButton btn = navButtons.get(viewKey);
@@ -395,7 +407,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         updateNavButtonStyles();
         activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()).toUpperCase(Locale.ROOT));
         cardLayout.show(contentHost, viewKey);
-        view.refreshData();
+        if (!newlyCreated) {
+            view.refreshData();
+        }
     }
 
     private void openProfileSettings() {

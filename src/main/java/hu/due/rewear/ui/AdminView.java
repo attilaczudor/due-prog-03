@@ -96,7 +96,6 @@ public final class AdminView extends JPanel implements NavigableView {
         wireEvents();
         applyTranslations();
         applyTheme();
-        refreshData();
     }
 
     private void buildUi() {
@@ -515,6 +514,10 @@ public final class AdminView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(addUserBtn);
         BrutalistStyle.stylePrimaryButton(backupDbBtn);
         BrutalistStyle.stylePrimaryButton(loadI18nBtn);
+        BrutalistStyle.styleSecondaryButtons(
+                editUserBtn, resetPwBtn, refreshUsersBtn,
+                refreshAuditBtn, exportAuditBtn,
+                restoreDbBtn, exportI18nBtn, resetI18nBtn);
         BrutalistStyle.applyBoxCard(dbCard, 14, 16);
         BrutalistStyle.applyBoxCard(i18nCard, 14, 16);
         BrutalistStyle.styleTable(usersTable);
