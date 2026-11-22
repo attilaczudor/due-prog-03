@@ -307,7 +307,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
             BigDecimal priceEur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(eurF.getText()));
             BigDecimal priceHuf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(hufF.getText()));
             if (priceEur.compareTo(BigDecimal.ZERO) < 0 || priceHuf.compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("Prices must be >= 0");
+                throw new IllegalArgumentException(i18n.t("validation.prices_non_negative"));
             }
             if (existing == null) {
                 ctx.getDictionaryDao().insertGarmentType(code, requireText(enF), requireText(huF), priceEur, priceHuf);
@@ -357,7 +357,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
             BigDecimal priceEur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(eurF.getText()));
             BigDecimal priceHuf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(hufF.getText()));
             if (priceEur.compareTo(BigDecimal.ZERO) < 0 || priceHuf.compareTo(BigDecimal.ZERO) < 0) {
-                throw new IllegalArgumentException("Prices must be >= 0");
+                throw new IllegalArgumentException(i18n.t("validation.prices_non_negative"));
             }
             if (existing == null) {
                 ctx.getDictionaryDao().insertQualityGrade(code, requireText(enF), requireText(huF), priceEur, priceHuf);
@@ -419,7 +419,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
             BigDecimal tare = new BigDecimal(tareF.getText().trim().replace(',', '.'));
             BigDecimal maxW = new BigDecimal(maxF.getText().trim().replace(',', '.'));
             if (tare.compareTo(BigDecimal.ZERO) < 0 || maxW.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("Invalid package weights");
+                throw new IllegalArgumentException(i18n.t("validation.invalid_package_weights"));
             }
             if (existing == null) {
                 ctx.getDictionaryDao().insertPackageType(code, requireText(enF), requireText(huF), tare, maxW);
@@ -466,10 +466,10 @@ public final class DictionariesView extends JPanel implements NavigableView {
         return code;
     }
 
-    private static String requireText(JTextField field) {
+    private String requireText(JTextField field) {
         String text = field.getText().trim();
         if (text.isEmpty()) {
-            throw new IllegalArgumentException("English and Hungarian names are required.");
+            throw new IllegalArgumentException(ctx.getI18n().t("validation.names_bilingual_required"));
         }
         return text;
     }

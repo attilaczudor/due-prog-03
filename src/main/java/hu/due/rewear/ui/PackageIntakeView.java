@@ -10,6 +10,7 @@ import hu.due.rewear.model.QualityGrade;
 import hu.due.rewear.model.TargetGroup;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.LabelPreset;
+import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -379,7 +380,7 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
 
             locationCombo.removeAllItems();
             for (WarehouseLocation item : ctx.getLocationDao().findAll(true)) {
-                String label = item.code() + " (" + stripZeros(item.usedWeightKg()) + " / " + stripZeros(item.maxCapacityKg()) + " kg)";
+                String label = item.code() + " (" + FormatUtil.stripZeros(item.usedWeightKg()) + " / " + FormatUtil.stripZeros(item.maxCapacityKg()) + " kg)";
                 ComboEntry<WarehouseLocation> entry = new ComboEntry<>(item, label);
                 locationCombo.addItem(entry);
                 if (locationId != null && item.id() == locationId) {
@@ -420,7 +421,7 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
             decodedSummaryLabel.setText("<html><center>"
                     + tg.localizedName(lang) + " &bull; " + gt.localizedName(lang) + "<br>"
                     + qg.localizedName(lang) + " &bull; " + pt.localizedName(lang)
-                    + " &bull; <b>" + stripZeros(weight) + " " + ctx.getI18n().t("common.kg") + "</b>"
+                    + " &bull; <b>" + FormatUtil.stripZeros(weight) + " " + ctx.getI18n().t("common.kg") + "</b>"
                     + "</center></html>");
         } catch (Exception ex) {
             generatedCodeValue.setText("—");
@@ -446,11 +447,11 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
 
         if (projected.compareTo(loc.maxCapacityKg()) > 0) {
             capacityInfoLabel.setForeground(new Color(0xD97706));
-            capacityInfoLabel.setText(i18n.t("intake.validation.capacity", stripZeros(loc.maxCapacityKg())));
+            capacityInfoLabel.setText(i18n.t("intake.validation.capacity", FormatUtil.stripZeros(loc.maxCapacityKg())));
         } else {
             capacityInfoLabel.setForeground(new Color(0x059669));
             capacityInfoLabel.setText(i18n.t("intake.capacity_status",
-                    stripZeros(loc.usedWeightKg()), stripZeros(loc.maxCapacityKg()), stripZeros(loc.remainingCapacityKg())));
+                    FormatUtil.stripZeros(loc.usedWeightKg()), FormatUtil.stripZeros(loc.maxCapacityKg()), FormatUtil.stripZeros(loc.remainingCapacityKg())));
         }
     }
 
@@ -468,14 +469,6 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
         } catch (NumberFormatException e) {
             return null;
         }
-    }
-
-    private static String stripZeros(BigDecimal val) {
-        if (val == null) {
-            return "0";
-        }
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
     }
 
     @SuppressWarnings("unchecked")

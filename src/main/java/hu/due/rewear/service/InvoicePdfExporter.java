@@ -278,8 +278,8 @@ public final class InvoicePdfExporter {
 
             String[] cells = {
                     Integer.toString(startIndex + idx + 1),
-                    truncate(item.description(), 46),
-                    stripZeros(item.quantity()),
+                    FormatUtil.truncate(item.description(), 46),
+                    FormatUtil.stripZeros(item.quantity()),
                     item.unit(),
                     CurrencyDef.formatNumeric(item.unitPrice(), decimals),
                     CurrencyDef.formatNumeric(item.lineNet(), decimals)
@@ -315,7 +315,7 @@ public final class InvoicePdfExporter {
             drawSummaryRow(g, i18n.t("invoice.net_amount").toUpperCase(Locale.ROOT) + ":",
                     CurrencyDef.formatAmount(inv.netAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 18);
             drawSummaryRow(g, i18n.t("invoice.vat").toUpperCase(Locale.ROOT)
-                            + " (" + inv.effectiveTaxTypeCode() + " " + stripZeros(inv.vatRate()) + "%):",
+                            + " (" + inv.effectiveTaxTypeCode() + " " + FormatUtil.stripZeros(inv.vatRate()) + "%):",
                     CurrencyDef.formatAmount(inv.vatAmount(), cur, decimals), sx + 10, sx + sumW - 10, y + 36);
 
             g.fillRect(Math.round(sx), Math.round(y + 46), Math.round(sumW), 28);
@@ -363,16 +363,16 @@ public final class InvoicePdfExporter {
         g.drawString(header, x, y);
         g.setColor(Color.BLACK);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
-        g.drawString(truncate(inv.partnerName(), 28), x, y + 16);
+        g.drawString(FormatUtil.truncate(inv.partnerName(), 28), x, y + 16);
         g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 8));
         if (inv.partnerAddress() != null && !inv.partnerAddress().isBlank()) {
-            g.drawString(truncate(inv.partnerAddress(), 34), x, y + 32);
+            g.drawString(FormatUtil.truncate(inv.partnerAddress(), 34), x, y + 32);
         }
         if (inv.partnerTaxNumber() != null && !inv.partnerTaxNumber().isBlank()) {
             g.drawString("TAX: " + inv.partnerTaxNumber(), x, y + 46);
         }
         if (inv.partnerEmail() != null && !inv.partnerEmail().isBlank()) {
-            g.drawString("EMAIL: " + truncate(inv.partnerEmail(), 28), x, y + 60);
+            g.drawString("EMAIL: " + FormatUtil.truncate(inv.partnerEmail(), 28), x, y + 60);
         }
     }
 
@@ -382,20 +382,12 @@ public final class InvoicePdfExporter {
         g.drawString(label, x, y);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 9));
         g.setColor(Color.BLACK);
-        g.drawString(truncate(value, 20), x, y + 15);
+        g.drawString(FormatUtil.truncate(value, 20), x, y + 15);
     }
 
     private static void drawSummaryRow(Graphics2D g, String label, String value, float leftX, float rightX, float y) {
         g.drawString(label, leftX, y);
         int vw = g.getFontMetrics().stringWidth(value);
         g.drawString(value, rightX - vw, y);
-    }
-
-    private static String stripZeros(BigDecimal v) {
-        return FormatUtil.stripZeros(v);
-    }
-
-    private static String truncate(String s, int max) {
-        return FormatUtil.truncate(s, max);
     }
 }

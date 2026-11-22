@@ -13,8 +13,10 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -212,6 +214,25 @@ public final class FinanceConfigDao {
         return findCurrencyByCode(currencyCode)
                 .map(CurrencyDef::decimalPlaces)
                 .orElseGet(() -> CurrencyDef.defaultDecimalsFor(currencyCode));
+    }
+
+    /**
+     * Loads all configured currency decimal precisions in a single SQL query so callers rendering
+     * multi-row tables or summaries never trigger N+1 lookups.
+     */
+    public Map<String, Integer> decimalPlacesMap() {
+        String sql = "SELECT upper(code) AS code, decimal_places FROM currencies";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            Map<String, Integer> map = new HashMap<>();
+            while (rs.next()) {
+                map.put(rs.getString("code"), rs.getInt("decimal_places"));
+            }
+            return map;
+        } catch (SQLException e) {
+            throw new DaoException("Failed to load currency decimal map", e);
+        }
     }
 
     public long insertCurrency(String code, String nameEn, String nameHu, String symbol, int decimalPlaces) {

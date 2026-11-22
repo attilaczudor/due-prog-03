@@ -22,7 +22,6 @@ import java.awt.RenderingHints;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.OutputStream;
-import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
@@ -202,12 +201,12 @@ public final class DeliveryNotePdfExporter {
             g.drawString(truncate(custName, g.getFontMetrics(), leftW - 16), margin + 8, y + 30);
             g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 9));
             if (customer != null) {
-                g.drawString(truncate(safe(customer.address()), g.getFontMetrics(), leftW - 16), margin + 8, y + 45);
-                g.drawString(truncate(safe(customer.contactName()) + "  " + safe(customer.phone()),
+                g.drawString(truncate(FormatUtil.safe(customer.address()), g.getFontMetrics(), leftW - 16), margin + 8, y + 45);
+                g.drawString(truncate(FormatUtil.safe(customer.contactName()) + "  " + FormatUtil.safe(customer.phone()),
                         g.getFontMetrics(), leftW - 16), margin + 8, y + 60);
-                g.drawString(truncate("TAX: " + safe(customer.taxNumber()),
+                g.drawString(truncate("TAX: " + FormatUtil.safe(customer.taxNumber()),
                         g.getFontMetrics(), leftW - 16), margin + 8, y + 75);
-                g.drawString(truncate(safe(customer.email()), g.getFontMetrics(), leftW - 16), margin + 8, y + 88);
+                g.drawString(truncate(FormatUtil.safe(customer.email()), g.getFontMetrics(), leftW - 16), margin + 8, y + 88);
             }
 
             // Order metadata box
@@ -218,7 +217,7 @@ public final class DeliveryNotePdfExporter {
             g.drawString(i18n.t("common.status") + ": " + i18n.t("status.order." + order.status().name()), mx, y + 34);
             g.drawString(i18n.t("common.created_at") + ": " + (order.createdAt() != null ? DT_FMT.format(order.createdAt()) : "-"), mx, y + 49);
             g.drawString("Shipped: " + (order.shippedAt() != null ? DT_FMT.format(order.shippedAt()) : "-"), mx, y + 64);
-            g.drawString(truncate("By: " + safe(order.createdByFullName()), g.getFontMetrics(), midW - 16), mx, y + 79);
+            g.drawString(truncate("By: " + FormatUtil.safe(order.createdByFullName()), g.getFontMetrics(), midW - 16), mx, y + 79);
 
             // Order QR Code
             BufferedImage qrImg = qrService.generateQrImage(order.orderNumber(), 240);
@@ -265,7 +264,7 @@ public final class DeliveryNotePdfExporter {
             g.drawString(Integer.toString(startIndex + i + 1), colX[0] + 3, textY);
             g.drawString(truncate(item.packageQrCode(), g.getFontMetrics(), 176), colX[1] + 2, textY);
             g.drawString(truncate(item.localizedSummary(lang), g.getFontMetrics(), 165), colX[2] + 2, textY);
-            g.drawString(stripZeros(item.weightKg()), colX[3] + 2, textY);
+            g.drawString(FormatUtil.stripZeros(item.weightKg()), colX[3] + 2, textY);
             g.drawString(CurrencyDef.formatNumeric(item.pricePerKg(), decimals), colX[4] + 2, textY);
             g.drawString(CurrencyDef.formatNumeric(item.lineTotal(), decimals), colX[5] + 2, textY);
 
@@ -284,7 +283,7 @@ public final class DeliveryNotePdfExporter {
             g.drawRect(Math.round(sumBoxX), Math.round(y), Math.round(sumBoxW), 48);
 
             g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
-            g.drawString(i18n.t("orders.total_weight") + ": " + stripZeros(order.totalWeightKg()) + " kg",
+            g.drawString(i18n.t("orders.total_weight") + ": " + FormatUtil.stripZeros(order.totalWeightKg()) + " kg",
                     sumBoxX + 10, y + 19);
             g.drawString(i18n.t("orders.total_price") + ": " + CurrencyDef.formatAmount(order.totalPrice(), cur, decimals),
                     sumBoxX + 10, y + 38);
@@ -306,14 +305,6 @@ public final class DeliveryNotePdfExporter {
         String pageStr = i18n.t("print.page_of", pageNum, totalPages);
         g.drawString("REWEAR WMS — " + order.orderNumber(), margin, pageH - 22);
         g.drawString(pageStr, margin + contentW - g.getFontMetrics().stringWidth(pageStr), pageH - 22);
-    }
-
-    private static String safe(String s) {
-        return FormatUtil.safe(s);
-    }
-
-    private static String stripZeros(BigDecimal val) {
-        return FormatUtil.stripZeros(val);
     }
 
     private static String truncate(String text, FontMetrics fm, float maxW) {

@@ -13,6 +13,7 @@ import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.TargetGroup;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.LabelPreset;
+import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
 import javax.swing.ImageIcon;
@@ -329,7 +330,7 @@ public final class InventoryView extends JPanel implements NavigableView {
                     p.garmentTypeCode() + " — " + p.localizedGarmentType(lang),
                     p.qualityGradeCode() + " — " + p.localizedQualityGrade(lang),
                     p.packageTypeCode() + " — " + p.localizedPackageType(lang),
-                    stripZeros(p.weightKg()),
+                    FormatUtil.stripZeros(p.weightKg()),
                     p.locationCode(),
                     p.status(),
                     p.createdAt() != null ? DT_FMT.format(p.createdAt()) : ""
@@ -341,7 +342,7 @@ public final class InventoryView extends JPanel implements NavigableView {
             table.getColumnModel().getColumn(7).setCellRenderer(new StatusCellRenderer());
         }
 
-        summaryLabel.setText(i18n.t("inventory.summary", currentRows.size(), stripZeros(totalWeight)));
+        summaryLabel.setText(i18n.t("inventory.summary", currentRows.size(), FormatUtil.stripZeros(totalWeight)));
     }
 
     private List<InventoryPackage> getSelectedPackages() {
@@ -392,7 +393,7 @@ public final class InventoryView extends JPanel implements NavigableView {
                 + "<b>" + i18n.t("intake.garment_type") + ":</b> " + pkg.garmentTypeCode() + " — " + pkg.localizedGarmentType(lang) + "<br>"
                 + "<b>" + i18n.t("intake.quality_grade") + ":</b> " + pkg.qualityGradeCode() + " — " + pkg.localizedQualityGrade(lang) + "<br>"
                 + "<b>" + i18n.t("intake.package_type") + ":</b> " + pkg.packageTypeCode() + " — " + pkg.localizedPackageType(lang) + "<br>"
-                + "<b>" + i18n.t("intake.weight_kg") + ":</b> " + stripZeros(pkg.weightKg()) + " kg &nbsp;|&nbsp; "
+                + "<b>" + i18n.t("intake.weight_kg") + ":</b> " + FormatUtil.stripZeros(pkg.weightKg()) + " kg &nbsp;|&nbsp; "
                 + "<b>" + i18n.t("intake.location") + ":</b> " + pkg.locationCode() + " &nbsp;|&nbsp; "
                 + "<b>" + i18n.t("common.status") + ":</b> " + i18n.t("status.package." + pkg.status().name())
                 + "</body></html>";
@@ -442,7 +443,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         List<WarehouseLocation> locations = ctx.getLocationDao().findAll(true);
         Object[] options = locations.stream()
-                .map(l -> l.code() + " (" + stripZeros(l.usedWeightKg()) + "/" + stripZeros(l.maxCapacityKg()) + " kg)")
+                .map(l -> l.code() + " (" + FormatUtil.stripZeros(l.usedWeightKg()) + "/" + FormatUtil.stripZeros(l.maxCapacityKg()) + " kg)")
                 .toArray();
         Object chosen = JOptionPane.showInputDialog(this, i18n.t("scanner.relocate.prompt"),
                 i18n.t("scanner.action.relocate"), JOptionPane.PLAIN_MESSAGE, null, options,
@@ -528,14 +529,6 @@ public final class InventoryView extends JPanel implements NavigableView {
     private static <T> T selectedValue(JComboBox<FilterItem<T>> combo) {
         Object o = combo.getSelectedItem();
         return o instanceof FilterItem<?> fi ? ((FilterItem<T>) fi).value() : null;
-    }
-
-    private static String stripZeros(BigDecimal val) {
-        if (val == null) {
-            return "0";
-        }
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
     }
 
     @Override

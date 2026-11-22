@@ -88,28 +88,40 @@ public final class InventoryPackageDao {
     }
 
     public boolean existsByQrCode(String qrCode) {
-        String sql = "SELECT 1 FROM inventory_packages WHERE upper(qr_code) = upper(?) LIMIT 1";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, qrCode.trim());
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next();
-            }
+        try (Connection conn = db.getConnection()) {
+            return existsByQrCode(conn, qrCode);
         } catch (SQLException e) {
             throw new DaoException("Failed to check QR code existence: " + qrCode, e);
         }
     }
 
+    /** Transaction-aware overload that reuses the caller's active SQLite {@link Connection}. */
+    public boolean existsByQrCode(Connection conn, String qrCode) throws SQLException {
+        String sql = "SELECT 1 FROM inventory_packages WHERE upper(qr_code) = upper(?) LIMIT 1";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, qrCode.trim());
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        }
+    }
+
     public Optional<InventoryPackage> findById(long id) {
+        try (Connection conn = db.getConnection()) {
+            return findById(conn, id);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to find package by id: " + id, e);
+        }
+    }
+
+    /** Transaction-aware overload that reuses the caller's active SQLite {@link Connection}. */
+    public Optional<InventoryPackage> findById(Connection conn, long id) throws SQLException {
         String sql = BASE_SELECT + " WHERE ip.id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
             }
-        } catch (SQLException e) {
-            throw new DaoException("Failed to find package by id: " + id, e);
         }
     }
 

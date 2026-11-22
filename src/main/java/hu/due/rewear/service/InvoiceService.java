@@ -306,9 +306,14 @@ public final class InvoiceService {
     public FinancialSummary computeSummary(List<Invoice> invoices) {
         Map<String, MutableTotals> acc = new LinkedHashMap<>();
 
-        // Pre-seed active configured currencies in order so they appear cleanly
-        for (CurrencyDef c : financeConfigDao.findCurrencies(true)) {
-            acc.put(c.code(), new MutableTotals(c.code(), c.decimalPlaces()));
+        // Single query loads all configured currencies (active + inactive) to avoid N+1 decimal lookups
+        List<CurrencyDef> allCurrencies = financeConfigDao.findCurrencies(false);
+        Map<String, Integer> configuredDecimals = new LinkedHashMap<>();
+        for (CurrencyDef c : allCurrencies) {
+            configuredDecimals.put(c.code(), c.decimalPlaces());
+            if (c.active()) {
+                acc.put(c.code(), new MutableTotals(c.code(), c.decimalPlaces()));
+            }
         }
 
         for (Invoice inv : invoices) {
@@ -317,7 +322,7 @@ public final class InvoiceService {
             }
             String cur = inv.effectiveCurrencyCode();
             MutableTotals bucket = acc.computeIfAbsent(cur,
-                    k -> new MutableTotals(k, financeConfigDao.decimalPlacesFor(k)));
+                    k -> new MutableTotals(k, configuredDecimals.getOrDefault(k, CurrencyDef.defaultDecimalsFor(k))));
             BigDecimal amt = CurrencyDef.roundForScale(
                     inv.grossAmount() != null ? inv.grossAmount() : BigDecimal.ZERO, bucket.decimals);
             if (inv.direction() == InvoiceDirection.OUTGOING) {

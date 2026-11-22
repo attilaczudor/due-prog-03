@@ -37,7 +37,6 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Toolkit;
-import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
@@ -200,7 +199,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         List<Customer> activeCustomers = ctx.getCustomerDao().findBuyers(true);
         if (activeCustomers.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No active buyers available.",
+            JOptionPane.showMessageDialog(this, i18n.t("orders.no_active_buyers"),
                     i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -327,7 +326,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         }
 
         Object[] options = available.stream()
-                .map(p -> p.qrCode() + "  [" + p.shortSummary(lang) + " | " + stripZeros(p.weightKg()) + " kg]")
+                .map(p -> p.qrCode() + "  [" + p.shortSummary(lang) + " | " + FormatUtil.stripZeros(p.weightKg()) + " kg]")
                 .toArray();
         Object chosen = JOptionPane.showInputDialog(this, i18n.t("orders.add_from_stock"),
                 order.orderNumber(), JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
@@ -478,7 +477,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         });
 
         orderMetaLabel.setText(
-                i18n.t("orders.total_weight") + ": " + stripZeros(order.totalWeightKg()) + " kg   |   "
+                i18n.t("orders.total_weight") + ": " + FormatUtil.stripZeros(order.totalWeightKg()) + " kg   |   "
                         + i18n.t("orders.total_price") + ": " + CurrencyDef.formatAmount(order.totalPrice(), cur, dec) + "   |   "
                         + i18n.t("common.created_at") + ": " + (order.createdAt() != null ? DT_FMT.format(order.createdAt()) : "—")
         );
@@ -488,7 +487,7 @@ public final class OrdersView extends JPanel implements NavigableView {
             itemsModel.addRow(new Object[]{
                     item.packageQrCode(),
                     item.localizedSummary(lang),
-                    stripZeros(item.weightKg()),
+                    FormatUtil.stripZeros(item.weightKg()),
                     CurrencyDef.formatNumeric(item.pricePerKg(), dec),
                     CurrencyDef.formatNumeric(item.lineTotal(), dec)
             });
@@ -518,10 +517,6 @@ public final class OrdersView extends JPanel implements NavigableView {
             }
         }
         renderSelectedOrder();
-    }
-
-    private static String stripZeros(BigDecimal val) {
-        return FormatUtil.stripZeros(val);
     }
 
     @Override
@@ -570,7 +565,7 @@ public final class OrdersView extends JPanel implements NavigableView {
                     o.orderNumber(),
                     o.customerName(),
                     i18n.t("status.order." + o.status().name()).toUpperCase(),
-                    stripZeros(o.totalWeightKg()) + " kg",
+                    FormatUtil.stripZeros(o.totalWeightKg()) + " kg",
                     CurrencyDef.formatAmount(o.totalPrice(), o.effectiveCurrencyCode(), o.currencyDecimals())
             });
             if (prevId != null && o.id() == prevId) {

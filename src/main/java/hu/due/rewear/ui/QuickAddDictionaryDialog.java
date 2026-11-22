@@ -112,8 +112,10 @@ public final class QuickAddDictionaryDialog extends JDialog {
 
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
         JButton cancelBtn = new JButton(i18n.t("common.cancel"));
+        BrutalistStyle.styleSecondaryButton(cancelBtn);
         cancelBtn.addActionListener(e -> dispose());
         JButton saveBtn = new JButton(i18n.t("common.save"));
+        BrutalistStyle.stylePrimaryButton(saveBtn);
         saveBtn.addActionListener(e -> saveAndClose());
         buttons.add(cancelBtn);
         buttons.add(saveBtn);
@@ -158,7 +160,7 @@ public final class QuickAddDictionaryDialog extends JDialog {
                     BigDecimal eur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(priceEurField.getText()));
                     BigDecimal huf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(priceHufField.getText()));
                     if (eur.compareTo(BigDecimal.ZERO) < 0 || huf.compareTo(BigDecimal.ZERO) < 0) {
-                        throw new IllegalArgumentException("Prices must be >= 0");
+                        throw new IllegalArgumentException(i18n.t("validation.prices_non_negative"));
                     }
                     yield ctx.getDictionaryDao().insertGarmentType(code, nameEn, nameHu, eur, huf);
                 }
@@ -166,7 +168,7 @@ public final class QuickAddDictionaryDialog extends JDialog {
                     BigDecimal eur = CurrencyCode.EUR.round(CurrencyCode.parseAmount(priceEurField.getText()));
                     BigDecimal huf = CurrencyCode.HUF.round(CurrencyCode.parseAmount(priceHufField.getText()));
                     if (eur.compareTo(BigDecimal.ZERO) < 0 || huf.compareTo(BigDecimal.ZERO) < 0) {
-                        throw new IllegalArgumentException("Prices must be >= 0");
+                        throw new IllegalArgumentException(i18n.t("validation.prices_non_negative"));
                     }
                     yield ctx.getDictionaryDao().insertQualityGrade(code, nameEn, nameHu, eur, huf);
                 }
@@ -174,7 +176,7 @@ public final class QuickAddDictionaryDialog extends JDialog {
                     BigDecimal tare = new BigDecimal(tareField.getText().trim().replace(',', '.'));
                     BigDecimal maxW = new BigDecimal(maxWeightField.getText().trim().replace(',', '.'));
                     if (tare.compareTo(BigDecimal.ZERO) < 0 || maxW.compareTo(BigDecimal.ZERO) <= 0) {
-                        throw new IllegalArgumentException("Invalid package weights");
+                        throw new IllegalArgumentException(i18n.t("validation.invalid_package_weights"));
                     }
                     yield ctx.getDictionaryDao().insertPackageType(code, nameEn, nameHu, tare, maxW);
                 }

@@ -503,9 +503,10 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     private void renderTable(I18nManager i18n) {
         tableModel.setRowCount(0);
+        Map<String, Integer> decByCur = ctx.getFinanceConfigDao().decimalPlacesMap();
         for (Invoice inv : filteredInvoices) {
             String cur = inv.effectiveCurrencyCode();
-            int dec = ctx.getFinanceConfigDao().decimalPlacesFor(cur);
+            int dec = decByCur.getOrDefault(cur, CurrencyDef.defaultDecimalsFor(cur));
             String vatLabel = inv.effectiveTaxTypeCode() + " (" + inv.vatRate().stripTrailingZeros().toPlainString() + "%)";
             tableModel.addRow(new Object[]{
                     inv.invoiceNumber(),

@@ -8,6 +8,7 @@ import hu.due.rewear.model.PackageFilter;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.LabelPreset;
+import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -158,7 +159,7 @@ public final class LocationsView extends JPanel implements NavigableView {
         JTextField zoneField = new JTextField(existing != null ? existing.zone() : "A", 10);
         JTextField aisleField = new JTextField(existing != null ? existing.aisle() : "01", 10);
         JTextField shelfField = new JTextField(existing != null ? existing.shelf() : "01", 10);
-        JTextField capField = new JTextField(existing != null ? stripZeros(existing.maxCapacityKg()) : "600", 10);
+        JTextField capField = new JTextField(existing != null ? FormatUtil.stripZeros(existing.maxCapacityKg()) : "600", 10);
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
         JPanel form = new JPanel(new GridBagLayout());
@@ -167,11 +168,11 @@ public final class LocationsView extends JPanel implements NavigableView {
         gbc.fill = GridBagConstraints.HORIZONTAL;
 
         int r = 0;
-        addRow(form, gbc, r++, i18n.t("common.code") + " *", codeField);
-        addRow(form, gbc, r++, i18n.t("locations.zone") + " *", zoneField);
-        addRow(form, gbc, r++, i18n.t("locations.aisle") + " *", aisleField);
-        addRow(form, gbc, r++, i18n.t("locations.shelf") + " *", shelfField);
-        addRow(form, gbc, r++, i18n.t("locations.capacity") + " *", capField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.code") + " *", codeField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.zone") + " *", zoneField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.aisle") + " *", aisleField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.shelf") + " *", shelfField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.capacity") + " *", capField);
         if (existing != null) {
             gbc.gridx = 1;
             gbc.gridy = r;
@@ -191,7 +192,7 @@ public final class LocationsView extends JPanel implements NavigableView {
             String shelf = shelfField.getText().trim();
             BigDecimal cap = new BigDecimal(capField.getText().trim().replace(',', '.'));
             if (code.isEmpty() || zone.isEmpty() || aisle.isEmpty() || shelf.isEmpty() || cap.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new IllegalArgumentException("All fields are required and capacity must be > 0.");
+                throw new IllegalArgumentException(i18n.t("validation.location_fields_required"));
             }
             if (existing == null) {
                 ctx.getLocationDao().insert(code, zone, aisle, shelf, cap);
@@ -202,13 +203,6 @@ public final class LocationsView extends JPanel implements NavigableView {
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
-    }
-
-    private static void addRow(JPanel form, GridBagConstraints gbc, int row, String label, JTextField field) {
-        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
-        form.add(new JLabel(label), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        form.add(field, gbc);
     }
 
     private void loadStoredPackagesForSelected() {
@@ -231,14 +225,10 @@ public final class LocationsView extends JPanel implements NavigableView {
             storedModel.addRow(new Object[]{
                     p.qrCode(),
                     p.shortSummary(lang),
-                    stripZeros(p.weightKg()) + " kg",
+                    FormatUtil.stripZeros(p.weightKg()) + " kg",
                     i18n.t("status.package." + p.status().name())
             });
         }
-    }
-
-    private static String stripZeros(BigDecimal val) {
-        return hu.due.rewear.util.FormatUtil.stripZeros(val);
     }
 
     @Override
@@ -271,8 +261,8 @@ public final class LocationsView extends JPanel implements NavigableView {
                     l.zone(),
                     l.aisle(),
                     l.shelf(),
-                    stripZeros(l.usedWeightKg()),
-                    stripZeros(l.maxCapacityKg()),
+                    FormatUtil.stripZeros(l.usedWeightKg()),
+                    FormatUtil.stripZeros(l.maxCapacityKg()),
                     pct,
                     l.active() ? i18n.t("common.yes") : i18n.t("common.no")
             });

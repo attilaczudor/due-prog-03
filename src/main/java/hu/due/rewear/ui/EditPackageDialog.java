@@ -129,13 +129,13 @@ public final class EditPackageDialog extends JDialog {
         gbc.anchor = GridBagConstraints.WEST;
 
         int r = 0;
-        addRow(form, gbc, r++, i18n.t("intake.target_group") + ":", targetCombo);
-        addRow(form, gbc, r++, i18n.t("intake.garment_type") + ":", garmentCombo);
-        addRow(form, gbc, r++, i18n.t("intake.quality_grade") + ":", qualityCombo);
-        addRow(form, gbc, r++, i18n.t("intake.package_type") + ":", packageTypeCombo);
-        addRow(form, gbc, r++, i18n.t("intake.weight_kg") + ":", weightField);
-        addRow(form, gbc, r++, i18n.t("intake.location") + ":", locationCombo);
-        addRow(form, gbc, r++, i18n.t("common.status") + ":", statusCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("intake.target_group") + ":", targetCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("intake.garment_type") + ":", garmentCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("intake.quality_grade") + ":", qualityCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("intake.package_type") + ":", packageTypeCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("intake.weight_kg") + ":", weightField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("intake.location") + ":", locationCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.status") + ":", statusCombo);
 
         topSplit.add(form, BorderLayout.CENTER);
 
@@ -203,6 +203,7 @@ public final class EditPackageDialog extends JDialog {
         // Bottom buttons
         JPanel buttons = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 4));
         JButton reprintCurrentBtn = new JButton(i18n.t("scanner.action.reprint").toUpperCase());
+        BrutalistStyle.styleSecondaryButton(reprintCurrentBtn);
         reprintCurrentBtn.addActionListener(e ->
                 PrintPreviewDialog.showPreview(this, ctx, List.of(original), LabelPreset.THERMAL_100X150));
 
@@ -211,9 +212,11 @@ public final class EditPackageDialog extends JDialog {
         saveAndPrintBtn.addActionListener(e -> saveChanges(true));
 
         JButton saveBtn = new JButton(i18n.t("common.save").toUpperCase());
+        BrutalistStyle.styleSecondaryButton(saveBtn);
         saveBtn.addActionListener(e -> saveChanges(false));
 
         JButton cancelBtn = new JButton(i18n.t("common.cancel").toUpperCase());
+        BrutalistStyle.styleSecondaryButton(cancelBtn);
         cancelBtn.addActionListener(e -> dispose());
 
         buttons.add(reprintCurrentBtn);
@@ -224,13 +227,6 @@ public final class EditPackageDialog extends JDialog {
 
         setContentPane(root);
         getRootPane().setDefaultButton(saveBtn);
-    }
-
-    private static void addRow(JPanel form, GridBagConstraints gbc, int row, String label, Component comp) {
-        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
-        form.add(new JLabel(label), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        form.add(comp, gbc);
     }
 
     private void populateFields() {

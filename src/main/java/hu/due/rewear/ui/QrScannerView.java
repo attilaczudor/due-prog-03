@@ -12,6 +12,7 @@ import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.LabelPreset;
 import hu.due.rewear.service.ScannerService;
+import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -47,7 +48,6 @@ import java.awt.Window;
 import java.awt.datatransfer.DataFlavor;
 import java.awt.image.BufferedImage;
 import java.io.File;
-import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 
@@ -365,7 +365,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
                 valGarment.setText(pkg.garmentTypeCode() + " — " + pkg.localizedGarmentType(lang));
                 valQuality.setText(pkg.qualityGradeCode() + " — " + pkg.localizedQualityGrade(lang));
                 valPackageType.setText(pkg.packageTypeCode() + " — " + pkg.localizedPackageType(lang));
-                valWeight.setText(stripZeros(pkg.weightKg()) + " " + i18n.t("common.kg"));
+                valWeight.setText(FormatUtil.stripZeros(pkg.weightKg()) + " " + i18n.t("common.kg"));
                 valHex.setText(pkg.hexSuffix());
                 valLocation.setText(pkg.locationCode());
                 valOperator.setText(pkg.createdByFullName() + " (" + pkg.createdByUsername() + ")");
@@ -389,7 +389,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
                 valGarment.setText(p.garmentTypeCode());
                 valQuality.setText(p.qualityGradeCode());
                 valPackageType.setText(p.packageTypeCode());
-                valWeight.setText(stripZeros(p.weightKg()) + " " + i18n.t("common.kg"));
+                valWeight.setText(FormatUtil.stripZeros(p.weightKg()) + " " + i18n.t("common.kg"));
                 valHex.setText(p.hexSuffix());
                 valLocation.setText("—");
                 valOperator.setText("—");
@@ -492,7 +492,7 @@ public final class QrScannerView extends JPanel implements NavigableView {
         InventoryPackage pkg = lastResult.inventoryPackage();
         List<WarehouseLocation> locations = ctx.getLocationDao().findAll(true);
         Object[] options = locations.stream()
-                .map(l -> l.code() + " (" + stripZeros(l.usedWeightKg()) + "/" + stripZeros(l.maxCapacityKg()) + " kg)")
+                .map(l -> l.code() + " (" + FormatUtil.stripZeros(l.usedWeightKg()) + "/" + FormatUtil.stripZeros(l.maxCapacityKg()) + " kg)")
                 .toArray();
 
         Object selected = JOptionPane.showInputDialog(
@@ -596,14 +596,6 @@ public final class QrScannerView extends JPanel implements NavigableView {
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
-    }
-
-    private static String stripZeros(BigDecimal val) {
-        if (val == null) {
-            return "0";
-        }
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
     }
 
     @Override

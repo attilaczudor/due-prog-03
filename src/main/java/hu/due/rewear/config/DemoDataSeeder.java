@@ -94,6 +94,16 @@ public final class DemoDataSeeder {
                 .map(hu.due.rewear.model.User::id)
                 .orElse(1L);
         List<Order> orders = orderDao.findAll();
+        // Pre-fetch related items & customers before opening the write transaction to avoid nested SQLite connections
+        Map<Long, List<OrderItem>> itemsByOrderId = new HashMap<>();
+        Map<Long, Customer> customerById = new HashMap<>();
+        for (Order ord : orders) {
+            if (ord.status() == OrderStatus.SHIPPED || ord.status() == OrderStatus.PACKING) {
+                itemsByOrderId.put(ord.id(), orderItemDao.findByOrderId(ord.id()));
+                customerById.computeIfAbsent(ord.customerId(),
+                        cid -> customerDao.findById(cid).orElse(null));
+            }
+        }
         BigDecimal vat27 = new BigDecimal("27.00");
         LocalDate today = LocalDate.now();
         LocalDateTime now = LocalDateTime.now();
@@ -103,9 +113,9 @@ public final class DemoDataSeeder {
             int outSeq = 1;
             for (Order ord : orders) {
                 if (ord.status() == OrderStatus.SHIPPED || ord.status() == OrderStatus.PACKING) {
-                    List<OrderItem> items = orderItemDao.findByOrderId(ord.id());
+                    List<OrderItem> items = itemsByOrderId.getOrDefault(ord.id(), List.of());
                     if (items.isEmpty()) continue;
-                    Customer cust = customerDao.findById(ord.customerId()).orElse(null);
+                    Customer cust = customerById.get(ord.customerId());
                     String cur = ord.effectiveCurrencyCode();
                     int dec = ord.currencyDecimals();
                     boolean isHu = cust == null || CountryDirectory.isHungary(cust.effectiveCountryCode());

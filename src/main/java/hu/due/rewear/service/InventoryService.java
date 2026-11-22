@@ -1,6 +1,7 @@
 package hu.due.rewear.service;
 
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.dao.DaoException;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.model.GarmentType;
@@ -15,6 +16,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -91,13 +94,13 @@ public final class InventoryService {
                             weightKg,
                             preferredFirstHex.toUpperCase()
                     );
-                    if (!batchCodes.contains(candidate) && !packageDao.existsByQrCode(candidate)) {
+                    if (!batchCodes.contains(candidate) && !packageDao.existsByQrCode(conn, candidate)) {
                         qrCode = candidate;
                     } else {
-                        qrCode = generateUniqueForBatch(now, targetGroup, garmentType, qualityGrade, packageType, weightKg, batchCodes);
+                        qrCode = generateUniqueForBatch(conn, now, targetGroup, garmentType, qualityGrade, packageType, weightKg, batchCodes);
                     }
                 } else {
-                    qrCode = generateUniqueForBatch(now, targetGroup, garmentType, qualityGrade, packageType, weightKg, batchCodes);
+                    qrCode = generateUniqueForBatch(conn, now, targetGroup, garmentType, qualityGrade, packageType, weightKg, batchCodes);
                 }
                 batchCodes.add(qrCode);
                 String hex = qrCode.substring(qrCode.length() - 2);
@@ -141,6 +144,7 @@ public final class InventoryService {
     }
 
     private String generateUniqueForBatch(
+            Connection conn,
             LocalDateTime timestamp,
             TargetGroup targetGroup,
             GarmentType garmentType,
@@ -156,8 +160,16 @@ public final class InventoryService {
                 qualityGrade.code(),
                 packageType.code(),
                 weightKg,
-                candidate -> batchCodes.contains(candidate) || packageDao.existsByQrCode(candidate)
+                candidate -> batchCodes.contains(candidate) || existsInTransaction(conn, candidate)
         );
+    }
+
+    private boolean existsInTransaction(Connection conn, String qrCode) {
+        try {
+            return packageDao.existsByQrCode(conn, qrCode);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to verify QR uniqueness in transaction: " + qrCode, e);
+        }
     }
 
     public InventoryPackage relocatePackage(long packageId, long newLocationId, String note, long userId) {

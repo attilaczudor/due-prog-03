@@ -60,6 +60,30 @@ public final class InvoiceDao {
         }
     }
 
+    /**
+     * Indexed lookup for all invoices belonging to a given partner (either linked by {@code customer_id}
+     * or matching a manual/seeded {@code partner_name} case-insensitively).
+     */
+    public List<Invoice> findByPartner(long customerId, String partnerName) {
+        String sql = BASE_SELECT
+                + " WHERE i.customer_id = ? OR lower(i.partner_name) = lower(?) "
+                + " ORDER BY i.issue_date DESC, i.id DESC";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, customerId);
+            ps.setString(2, partnerName != null ? partnerName.trim() : "");
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Invoice> list = new ArrayList<>();
+                while (rs.next()) {
+                    list.add(mapInvoice(rs));
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to list invoices for partner: " + customerId, e);
+        }
+    }
+
     public Optional<Invoice> findById(long id) {
         String sql = BASE_SELECT + " WHERE i.id = ?";
         try (Connection conn = db.getConnection();

@@ -3,6 +3,10 @@ package hu.due.rewear.model;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
+/**
+ * Immutable domain projection of a physical sorted-clothing bale/bag/box ({@code inventory_packages})
+ * joined with its bilingual dictionary metadata, warehouse location, dual EUR/HUF pricing, and audit info.
+ */
 public record InventoryPackage(
         long id,
         String qrCode,

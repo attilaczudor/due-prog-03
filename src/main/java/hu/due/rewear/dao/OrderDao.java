@@ -69,6 +69,23 @@ public final class OrderDao {
         }
     }
 
+    public List<Order> findByCustomerId(long customerId) {
+        String sql = BASE_SELECT + " WHERE o.customer_id = ? ORDER BY o.created_at DESC, o.id DESC";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, customerId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<Order> list = new ArrayList<>();
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to list orders for customer: " + customerId, e);
+        }
+    }
+
     public Optional<Order> findById(long id) {
         String sql = BASE_SELECT + " WHERE o.id = ?";
         try (Connection conn = db.getConnection();
@@ -96,14 +113,23 @@ public final class OrderDao {
     public String generateNextOrderNumber(Connection conn) throws SQLException {
         int year = LocalDate.now().getYear();
         String prefix = "ORD-" + year + "-";
-        String sql = "SELECT COUNT(*) FROM orders WHERE order_number LIKE ?";
+        String sql = "SELECT order_number FROM orders WHERE order_number LIKE ? ORDER BY order_number DESC LIMIT 1";
+        int nextSeq = 1;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, prefix + "%");
             try (ResultSet rs = ps.executeQuery()) {
-                int next = (rs.next() ? rs.getInt(1) : 0) + 1;
-                return String.format("%s%04d", prefix, next);
+                if (rs.next()) {
+                    String last = rs.getString(1);
+                    String tail = last.substring(prefix.length());
+                    try {
+                        nextSeq = Integer.parseInt(tail) + 1;
+                    } catch (NumberFormatException ignored) {
+                        nextSeq = 1;
+                    }
+                }
             }
         }
+        return String.format("%s%04d", prefix, nextSeq);
     }
 
     public long insert(Connection conn, String orderNumber, long customerId, OrderStatus status,

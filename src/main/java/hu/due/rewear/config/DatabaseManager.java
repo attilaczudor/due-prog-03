@@ -13,6 +13,14 @@ import java.util.Objects;
 
 /**
  * Manages embedded SQLite JDBC connections with foreign key enforcement and transaction helpers.
+ * <p>
+ * <b>Journal mode note:</b> SQLite's default rollback journal mode (DELETE) is intentionally kept
+ * instead of WAL mode so that {@link hu.due.rewear.service.BackupService} can safely back up and
+ * restore the database as a single self-contained {@code .db} file without risking orphaned
+ * {@code -wal}/{@code -shm} sidecar files. Callers executing inside
+ * {@link #executeInTransaction(SqlFunction)} / {@link #runInTransaction(SqlConsumer)} MUST reuse
+ * the supplied {@link Connection} for all reads and writes to avoid {@code SQLITE_BUSY} lock
+ * contention.
  */
 public final class DatabaseManager {
 
@@ -85,6 +93,9 @@ public final class DatabaseManager {
                 }
                 if (ex instanceof DaoException daoEx) {
                     throw daoEx;
+                }
+                if (ex instanceof IllegalStateException || ex instanceof IllegalArgumentException) {
+                    throw (RuntimeException) ex;
                 }
                 throw new DaoException("Transaction failed: " + ex.getMessage(), ex);
             } finally {

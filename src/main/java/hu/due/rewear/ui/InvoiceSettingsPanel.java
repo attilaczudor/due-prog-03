@@ -199,7 +199,7 @@ final class InvoiceSettingsPanel extends JPanel {
             ScopeOption sc = (ScopeOption) scopeCombo.getSelectedItem();
             String scope = sc != null ? sc.code() : "ANY";
             if (enF.getText().trim().isEmpty() || huF.getText().trim().isEmpty()) {
-                throw new IllegalArgumentException("English and Hungarian names are required.");
+                throw new IllegalArgumentException(i18n.t("validation.names_bilingual_required"));
             }
             if (existing == null) {
                 ctx.getFinanceConfigDao().insertTaxType(codeF.getText(), enF.getText(), huF.getText(), rate, scope);
@@ -277,7 +277,7 @@ final class InvoiceSettingsPanel extends JPanel {
         }
         try {
             if (enF.getText().trim().isEmpty() || huF.getText().trim().isEmpty()) {
-                throw new IllegalArgumentException("English and Hungarian names are required.");
+                throw new IllegalArgumentException(i18n.t("validation.names_bilingual_required"));
             }
             int dec = decCombo.getSelectedItem() instanceof Integer d ? d : 2;
             if (existing == null) {

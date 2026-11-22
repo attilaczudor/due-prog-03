@@ -128,7 +128,7 @@ public final class OrderService {
         db.runInTransaction(conn -> {
             orderDao.updateCurrency(conn, orderId, cur);
             for (OrderItem item : items) {
-                InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                InventoryPackage pkg = packageDao.findById(conn, item.packageId()).orElseThrow();
                 BigDecimal unitPrice = pkg.effectivePricePerKg(cur);
                 BigDecimal lineTotal = CurrencyDef.roundForScale(pkg.weightKg().multiply(unitPrice), decimals);
                 orderItemDao.updateItemPricing(conn, item.id(), unitPrice, lineTotal);
@@ -183,22 +183,22 @@ public final class OrderService {
             throw new IllegalStateException("Cannot transition an empty order to " + targetStatus);
         }
 
-        // If restoring from CANCELLED, verify all allocated packages are still available IN_STOCK
-        if (current == OrderStatus.CANCELLED) {
-            for (OrderItem item : items) {
-                InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
-                if (pkg.status() != PackageStatus.IN_STOCK) {
-                    throw new IllegalStateException("Cannot restore order: package " + pkg.qrCode()
-                            + " is currently " + pkg.status());
-                }
-            }
-        }
-
         LocalDateTime now = LocalDateTime.now();
         db.runInTransaction(conn -> {
+            // If restoring from CANCELLED, verify all allocated packages are still IN_STOCK atomically inside the write tx
+            if (current == OrderStatus.CANCELLED) {
+                for (OrderItem item : items) {
+                    InventoryPackage pkg = packageDao.findById(conn, item.packageId()).orElseThrow();
+                    if (pkg.status() != PackageStatus.IN_STOCK) {
+                        throw new IllegalStateException("Cannot restore order: package " + pkg.qrCode()
+                                + " is currently " + pkg.status());
+                    }
+                }
+            }
+
             if (targetStatus == OrderStatus.SHIPPED) {
                 for (OrderItem item : items) {
-                    InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                    InventoryPackage pkg = packageDao.findById(conn, item.packageId()).orElseThrow();
                     packageDao.updateStatus(conn, pkg.id(), PackageStatus.SHIPPED, now);
                     movementDao.insert(conn, pkg.id(), MovementType.SHIP, pkg.locationId(), null,
                             userId, "Shipped on " + order.orderNumber(), now);
@@ -206,7 +206,7 @@ public final class OrderService {
                 orderDao.updateStatus(conn, orderId, OrderStatus.SHIPPED, now);
             } else if (targetStatus == OrderStatus.CANCELLED) {
                 for (OrderItem item : items) {
-                    InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                    InventoryPackage pkg = packageDao.findById(conn, item.packageId()).orElseThrow();
                     packageDao.updateStatus(conn, pkg.id(), PackageStatus.IN_STOCK, now);
                     movementDao.insert(conn, pkg.id(), MovementType.RELEASE, pkg.locationId(), pkg.locationId(),
                             userId, "Order " + order.orderNumber() + " cancelled", now);
@@ -219,7 +219,7 @@ public final class OrderService {
                             ? "Shipment reverted on " + order.orderNumber()
                             : "Order " + order.orderNumber() + " restored";
                     for (OrderItem item : items) {
-                        InventoryPackage pkg = packageDao.findById(item.packageId()).orElseThrow();
+                        InventoryPackage pkg = packageDao.findById(conn, item.packageId()).orElseThrow();
                         packageDao.updateStatus(conn, pkg.id(), PackageStatus.RESERVED, now);
                         movementDao.insert(conn, pkg.id(), MovementType.RESERVE, pkg.locationId(), pkg.locationId(),
                                 userId, reason, now);

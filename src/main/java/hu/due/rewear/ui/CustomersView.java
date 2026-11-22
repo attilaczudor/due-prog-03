@@ -9,6 +9,7 @@ import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.PartnerType;
+import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
@@ -184,11 +185,11 @@ public final class CustomersView extends JPanel implements NavigableView {
             });
         }
 
-        JTextField contactF = new JTextField(existing != null ? safe(existing.contactName()) : "", 24);
-        JTextField emailF = new JTextField(existing != null ? safe(existing.email()) : "", 24);
-        JTextField phoneF = new JTextField(existing != null ? safe(existing.phone()) : "", 24);
-        JTextField addrF = new JTextField(existing != null ? safe(existing.address()) : "", 24);
-        JTextField taxF = new JTextField(existing != null ? safe(existing.taxNumber()) : "", 24);
+        JTextField contactF = new JTextField(existing != null ? FormatUtil.safe(existing.contactName()) : "", 24);
+        JTextField emailF = new JTextField(existing != null ? FormatUtil.safe(existing.email()) : "", 24);
+        JTextField phoneF = new JTextField(existing != null ? FormatUtil.safe(existing.phone()) : "", 24);
+        JTextField addrF = new JTextField(existing != null ? FormatUtil.safe(existing.address()) : "", 24);
+        JTextField taxF = new JTextField(existing != null ? FormatUtil.safe(existing.taxNumber()) : "", 24);
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
         JPanel form = new JPanel(new GridBagLayout());
@@ -196,15 +197,15 @@ public final class CustomersView extends JPanel implements NavigableView {
         gbc.insets = new Insets(4, 4, 4, 6);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
-        addCompRow(form, gbc, r++, i18n.t("customers.company") + " *", nameF);
-        addCompRow(form, gbc, r++, i18n.t("partners.type") + " *", typeCombo);
-        addCompRow(form, gbc, r++, i18n.t("partners.country") + " *", countryCombo);
-        addCompRow(form, gbc, r++, i18n.t("customers.preferred_currency") + " *", curCombo);
-        addCompRow(form, gbc, r++, i18n.t("customers.contact"), contactF);
-        addCompRow(form, gbc, r++, i18n.t("customers.email"), emailF);
-        addCompRow(form, gbc, r++, i18n.t("customers.phone"), phoneF);
-        addCompRow(form, gbc, r++, i18n.t("customers.address"), addrF);
-        addCompRow(form, gbc, r++, i18n.t("customers.tax_number"), taxF);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.company") + " *", nameF);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("partners.type") + " *", typeCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("partners.country") + " *", countryCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.preferred_currency") + " *", curCombo);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.contact"), contactF);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.email"), emailF);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.phone"), phoneF);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.address"), addrF);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("customers.tax_number"), taxF);
         if (existing != null) {
             gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
         }
@@ -217,7 +218,7 @@ public final class CustomersView extends JPanel implements NavigableView {
         try {
             String company = nameF.getText().trim();
             if (company.isEmpty()) {
-                throw new IllegalArgumentException("Company name is required.");
+                throw new IllegalArgumentException(i18n.t("validation.company_required"));
             }
             PartnerType chosenType = typeCombo.getSelectedItem() instanceof TypeOption to ? to.type() : PartnerType.CUSTOMER;
             String chosenCountry = countryCombo.getSelectedItem() instanceof CountryItem ci ? ci.code() : "HU";
@@ -237,13 +238,6 @@ public final class CustomersView extends JPanel implements NavigableView {
         }
     }
 
-    private static void addCompRow(JPanel form, GridBagConstraints gbc, int row, String label, JComponent comp) {
-        gbc.gridx = 0; gbc.gridy = row; gbc.weightx = 0;
-        form.add(new JLabel(label), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        form.add(comp, gbc);
-    }
-
     private void loadHistoryForSelectedPartner() {
         historyModel.setRowCount(0);
         Customer sel = getSelectedCustomer();
@@ -251,31 +245,25 @@ public final class CustomersView extends JPanel implements NavigableView {
             return;
         }
         I18nManager i18n = ctx.getI18n();
-        for (Order o : ctx.getOrderDao().findAll()) {
-            if (o.customerId() == sel.id()) {
-                historyModel.addRow(new Object[]{
-                        i18n.t("nav.orders").toUpperCase(Locale.ROOT),
-                        o.orderNumber(),
-                        i18n.t("status.order." + o.status().name()).toUpperCase(Locale.ROOT),
-                        o.totalWeightKg().stripTrailingZeros().toPlainString() + " kg",
-                        CurrencyDef.formatAmount(o.totalPrice(), o.effectiveCurrencyCode(), o.currencyDecimals()),
-                        o.createdAt() != null ? DT_FMT.format(o.createdAt()) : ""
-                });
-            }
+        for (Order o : ctx.getOrderDao().findByCustomerId(sel.id())) {
+            historyModel.addRow(new Object[]{
+                    i18n.t("nav.orders").toUpperCase(Locale.ROOT),
+                    o.orderNumber(),
+                    i18n.t("status.order." + o.status().name()).toUpperCase(Locale.ROOT),
+                    FormatUtil.stripZeros(o.totalWeightKg()) + " kg",
+                    CurrencyDef.formatAmount(o.totalPrice(), o.effectiveCurrencyCode(), o.currencyDecimals()),
+                    o.createdAt() != null ? DT_FMT.format(o.createdAt()) : ""
+            });
         }
-        for (Invoice inv : ctx.getInvoiceDao().findAll()) {
-            boolean matchesId = inv.customerId() != null && inv.customerId() == sel.id();
-            boolean matchesName = inv.partnerName() != null && inv.partnerName().equalsIgnoreCase(sel.name());
-            if (matchesId || matchesName) {
-                historyModel.addRow(new Object[]{
-                        i18n.t("invoice.direction.short." + inv.direction().name()),
-                        inv.invoiceNumber(),
-                        i18n.t("status.invoice." + inv.status().name()).toUpperCase(Locale.ROOT),
-                        inv.effectiveTaxTypeCode() + " (" + inv.vatRate().stripTrailingZeros().toPlainString() + "%)",
-                        CurrencyDef.formatAmount(inv.grossAmount(), inv.effectiveCurrencyCode(), inv.currencyDecimals()),
-                        inv.issueDate().toString()
-                });
-            }
+        for (Invoice inv : ctx.getInvoiceDao().findByPartner(sel.id(), sel.name())) {
+            historyModel.addRow(new Object[]{
+                    i18n.t("invoice.direction.short." + inv.direction().name()),
+                    inv.invoiceNumber(),
+                    i18n.t("status.invoice." + inv.status().name()).toUpperCase(Locale.ROOT),
+                    inv.effectiveTaxTypeCode() + " (" + FormatUtil.stripZeros(inv.vatRate()) + "%)",
+                    CurrencyDef.formatAmount(inv.grossAmount(), inv.effectiveCurrencyCode(), inv.currencyDecimals()),
+                    inv.issueDate().toString()
+            });
         }
     }
 
@@ -288,10 +276,6 @@ public final class CustomersView extends JPanel implements NavigableView {
 
         if (filterMode == FilterMode.SUPPLIERS) BrutalistStyle.stylePrimaryButton(filterSuppliersBtn);
         else BrutalistStyle.styleSecondaryButton(filterSuppliersBtn);
-    }
-
-    private static String safe(String s) {
-        return s == null ? "" : s;
     }
 
     @Override
@@ -339,9 +323,9 @@ public final class CustomersView extends JPanel implements NavigableView {
                     i18n.t("partners.type." + c.effectivePartnerType().name()).toUpperCase(Locale.ROOT),
                     CountryDirectory.localizedCountryName(c.effectiveCountryCode(), lang),
                     c.effectiveCurrencyCode(),
-                    safe(c.contactName()),
-                    safe(c.email()),
-                    safe(c.taxNumber()),
+                    FormatUtil.safe(c.contactName()),
+                    FormatUtil.safe(c.email()),
+                    FormatUtil.safe(c.taxNumber()),
                     c.active() ? i18n.t("common.yes").toUpperCase(Locale.ROOT) : i18n.t("common.no").toUpperCase(Locale.ROOT)
             });
         }

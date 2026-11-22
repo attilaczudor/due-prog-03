@@ -5,6 +5,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+/**
+ * Immutable warehouse user account ({@code users} table) carrying BCrypt credentials,
+ * split profile fields, optional PNG avatar, and assigned {@link RoleCode} permissions.
+ */
 public record User(
         long id,
         String username,

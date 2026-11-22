@@ -3,14 +3,21 @@ package hu.due.rewear.i18n;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import java.io.BufferedReader;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -73,5 +80,38 @@ class I18nManagerTest {
     void rejectsUnsupportedLanguageCode() {
         I18nManager manager = new I18nManager();
         assertThrows(IllegalArgumentException.class, () -> manager.setLanguage("fr"));
+    }
+
+    @Test
+    void bundledTranslationsCsvHasCleanStructureAndCompleteBilingualEntries() throws IOException {
+        try (InputStream is = I18nManager.class.getResourceAsStream(I18nManager.DEFAULT_RESOURCE)) {
+            assertNotNull(is, "Bundled translations.csv must exist");
+            List<List<String>> rows = CsvTranslationLoader.parseCsvRows(
+                    new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8)));
+            assertTrue(rows.size() > 100, "Expected populated translations.csv");
+            assertEquals(List.of("key", "en", "hu"), rows.get(0), "Header must be key,en,hu");
+
+            Set<String> seenKeys = new HashSet<>();
+            for (int i = 1; i < rows.size(); i++) {
+                List<String> row = rows.get(i);
+                assertEquals(3, row.size(), "Row " + (i + 1) + " has malformed column count (check unquoted commas): " + row);
+                String key = row.get(0).trim();
+                String en = row.get(1);
+                String hu = row.get(2);
+                assertFalse(key.isEmpty(), "Blank key at row " + (i + 1));
+                assertTrue(seenKeys.add(key), "Duplicate translation key: " + key);
+                assertFalse(en.isBlank(), "Missing English translation for key: " + key);
+                assertFalse(hu.isBlank(), "Missing Hungarian translation for key: " + key);
+                assertFalse(en.contains("''"), "Double apostrophe in EN for key (I18nManager escapes single quotes automatically): " + key);
+                assertFalse(hu.contains("''"), "Double apostrophe in HU for key (I18nManager escapes single quotes automatically): " + key);
+            }
+        }
+
+        // Verify previously comma-broken keys now resolve properly in Hungarian
+        I18nManager hu = new I18nManager();
+        hu.setLanguage("hu");
+        assertTrue(hu.t("dictionaries.code_hint").contains("kötőjel"), "HU code_hint must load cleanly");
+        assertTrue(hu.t("docpreview.none_selected").contains("dokumentumot"), "HU docpreview.none_selected must load cleanly");
+        assertFalse(hu.t("dictionaries.delete_confirm", "TSH").contains("''"), "Delete confirm must render single quotes, not doubled");
     }
 }

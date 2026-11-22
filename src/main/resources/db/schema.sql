@@ -245,6 +245,7 @@ CREATE INDEX IF NOT EXISTS idx_packages_created_at ON inventory_packages(created
 CREATE INDEX IF NOT EXISTS idx_movements_package ON stock_movements(package_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_direction ON invoices(direction);
 CREATE INDEX IF NOT EXISTS idx_invoices_order ON invoices(order_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_customer ON invoices(customer_id);
 CREATE INDEX IF NOT EXISTS idx_invoice_items_invoice ON invoice_items(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_movements_created_at ON stock_movements(created_at);
 CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);

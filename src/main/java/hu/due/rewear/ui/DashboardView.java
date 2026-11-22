@@ -7,6 +7,7 @@ import hu.due.rewear.model.CategoryWeightStat;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.StockMovement;
+import hu.due.rewear.util.FormatUtil;
 import org.knowm.xchart.CategoryChart;
 import org.knowm.xchart.CategoryChartBuilder;
 import org.knowm.xchart.PieChart;
@@ -242,12 +243,6 @@ public final class DashboardView extends JPanel implements NavigableView {
         chartsGrid.repaint();
     }
 
-    private static String stripZeros(BigDecimal val) {
-        if (val == null) return "0";
-        BigDecimal s = val.stripTrailingZeros();
-        return (s.scale() < 0 ? s.setScale(0) : s).toPlainString();
-    }
-
     @Override
     public String getViewKey() {
         return MainFrame.VIEW_DASHBOARD;
@@ -274,7 +269,7 @@ public final class DashboardView extends JPanel implements NavigableView {
         int openOrders = ctx.getOrderDao().countOpenOrders();
 
         kpiValue1.setText(Integer.toString(inStockCount));
-        kpiValue2.setText(stripZeros(inStockWeight) + " " + i18n.t("common.kg"));
+        kpiValue2.setText(FormatUtil.stripZeros(inStockWeight) + " " + i18n.t("common.kg"));
         kpiValue3.setText(Integer.toString(todayIntake));
         kpiValue4.setText(Integer.toString(openOrders));
 

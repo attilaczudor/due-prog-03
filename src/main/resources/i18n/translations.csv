@@ -1,9 +1,5 @@
 key,en,hu
 app.title,ReWear WMS — Second-Hand Clothing Warehouse,ReWear WMS — Használt Ruha Raktárkezelő
-app.subtitle,Sorted Clothing Inventory & QR Logistics,Válogatott Ruha Készlet- és QR Logisztika
-app.language,Language,Nyelv
-app.theme.light,Light Theme,Világos téma
-app.theme.dark,Dark Theme,Sötét téma
 app.logout,Sign Out,Kijelentkezés
 app.ready,Ready,Kész
 common.save,Save,Mentés
@@ -18,11 +14,8 @@ common.search,Search,Keresés
 common.clear,Clear Filters,Szűrők törlése
 common.close,Close,Bezárás
 common.export.csv,Export CSV,CSV exportálás
-common.export.pdf,Export PDF,PDF exportálás
-common.print,Print,Nyomtatás
 common.yes,Yes,Igen
 common.no,No,Nem
-common.ok,OK,Rendben
 common.all,All,Összes
 common.code,Code,Kód
 common.name.en,Name (EN),Név (EN)
@@ -30,7 +23,6 @@ common.name.hu,Name (HU),Név (HU)
 common.status,Status,Állapot
 common.notes,Notes,Megjegyzés
 common.created_at,Created At,Létrehozva
-common.updated_at,Updated At,Frissítve
 common.actions,Actions,Műveletek
 common.kg,kg,kg
 common.error,Error,Hiba
@@ -81,7 +73,6 @@ dashboard.kpi.today_intake,Today's Intake,Mai bevételezés
 dashboard.kpi.open_orders,Open Orders,Nyitott rendelések
 dashboard.chart.by_quality,Stock Weight (kg) by Quality Grade,Készletsúly (kg) minőség szerint
 dashboard.chart.by_type,Stock Weight (kg) by Garment Type,Készletsúly (kg) terméktípus szerint
-dashboard.chart.activity,Intake vs. Shipped Weight (kg),Bevételezett vs. kiadott súly (kg)
 dashboard.recent_movements,Recent Stock Movements,Legutóbbi készletmozgások
 intake.title,New Package Intake & QR Generator,Új csomag felvétele és QR generátor
 intake.target_group,Target Group (What For),Célcsoport (Kinek)
@@ -96,13 +87,13 @@ intake.regenerate_hex,New Hex Suffix,Új hex végződés
 intake.save_and_print,Save & Print Preview,Mentés és nyomtatási előnézet
 intake.save_only,Save Package,Csomag mentése
 intake.quick_add.tooltip,Create a new item directly in the app,Új elem létrehozása az alkalmazásban
-intake.quick_add.title,"Add New {0}","Új elem hozzáadása: {0}"
+intake.quick_add.title,Add New {0},Új elem hozzáadása: {0}
 intake.live_preview,Live QR & Product Code Preview,Élő QR-kód és termékkód előnézet
-intake.capacity_status,"Used: {0} / {1} kg (Remaining: {2} kg)","Foglalt: {0} / {1} kg (Szabad: {2} kg)"
-intake.saved_success,"Saved {0} package(s) successfully.","{0} csomag sikeresen elmentve."
+intake.capacity_status,Used: {0} / {1} kg (Remaining: {2} kg),Foglalt: {0} / {1} kg (Szabad: {2} kg)
+intake.saved_success,Saved {0} package(s) successfully.,{0} csomag sikeresen elmentve.
 intake.validation.weight,Please enter a valid positive weight (kg).,Kérjük adjon meg érvényes pozitív súlyt (kg).
 intake.validation.select_all,Please select all code segments and a warehouse location.,Kérjük válassza ki az összes kódelemet és a raktárhelyet.
-intake.validation.capacity,"Warning: Location capacity ({0} kg) will be exceeded.","Figyelem: A raktárhely kapacitása ({0} kg) túllépésre kerül."
+intake.validation.capacity,Warning: Location capacity ({0} kg) will be exceeded.,Figyelem: A raktárhely kapacitása ({0} kg) túllépésre kerül.
 print.title,Ticket / Label Print Preview,Címke nyomtatási előnézet
 print.preset,Paper / Label Format,Papír / Címke formátum
 print.preset.thermal_100x150,Thermal Label 100 × 150 mm,Hőcímke 100 × 150 mm
@@ -118,12 +109,12 @@ print.zoom,Zoom,Nagyítás
 print.copies,Copies,Példányszám
 print.printer,Printer,Nyomtató
 print.no_printers,(System Default / No Printers Detected),(Alapértelmezett / Nem található nyomtató)
-print.page_of,"Page {0} / {1}","Oldal {0} / {1}"
+print.page_of,Page {0} / {1},Oldal {0} / {1}
 print.button.print,Print to Printer,Nyomtatás nyomtatóra
 print.button.pdf,Save Label PDF,Címke mentése PDF-be
 print.button.png,Save QR PNG,QR mentése PNG-be
 print.success,Print job submitted successfully.,A nyomtatási feladat elküldve.
-print.exported,"Exported to: {0}","Sikeresen exportálva: {0}"
+print.exported,Exported to: {0},Sikeresen exportálva: {0}
 scanner.title,QR Code Scanner Station,QR Kód Szkenner Állomás
 scanner.input_label,Scan QR Code (USB/Bluetooth Scanner or Paste + Enter):,QR kód beolvasása (USB/Bluetooth szkenner vagy beillesztés + Enter):
 scanner.scan_button,Lookup Code,Kód keresése
@@ -142,7 +133,7 @@ scanner.field.operator,Recorded By,Rögzítette
 scanner.relocate.prompt,Select destination warehouse location:,Válassza ki a cél raktárhelyet:
 scanner.verify.done,Stocktake verification recorded.,Leltári ellenőrzés rögzítve.
 scanner.order.select,Select open order to attach this package:,Válasszon nyitott rendelést a csomag hozzáadásához:
-scanner.order.added,"Package attached to order {0}.","A csomag hozzáadva a(z) {0} rendeléshez."
+scanner.order.added,Package attached to order {0}.,A csomag hozzáadva a(z) {0} rendeléshez.
 scanner.order.none_open,No open (Draft/Packing) orders available.,Nincs nyitott (Piszkozat/Összekészítés) rendelés.
 scanner.action.relocate,Relocate Shelf,Áthelyezés másik helyre
 scanner.action.verify,Verify Stocktake,Leltári ellenőrzés
@@ -153,11 +144,10 @@ inventory.batch_print,Batch Print Preview (A4 4-up),Csoportos nyomtatási előn�
 inventory.view_details,Details & History,Részletek és előzmények
 inventory.edit_title,Edit Package Details,Csomag adatainak szerkesztése
 inventory.edit.code_changed,QR code updated to match new details — reprint label recommended.,A QR-kód frissült az új adatok alapján — címke újranyomtatása javasolt.
-inventory.edit.saved,Package details updated successfully.,A csomag adatai sikeresen frissítve.
 inventory.discard,Discard Package,Selejtezés
-inventory.discard.confirm,"Mark package {0} as DISCARDED?","Biztosan selejtezi a(z) {0} csomagot?"
+inventory.discard.confirm,Mark package {0} as DISCARDED?,Biztosan selejtezi a(z) {0} csomagot?
 inventory.select_one,Please select a package from the table first.,Kérjük előbb válasszon ki egy csomagot a táblázatból.
-inventory.summary,"Showing {0} package(s) — Total: {1} kg","Megjelenítve: {0} csomag — Összesen: {1} kg"
+inventory.summary,Showing {0} package(s) — Total: {1} kg,Megjelenítve: {0} csomag — Összesen: {1} kg
 locations.title,Warehouse Locations,Raktárhelyek
 locations.zone,Zone,Zóna
 locations.aisle,Aisle,Sor
@@ -173,12 +163,11 @@ dictionaries.tab.targets,Target Groups,Célcsoportok
 dictionaries.tab.garments,Product / Garment Types,Termék / Ruhatípusok
 dictionaries.tab.qualities,Quality Grades,Minőségi osztályok
 dictionaries.tab.packages,Package Types,Csomagolás típusok
-dictionaries.default_price,Default Price / kg,Alapár / kg
 dictionaries.tare_weight,Tare Weight (kg),Tára súly (kg)
 dictionaries.max_weight,Max Weight (kg),Max súly (kg)
-dictionaries.code_hint,Uppercase letters/digits only (1-8 chars, no hyphens),Csak nagybetű és szám (1-8 karakter, kötőjel nélkül)
-dictionaries.in_use,"Cannot delete ''{0}'' because existing packages reference it. Deactivate it instead.","A(z) ''{0}'' elem nem törölhető, mert meglévő csomagok hivatkoznak rá. Használja az Inaktiválás funkciót."
-dictionaries.delete_confirm,"Delete code ''{0}'' permanently?","Véglegesen törli a(z) ''{0}'' kódot?"
+dictionaries.code_hint,"Uppercase letters/digits only (1-8 chars, no hyphens)","Csak nagybetű és szám (1-8 karakter, kötőjel nélkül)"
+dictionaries.in_use,Cannot delete '{0}' because existing packages reference it. Deactivate it instead.,"A(z) '{0}' elem nem törölhető, mert meglévő csomagok hivatkoznak rá. Használja az Inaktiválás funkciót."
+dictionaries.delete_confirm,Delete code '{0}' permanently?,Véglegesen törli a(z) '{0}' kódot?
 customers.title,B2B Customers,B2B Ügyfelek
 customers.company,Company Name,Cégnév
 customers.contact,Contact Person,Kapcsolattartó
@@ -188,7 +177,6 @@ customers.address,Address,Cím
 customers.tax_number,Tax Number,Adószám
 customers.add_title,Add B2B Customer,Új B2B ügyfél hozzáadása
 customers.edit_title,Edit B2B Customer,B2B ügyfél szerkesztése
-customers.order_history,Customer Order History,Ügyfél rendelési előzményei
 orders.title,Orders & Dispatch,Rendelések és Kiszállítás
 orders.new_order,New Order,Új rendelés
 orders.order_number,Order #,Rendelésszám
@@ -198,13 +186,9 @@ orders.total_price,Total Price,Végösszeg
 orders.items_title,Order Line Items (Allocated Packages),Rendelési tételek (Kiosztott csomagok)
 orders.add_by_scan,Scan QR to Add Bale,QR szkennelése rendeléshez
 orders.scan_placeholder,Scan or enter QR code + Enter...,Olvasson be QR kódot + Enter...
-orders.scan_added,"Added {0} to order {1}.","A(z) {0} csomag hozzáadva a(z) {1} rendeléshez."
 orders.add_from_stock,Pick from Stock,Kiválasztás készletből
 orders.remove_item,Remove Selected Item,Tétel eltávolítása
-orders.start_packing,Start Packing,Összekészítés indítása
-orders.mark_shipped,Ship Order,Rendelés kiszállítása
 orders.cancel_order,Cancel Order,Rendelés törlése
-orders.export_delivery_note,PDF Delivery Note,PDF Szállítólevél
 orders.empty_stock,No available IN_STOCK packages to pick.,Nincs szabad (Készleten lévő) választható csomag.
 orders.select_order,Please select an order first.,Kérjük előbb válasszon ki egy rendelést.
 orders.delivery_note.title,DELIVERY NOTE / PACKING LIST,SZÁLLÍTÓLEVÉL / CSOMAGJEGYZÉK
@@ -226,7 +210,7 @@ admin.db.restored,Database restored successfully.,Adatbázis sikeresen visszaál
 admin.i18n.export,Export translations.csv,translations.csv exportálása
 admin.i18n.reload,Load External translations.csv,Külső translations.csv betöltése
 admin.i18n.reset,Reset to Bundled Translations,Alapértelmezett fordítások visszaállítása
-admin.i18n.loaded,"Loaded languages: {0}","Betöltött nyelvek: {0}"
+admin.i18n.loaded,Loaded languages: {0},Betöltött nyelvek: {0}
 profile.title,Profile & Account Settings,Profil és fiókbeállítások
 profile.settings.tooltip,Profile & Account Settings,Profil és fiókbeállítások
 profile.avatar.upload,Upload Photo,Kép feltöltése
@@ -234,7 +218,6 @@ profile.avatar.remove,Remove Photo,Kép törlése
 profile.handle,Handle (@username),Handle (@felhasználónév)
 profile.last_name,Last Name,Vezetéknév
 profile.first_name,First Name,Keresztnév
-profile.fullname,Full Name,Teljes név
 profile.email,Email Address,E-mail cím
 profile.phone,Phone / Contact,Telefon / Elérhetőség
 profile.password.section,Change Password (Optional),Jelszó módosítása (opcionális)
@@ -242,7 +225,6 @@ profile.password.current,Current Password,Jelenlegi jelszó
 profile.password.new,New Password,Új jelszó
 profile.password.confirm,Confirm New Password,Új jelszó megerősítése
 profile.saved,Profile settings saved successfully.,A profilbeállítások sikeresen elmentve.
-profile.error.fullname,Full name cannot be empty.,A teljes név nem lehet üres.
 profile.error.name_required,Both last name and first name are required.,A vezetéknév és a keresztnév megadása is kötelező.
 profile.error.handle_invalid,"Handle must be 3–32 characters (letters, digits, '.', '_', '-').","A handle 3–32 karakter legyen (betűk, számok, '.', '_', '-')."
 profile.error.handle_taken,This handle is already in use by another account.,Ez a handle már foglalt egy másik fiók által.
@@ -277,21 +259,20 @@ docpreview.viewing,Previewing:,Előnézet:
 docpreview.send_email,Send by Email,Küldés e-mailben
 docpreview.save_pdf,Save Selected PDF,Kiválasztott PDF mentése
 docpreview.print,Print Selected,Kiválasztottak nyomtatása
-docpreview.none_selected,Please select at least one document to print, save, or email.,Kérjük jelöljön ki legalább egy dokumentumot a művelethez.
+docpreview.none_selected,"Please select at least one document to print, save, or email.",Kérjük jelöljön ki legalább egy dokumentumot a művelethez.
 docpreview.email.title,Send Documents by Email,Dokumentumok küldése e-mailben
 docpreview.email.to,Recipient Email,Címzett e-mail címe
 docpreview.email.subject,Subject,Tárgy
 docpreview.email.body,Message,Üzenet
 docpreview.email.attachments,Attached PDF(s) exported to:,Csatolandó PDF fájl(ok) mentve ide:
-docpreview.email.send_btn,Open Email Client & Folder,E-mail kliens és mappa megnyitása
-docpreview.email.opened,"PDF file(s) saved to {0}. Your email client and export folder have been opened.","A PDF fájl(ok) elmentve ide: {0}. Az e-mail kliens és az export mappa megnyitva."
+docpreview.email.opened,PDF file(s) saved to {0}. Your email client and export folder have been opened.,A PDF fájl(ok) elmentve ide: {0}. Az e-mail kliens és az export mappa megnyitva.
 invoice.title,Invoices & Financial Overview,Számlák és Pénzügyi Áttekintés
 invoice.kpi.income,Total Income (Outgoing),Összes bevétel (Kimenő)
 invoice.kpi.expenses,Total Expenses (Incoming),Összes kiadás (Bejövő)
 invoice.kpi.balance,Net Balance (Income − Expenses),Nettó egyenleg (Bevétel − Kiadás)
 invoice.kpi.unpaid,Open / Unpaid Invoices,Fizetésre váró számlák
-invoice.kpi.paid_sub,"Paid: {0}","Fizetve: {0}"
-invoice.kpi.unpaid_sub,"{0} open invoice(s)","{0} nyitott számla"
+invoice.kpi.paid_sub,Paid: {0},Fizetve: {0}
+invoice.kpi.unpaid_sub,{0} open invoice(s),{0} nyitott számla
 invoice.direction,Type,Irányszám / Típus
 invoice.direction.OUTGOING,Outgoing (Income),Kimenő (Bevétel)
 invoice.direction.INCOMING,Incoming (Expense),Bejövő (Kiadás)
@@ -338,17 +319,12 @@ invoice.number_optional,Invoice No. (auto if blank),Számlaszám (üresen automa
 invoice.tax_number,Tax Number,Adószám
 invoice.address,Address,Cím
 invoice.email,Email,E-mail
-invoice.vat_rate,VAT Rate (%),ÁFA kulcs (%)
 currency.label,Currency,Deviza
 currency.price_eur_kg,Price (EUR/kg),Ár (EUR/kg)
 currency.price_huf_kg,Price (HUF/kg),Ár (HUF/kg)
 currency.convert_btn,Convert ⇄,Átszámítás ⇄
-currency.reporting,Summary Currency,Összesítés devizája
-currency.fx_rate,Exchange Rate,Árfolyam
-currency.fx_save,Save Rate,Árfolyam mentése
-currency.fx_saved,"Exchange rate updated to 1 EUR = {0} HUF.","Árfolyam frissítve: 1 EUR = {0} HUF."
 customers.preferred_currency,Default Currency,Alapértelmezett deviza
-orders.currency_change_confirm,"Switch order {0} to {1} and recalculate all line item prices in {1}?","Átváltja a(z) {0} rendelést {1} devizára és újraszámolja a tételek árait {1} devizában?"
+orders.currency_change_confirm,Switch order {0} to {1} and recalculate all line item prices in {1}?,Átváltja a(z) {0} rendelést {1} devizára és újraszámolja a tételek árait {1} devizában?
 partners.type,Partner Type,Partner típusa
 partners.type.CUSTOMER,Customer (Buyer),Vevő (Ügyfél)
 partners.type.SUPPLIER,Provider (Supplier),Szállító / Szolgáltató
@@ -373,4 +349,10 @@ invoice.settings.scope.NON_EU,Outside EU (Export),EU-n kívüli (Export)
 invoice.settings.scope.ANY,Any / Manual,Bármely / Kézi
 invoice.settings.symbol,Symbol,Szimbólum
 invoice.settings.decimals,Decimals,Tizedesjegyek
-invoice.settings.in_use,"Cannot delete ''{0}'' because existing records reference it. Deactivate it instead.","A(z) ''{0}'' nem törölhető, mert meglévő tételek hivatkoznak rá. Használja az Inaktiválás gombot."
+invoice.settings.in_use,Cannot delete '{0}' because existing records reference it. Deactivate it instead.,"A(z) '{0}' nem törölhető, mert meglévő tételek hivatkoznak rá. Használja az Inaktiválás gombot."
+validation.company_required,Company name is required.,A cégnév megadása kötelező.
+validation.names_bilingual_required,English and Hungarian names are required.,Az angol és a magyar név megadása is kötelező.
+validation.prices_non_negative,Prices must be 0 or greater.,Az árak nem lehetnek negatívak.
+validation.invalid_package_weights,Tare weight must be >= 0 and max weight must be > 0.,"A tára súly >= 0, a max. súly pedig > 0 kell legyen."
+validation.location_fields_required,All fields are required and capacity must be > 0.,"Minden mező kitöltése kötelező, és a kapacitás > 0 kell legyen."
+orders.no_active_buyers,No active buyers available.,Nincs aktív vevő (ügyfél) a rendszerben.
