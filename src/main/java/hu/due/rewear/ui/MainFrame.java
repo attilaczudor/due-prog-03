@@ -74,7 +74,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JPanel contentHost = new JPanel(cardLayout);
     private final Map<String, Supplier<NavigableView>> viewFactories = new LinkedHashMap<>();
     private final Map<String, NavigableView> views = new LinkedHashMap<>();
-    private final Map<String, JToggleButton> navButtons = new LinkedHashMap<>();
+    private final Map<String, BadgeNavButton> navButtons = new LinkedHashMap<>();
     private ButtonGroup navGroup = new ButtonGroup();
 
     private final JPanel sidebar = new JPanel(new BorderLayout());
@@ -299,8 +299,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         brandLogoLabel.setIcon(LogoAssets.logoIcon(sidebarCollapsed ? 42 : 52, ThemeManager.isDarkMode()));
 
         // Update nav buttons: icons + text when expanded, centered icon-only when collapsed
-        for (Map.Entry<String, JToggleButton> entry : navButtons.entrySet()) {
-            JToggleButton btn = entry.getValue();
+        for (Map.Entry<String, BadgeNavButton> entry : navButtons.entrySet()) {
+            BadgeNavButton btn = entry.getValue();
+            btn.setCollapsedMode(sidebarCollapsed);
             String i18nKey = (String) btn.getClientProperty("i18nKey");
             String fullLabel = i18nKey != null ? i18n.t(i18nKey) : "";
             btn.setToolTipText(fullLabel);
@@ -393,7 +394,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     }
 
     private void addNavButton(JPanel container, String viewKey, String i18nKey) {
-        JToggleButton btn = new JToggleButton();
+        BadgeNavButton btn = new BadgeNavButton();
         btn.setAlignmentX(CENTER_ALIGNMENT);
         btn.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
         btn.setFocusPainted(false);
@@ -507,8 +508,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         if (!ctx.getSession().isAuthenticated()) {
             return;
         }
-        long uid = ctx.getSession().requireCurrentUser().id();
-        int unread = ctx.getNotificationService().countUnread(uid);
+        User me = ctx.getSession().requireCurrentUser();
+        int unread = ctx.getNotificationService().countUnread(me.id());
         String label = ctx.getI18n().t("todo.tab.notifications").toUpperCase(Locale.ROOT);
         if (unread > 0) {
             notificationBellBtn.setText("[ ! " + unread + " ]  " + label);
@@ -516,6 +517,102 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         } else {
             notificationBellBtn.setText("[ 0 ]  " + label);
             BrutalistStyle.styleSecondaryButton(notificationBellBtn);
+        }
+        refreshSidebarBadges(me, unread);
+    }
+
+    private void refreshSidebarBadges(User me, int unreadNotifications) {
+        setNavBadge(VIEW_NOTIFICATIONS, unreadNotifications);
+        setNavBadge(VIEW_EMAIL, ctx.getEmailService().countUnreadInbox(me.id()));
+        setNavBadge(VIEW_MESSAGES, ctx.getChatService().countTotalUnread(me.id()));
+
+        if (navButtons.containsKey(VIEW_TODO)) {
+            int sysCount = ctx.getTodoService().buildSystemTodosFor(me, ctx.getI18n()).size();
+            int openPersonal = (int) ctx.getTodoService().listPersonalTodos(me.id()).stream()
+                    .filter(t -> !t.completed()).count();
+            setNavBadge(VIEW_TODO, sysCount + openPersonal);
+        }
+        if (navButtons.containsKey(VIEW_TRANSPORT)) {
+            int putaway = ctx.getTransportService().findPutawayQueue().size();
+            Long driverFilter = ctx.getSession().isForklift() ? me.id() : null;
+            int pendingStaging = (int) ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter).stream()
+                    .filter(t -> !t.isAtDispatchZone()).count();
+            setNavBadge(VIEW_TRANSPORT, putaway + pendingStaging);
+        }
+        if (navButtons.containsKey(VIEW_ORDERS)) {
+            setNavBadge(VIEW_ORDERS, ctx.getOrderDao().countOpenOrders());
+        }
+        if (navButtons.containsKey(VIEW_INVOICES)) {
+            int overdue = (int) ctx.getInvoiceDao().findAll().stream()
+                    .filter(inv -> inv.status() == hu.due.rewear.model.InvoiceStatus.OVERDUE).count();
+            setNavBadge(VIEW_INVOICES, overdue);
+        }
+    }
+
+    private void setNavBadge(String viewKey, int count) {
+        BadgeNavButton btn = navButtons.get(viewKey);
+        if (btn != null) {
+            btn.setBadgeCount(Math.max(0, count));
+        }
+    }
+
+    /**
+     * Sidebar navigation button with an automatic red notification badge:
+     * right-aligned numbered badge when expanded, and a top-right red dot without number when collapsed.
+     */
+    private static final class BadgeNavButton extends JToggleButton {
+        private static final java.awt.Color BADGE_RED = new java.awt.Color(0xDC2626);
+        private int badgeCount = 0;
+        private boolean collapsedMode = false;
+
+        void setBadgeCount(int count) {
+            if (this.badgeCount != count) {
+                this.badgeCount = count;
+                repaint();
+            }
+        }
+
+        void setCollapsedMode(boolean collapsed) {
+            if (this.collapsedMode != collapsed) {
+                this.collapsedMode = collapsed;
+                repaint();
+            }
+        }
+
+        @Override
+        protected void paintComponent(java.awt.Graphics g) {
+            super.paintComponent(g);
+            if (badgeCount <= 0) {
+                return;
+            }
+            java.awt.Graphics2D g2 = (java.awt.Graphics2D) g.create();
+            try {
+                g2.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING, java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setRenderingHint(java.awt.RenderingHints.KEY_TEXT_ANTIALIASING, java.awt.RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
+                g2.setColor(BADGE_RED);
+                if (collapsedMode) {
+                    int dot = 8;
+                    int x = getWidth() - dot - 5;
+                    int y = 5;
+                    g2.fillOval(x, y, dot, dot);
+                } else {
+                    String text = badgeCount > 99 ? "99+" : String.valueOf(badgeCount);
+                    g2.setFont(ThemeManager.monoFont(Font.BOLD, 10.5f));
+                    java.awt.FontMetrics fm = g2.getFontMetrics();
+                    int textW = fm.stringWidth(text);
+                    int badgeH = 18;
+                    int badgeW = Math.max(badgeH, textW + 10);
+                    int x = getWidth() - badgeW - 8;
+                    int y = (getHeight() - badgeH) / 2;
+                    g2.fillRoundRect(x, y, badgeW, badgeH, badgeH, badgeH);
+                    g2.setColor(java.awt.Color.WHITE);
+                    int tx = x + (badgeW - textW) / 2;
+                    int ty = y + ((badgeH - fm.getHeight()) / 2) + fm.getAscent();
+                    g2.drawString(text, tx, ty);
+                }
+            } finally {
+                g2.dispose();
+            }
         }
     }
 
@@ -559,8 +656,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         String unselHover = dark ? "#1C1C1C" : "#EAEAEA";
         String unselPress = dark ? "#333333" : "#CFCFCF";
 
-        for (Map.Entry<String, JToggleButton> entry : navButtons.entrySet()) {
-            JToggleButton btn = entry.getValue();
+        for (Map.Entry<String, BadgeNavButton> entry : navButtons.entrySet()) {
+            BadgeNavButton btn = entry.getValue();
             boolean selected = entry.getKey().equals(currentViewKey);
             btn.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(ThemeManager.border(), 1),
