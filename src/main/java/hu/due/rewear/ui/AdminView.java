@@ -92,6 +92,9 @@ public final class AdminView extends JPanel implements NavigableView {
     // Tab 5: Email Settings (SUPER_ADMIN only)
     private AdminEmailSettingsPanel emailSettingsPanel;
 
+    // Tab 6: Roles & Modules Access Matrix (SUPER_ADMIN only)
+    private AdminModulesPanel modulesPanel;
+
     private List<User> users = List.of();
     private List<StockMovement> allMovements = List.of();
 
@@ -195,6 +198,8 @@ public final class AdminView extends JPanel implements NavigableView {
         if (ctx.getSession().isSuperAdmin()) {
             emailSettingsPanel = new AdminEmailSettingsPanel(ctx, this::refreshData);
             tabs.addTab("", emailSettingsPanel);
+            modulesPanel = new AdminModulesPanel(ctx);
+            tabs.addTab("", modulesPanel);
         }
         add(tabs, BorderLayout.CENTER);
     }
@@ -502,6 +507,9 @@ public final class AdminView extends JPanel implements NavigableView {
         if (emailSettingsPanel != null) {
             emailSettingsPanel.refreshData();
         }
+        if (modulesPanel != null) {
+            modulesPanel.refreshData();
+        }
     }
 
     private void updateMaintenanceInfo() {
@@ -581,6 +589,9 @@ public final class AdminView extends JPanel implements NavigableView {
         if (emailSettingsPanel != null) {
             emailSettingsPanel.refreshData();
         }
+        if (modulesPanel != null) {
+            modulesPanel.refreshData();
+        }
     }
 
     private void updateSystemDiagnostics() {
@@ -636,6 +647,10 @@ public final class AdminView extends JPanel implements NavigableView {
         if (emailSettingsPanel != null && tabs.getTabCount() > 4) {
             tabs.setTitleAt(4, i18n.t("admin.tab.mail").toUpperCase());
             emailSettingsPanel.applyTranslations();
+        }
+        if (modulesPanel != null && tabs.getTabCount() > 5) {
+            tabs.setTitleAt(5, i18n.t("admin.tab.modules").toUpperCase());
+            modulesPanel.applyTranslations();
         }
 
         runtimeCardTitle.setText(i18n.t("admin.system.runtime").toUpperCase());
@@ -698,6 +713,9 @@ public final class AdminView extends JPanel implements NavigableView {
         BrutalistStyle.styleTable(packagesTable);
         if (emailSettingsPanel != null) {
             emailSettingsPanel.applyTheme();
+        }
+        if (modulesPanel != null) {
+            modulesPanel.applyTheme();
         }
     }
 }

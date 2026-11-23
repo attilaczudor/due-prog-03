@@ -343,3 +343,12 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_room ON chat_messages(room_id, crea
 CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_room_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
 CREATE INDEX IF NOT EXISTS idx_user_todos_user ON user_todos(user_id, completed);
+
+-- 24. Super-Admin-managed Role -> Module access matrix (each sidebar menu item is a toggleable module)
+CREATE TABLE IF NOT EXISTS role_module_permissions (
+    role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+    module_code TEXT    NOT NULL,
+    enabled     INTEGER NOT NULL DEFAULT 1,
+    updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    PRIMARY KEY (role_id, module_code)
+);

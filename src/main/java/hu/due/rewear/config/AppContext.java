@@ -11,6 +11,7 @@ import hu.due.rewear.dao.NotificationDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
 import hu.due.rewear.dao.RoleDao;
+import hu.due.rewear.dao.RoleModulePermissionDao;
 import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.TodoDao;
@@ -34,6 +35,7 @@ import hu.due.rewear.service.PartnerStatementService;
 import hu.due.rewear.service.ProductCodeService;
 import hu.due.rewear.service.QrCodeService;
 import hu.due.rewear.service.ReceiptVaultService;
+import hu.due.rewear.service.RoleModuleService;
 import hu.due.rewear.service.ScannerService;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.TicketLabelPainter;
@@ -75,6 +77,7 @@ public final class AppContext {
     private final ChatDao chatDao;
     private final NotificationDao notificationDao;
     private final TodoDao todoDao;
+    private final RoleModulePermissionDao roleModulePermissionDao;
 
     private final AuthService authService;
     private final QrCodeService qrCodeService;
@@ -95,6 +98,7 @@ public final class AppContext {
     private final TransportService transportService;
     private final NotificationService notificationService;
     private final TodoService todoService;
+    private final RoleModuleService roleModuleService;
     private final BackupService backupService;
 
     public AppContext() {
@@ -127,6 +131,9 @@ public final class AppContext {
         this.chatDao = new ChatDao(databaseManager);
         this.notificationDao = new NotificationDao(databaseManager);
         this.todoDao = new TodoDao(databaseManager);
+        this.roleModulePermissionDao = new RoleModulePermissionDao(databaseManager);
+        this.roleModuleService = new RoleModuleService(roleModulePermissionDao, session);
+        this.session.setRoleModuleService(roleModuleService);
 
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
@@ -327,6 +334,10 @@ public final class AppContext {
 
     public TodoService getTodoService() {
         return todoService;
+    }
+
+    public RoleModuleService getRoleModuleService() {
+        return roleModuleService;
     }
 
     public BackupService getBackupService() {

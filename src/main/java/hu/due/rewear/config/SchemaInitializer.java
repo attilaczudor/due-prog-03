@@ -443,6 +443,17 @@ public final class SchemaInitializer {
             }
         }
         backfillSplitUserNames(conn);
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+                    CREATE TABLE IF NOT EXISTS role_module_permissions (
+                        role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
+                        module_code TEXT    NOT NULL,
+                        enabled     INTEGER NOT NULL DEFAULT 1,
+                        updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+                        PRIMARY KEY (role_id, module_code)
+                    )
+                    """);
+        }
     }
 
     private void backfillSplitUserNames(Connection conn) throws SQLException {

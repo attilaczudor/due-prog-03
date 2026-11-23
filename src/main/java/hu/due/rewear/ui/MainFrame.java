@@ -5,6 +5,7 @@ import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.i18n.LanguageChangeListener;
+import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.User;
 import hu.due.rewear.service.SessionContext;
 
@@ -98,6 +99,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JLabel activeViewTitleLabel = new JLabel();
     private final JButton notificationBellBtn = new JButton();
     private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshSidebarBadges);
+    private final Runnable moduleListener = () -> javax.swing.SwingUtilities.invokeLater(this::rebuildSidebarNavigation);
     private final javax.swing.Timer autoRefreshTimer;
     private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel statusBarLabel = new JLabel();
@@ -123,6 +125,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
         ctx.getNotificationService().addChangeListener(notifListener);
+        ctx.getRoleModuleService().addChangeListener(moduleListener);
         refreshSidebarBadges();
         // Automatic background refresh every 10s for live sidebar badges & operational feeds
         this.autoRefreshTimer = new javax.swing.Timer(10_000, e -> performBackgroundAutoRefresh());
@@ -241,47 +244,25 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         navGroup = new ButtonGroup();
 
         SessionContext session = ctx.getSession();
-        addNavButton(navList, VIEW_DASHBOARD, "nav.dashboard");
-        addNavButton(navList, VIEW_TODO, "nav.todo");
-        if (session.canUseIntake()) {
-            addNavButton(navList, VIEW_INTAKE, "nav.intake");
-        }
-        if (session.canUseTransportQueue()) {
-            addNavButton(navList, VIEW_PUTAWAY, "nav.putaway");
-            addNavButton(navList, VIEW_STAGING, "nav.staging");
-        }
-        if (session.canUseQrScannerStation()) {
-            addNavButton(navList, VIEW_SCANNER, "nav.scanner");
-        }
-        addNavButton(navList, VIEW_INVENTORY, "nav.inventory");
 
-        if (session.canManageLocationsAndDictionaries()) {
-            navList.add(Box.createVerticalStrut(7));
-            navList.add(createHairlineSeparator());
-            navList.add(Box.createVerticalStrut(7));
-            addNavButton(navList, VIEW_LOCATIONS, "nav.locations");
-            addNavButton(navList, VIEW_DICTIONARIES, "nav.dictionaries");
-        }
-        if (session.canManageOrders()) {
-            addNavButton(navList, VIEW_CUSTOMERS, "nav.customers");
-            addNavButton(navList, VIEW_ORDERS, "nav.orders");
-            addNavButton(navList, VIEW_INVOICES, "nav.invoices");
-        }
+        // Core & Operations modules
+        addModuleGroup(session, false,
+                AppModule.DASHBOARD, AppModule.TODO,
+                AppModule.INTAKE, AppModule.PUTAWAY, AppModule.STAGING,
+                AppModule.SCANNER, AppModule.INVENTORY);
 
-        // Communications (available to ALL logged-in users)
-        navList.add(Box.createVerticalStrut(7));
-        navList.add(createHairlineSeparator());
-        navList.add(Box.createVerticalStrut(7));
-        addNavButton(navList, VIEW_NOTIFICATIONS, "nav.notifications");
-        addNavButton(navList, VIEW_MESSAGES, "nav.messages");
-        addNavButton(navList, VIEW_EMAIL, "nav.email");
+        // Management modules (Locations, Dictionaries, Customers, Orders, Invoices)
+        addModuleGroup(session, true,
+                AppModule.LOCATIONS, AppModule.DICTIONARIES,
+                AppModule.CUSTOMERS, AppModule.ORDERS, AppModule.INVOICES);
 
-        if (session.canManageUsersAndMaintenance()) {
-            navList.add(Box.createVerticalStrut(7));
-            navList.add(createHairlineSeparator());
-            navList.add(Box.createVerticalStrut(7));
-            addNavButton(navList, VIEW_ADMIN, "nav.admin");
-        }
+        // Communications modules (Notifications, Messages, Email — in that order for all roles)
+        addModuleGroup(session, true,
+                AppModule.NOTIFICATIONS, AppModule.MESSAGES, AppModule.EMAIL);
+
+        // Administration module
+        addModuleGroup(session, true, AppModule.ADMIN);
+
         navList.add(Box.createVerticalGlue());
 
         if (currentViewKey != null && !navButtons.containsKey(currentViewKey)) {
@@ -292,6 +273,27 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             navButtons.get(currentViewKey).setSelected(true);
         }
         applySidebarState();
+        updateNavButtonStyles();
+    }
+
+    private void addModuleGroup(SessionContext session, boolean withTopDivider, AppModule... modules) {
+        List<AppModule> visible = new ArrayList<>();
+        for (AppModule mod : modules) {
+            if (session.canAccessModule(mod)) {
+                visible.add(mod);
+            }
+        }
+        if (visible.isEmpty()) {
+            return;
+        }
+        if (withTopDivider && !navButtons.isEmpty()) {
+            navList.add(Box.createVerticalStrut(7));
+            navList.add(createHairlineSeparator());
+            navList.add(Box.createVerticalStrut(7));
+        }
+        for (AppModule mod : visible) {
+            addNavButton(navList, mod.viewKey(), mod.navI18nKey());
+        }
     }
 
     private void applySidebarState() {
@@ -487,6 +489,10 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public void navigateTo(String viewKey) {
         if (VIEW_TRANSPORT.equals(viewKey)) {
             viewKey = VIEW_PUTAWAY;
+        }
+        var targetMod = AppModule.fromViewKey(viewKey);
+        if (targetMod.isPresent() && !ctx.getSession().canAccessModule(targetMod.get())) {
+            return;
         }
         NavigableView view = views.get(viewKey);
         if (view == null) {
@@ -801,6 +807,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         ctx.getI18n().removeListener(this);
         ThemeManager.removeListener(this);
         ctx.getNotificationService().removeChangeListener(notifListener);
+        ctx.getRoleModuleService().removeChangeListener(moduleListener);
         ctx.getAuthService().logout();
         dispose();
         onLogout.run();

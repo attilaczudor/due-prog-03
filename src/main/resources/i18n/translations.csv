@@ -431,6 +431,18 @@ transport.staging.summary,Pending pickup: {0} / Total allocated: {1} package(s),
 transport.status.pickup,PICKUP NEEDED,ELSZÁLLÍTANDÓ
 transport.status.staged,AT DISPATCH,KIADÓ ZÓNÁBAN
 admin.tab.mail,Email Settings,E-mail beállítások
+admin.tab.modules,Roles & Modules,Szerepkörök és modulok
+admin.modules.info,Toggle which menu modules are enabled for each user role. Super Admin always has full access.,Kapcsold be vagy ki az egyes menümodulokat szerepkörönként. A Szuper Admin mindenhez hozzáfér.
+admin.modules.reset,Reset to Defaults,Alapértelmezések visszaállítása
+admin.modules.reset_confirm,Reset all role module permissions back to default rules?,Visszaállítod az összes szerepkör moduljogosultságait az alapértelmezett szabályokra?
+admin.modules.col.module,Module,Modul
+admin.modules.col.category,Category,Kategória
+admin.modules.always_on,ALWAYS ON,MINDIG AKTÍV
+module.cat.core,Core,Alap
+module.cat.operations,Operations,Operáció
+module.cat.management,Management,Menedzsment
+module.cat.communications,Communications,Kommunikáció
+module.cat.administration,Administration,Adminisztráció
 admin.mail.domain_section,Company Email Domain & Mode,Céges e-mail domain és működési mód
 admin.mail.sim_mode,Offline Demo Mode (local mailbox simulation),Offline demó mód (helyi postafiók szimuláció)
 admin.mail.sync_users,Sync All User Emails,Összes felhasználói e-mail szinkronizálása

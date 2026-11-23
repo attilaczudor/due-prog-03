@@ -1,16 +1,36 @@
 package hu.due.rewear.service;
 
+import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 
 import java.util.Optional;
 
 /**
- * Holds the currently authenticated user and centralizes role-based access control (RBAC) checks.
+ * Holds the currently authenticated user and centralizes role-based access control (RBAC)
+ * and Super-Admin-managed module permission checks.
  */
 public final class SessionContext {
 
     private User currentUser;
+    private RoleModuleService roleModuleService;
+
+    public synchronized void setRoleModuleService(RoleModuleService roleModuleService) {
+        this.roleModuleService = roleModuleService;
+    }
+
+    public synchronized boolean canAccessModule(AppModule module) {
+        if (currentUser == null || module == null) {
+            return false;
+        }
+        if (currentUser.roleCode() == RoleCode.SUPER_ADMIN || module.isAlwaysEnabled()) {
+            return true;
+        }
+        if (roleModuleService != null) {
+            return roleModuleService.isModuleEnabled(currentUser.roleCode(), module);
+        }
+        return module.defaultEnabledFor(currentUser.roleCode());
+    }
 
     public synchronized void login(User user) {
         this.currentUser = user;
