@@ -73,6 +73,11 @@ public final class SessionContext {
         return isManagerOrAdmin() || isForklift();
     }
 
+    /** Only Management/Admins may send or receive external emails; Operators &amp; Forklift Drivers are internal-only. */
+    public boolean canUseExternalEmail() {
+        return isManagerOrAdmin();
+    }
+
     public boolean canManageOrders() {
         return isManagerOrAdmin();
     }

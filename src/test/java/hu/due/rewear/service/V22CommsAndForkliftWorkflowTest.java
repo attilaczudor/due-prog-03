@@ -150,6 +150,21 @@ class V22CommsAndForkliftWorkflowTest {
         assertEquals(mgrUnreadBefore + 1, ctx.getEmailService().countUnreadInbox(refreshedMgr.id()));
         List<EmailMessage> sent = ctx.getEmailService().listFolder(refreshedSuper.id(), EmailMessage.FOLDER_SENT);
         assertTrue(sent.stream().anyMatch(m -> m.subject().equals("Weekly Dispatch Sync") && m.external()));
+
+        // Operator & Forklift Driver are strictly internal-only (cannot send or receive external emails)
+        User operator = ctx.getUserDao().findByUsername("operator").orElseThrow();
+        User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
+        assertThrows(IllegalArgumentException.class, () ->
+                ctx.getEmailService().sendEmail(operator, "external@partner.at", "", "Hello", "Test", null));
+        assertThrows(IllegalArgumentException.class, () ->
+                ctx.getEmailService().sendEmail(forklift, "external@partner.at", "", "Hello", "Test", null));
+        assertThrows(IllegalArgumentException.class, () ->
+                ctx.getEmailService().simulateIncomingExternalEmail(forklift, "external@partner.at", "Hi", "Body"));
+
+        // Internal email between Forklift Driver and Operator works cleanly
+        int opUnreadBefore = ctx.getEmailService().countUnreadInbox(operator.id());
+        ctx.getEmailService().sendEmail(forklift, operator.email(), "", "Station pickup", "On my way to ST-OP-01", null);
+        assertEquals(opUnreadBefore + 1, ctx.getEmailService().countUnreadInbox(operator.id()));
     }
 
     @Test

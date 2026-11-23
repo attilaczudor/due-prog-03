@@ -471,3 +471,5 @@ chat.members,Members,Tagok
 chat.add_member,Add Member,Tag hozzáadása
 chat.all_members_in,All active users are already members of this room.,Minden aktív felhasználó már tagja ennek a szobának.
 chat.members_count,{0} member(s),{0} tag
+email.scope.all,Internal & External Mail,Belső és külső levelezés
+email.scope.internal_only,Internal Team Mail Only,Csak belső céges levelezés

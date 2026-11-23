@@ -6,6 +6,7 @@ import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.model.EmailMessage;
 import hu.due.rewear.model.EmailSettings;
+import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -105,6 +106,12 @@ public final class EmailService {
             }
         }
 
+        if (hasExternal && isInternalOnlyRole(sender.roleCode())) {
+            throw new IllegalArgumentException(
+                    "Operators and Forklift Drivers can only send emails to internal company team members (@"
+                            + cfg.companyDomain() + ").");
+        }
+
         String status = hasExternal
                 ? (cfg.simulationMode()
                         ? "SENT (SMTP DEMO: " + cfg.smtpHost() + ":" + cfg.smtpPort() + ")"
@@ -141,6 +148,13 @@ public final class EmailService {
 
     /** Simulates an incoming external email (e.g. from a B2B customer/supplier via IMAP) into {@code recipient}'s Inbox. */
     public void simulateIncomingExternalEmail(User recipient, String fromAddress, String subject, String body) {
+        if (recipient == null) {
+            throw new IllegalArgumentException("Recipient is required.");
+        }
+        if (isInternalOnlyRole(recipient.roleCode())) {
+            throw new IllegalArgumentException(
+                    "Operators and Forklift Drivers cannot receive external emails.");
+        }
         EmailSettings cfg = settingsDao.getEmailSettings();
         String toAddr = (recipient.email() != null && !recipient.email().isBlank())
                 ? recipient.email().trim()
@@ -164,7 +178,18 @@ public final class EmailService {
     }
 
     public List<EmailMessage> listFolder(long userId, String folder) {
-        return emailDao.findByOwnerAndFolder(userId, folder);
+        List<EmailMessage> raw = emailDao.findByOwnerAndFolder(userId, folder);
+        boolean internalOnly = userDao.findById(userId)
+                .map(u -> isInternalOnlyRole(u.roleCode()))
+                .orElse(false);
+        if (!internalOnly) {
+            return raw;
+        }
+        return raw.stream().filter(m -> !m.external()).toList();
+    }
+
+    public static boolean isInternalOnlyRole(RoleCode role) {
+        return role == RoleCode.OPERATOR || role == RoleCode.FORKLIFT;
     }
 
     public int countUnreadInbox(long userId) {

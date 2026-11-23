@@ -53,6 +53,7 @@ public final class EmailView extends JPanel implements NavigableView {
     private final AppContext ctx;
 
     private final JLabel accountLabel = new JLabel();
+    private final JLabel scopeBadgeLabel = new JLabel();
     private final JToggleButton inboxBtn = new JToggleButton();
     private final JToggleButton sentBtn = new JToggleButton();
     private final JToggleButton draftsBtn = new JToggleButton();
@@ -110,6 +111,9 @@ public final class EmailView extends JPanel implements NavigableView {
         accountLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
         accountLabel.setAlignmentX(LEFT_ALIGNMENT);
         folderPanel.add(accountLabel);
+        scopeBadgeLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 10.5f));
+        scopeBadgeLabel.setAlignmentX(LEFT_ALIGNMENT);
+        folderPanel.add(scopeBadgeLabel);
         folderPanel.add(Box.createVerticalStrut(10));
 
         for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
@@ -285,7 +289,7 @@ public final class EmailView extends JPanel implements NavigableView {
             }
         });
 
-        // Quick-pick recipient directory (company teammates + B2B partners)
+        // Quick-pick recipient directory (company teammates; B2B external partners only for Manager/Admin/SuperAdmin)
         JComboBox<String> directoryCombo = new JComboBox<>();
         directoryCombo.addItem("— " + i18n.t("email.quick_pick") + " —");
         for (User u : ctx.getUserDao().findAll()) {
@@ -293,9 +297,11 @@ public final class EmailView extends JPanel implements NavigableView {
                 directoryCombo.addItem(u.displayName() + " <" + u.email() + ">");
             }
         }
-        for (Customer c : ctx.getCustomerDao().findAll(true)) {
-            if (c.email() != null && !c.email().isBlank()) {
-                directoryCombo.addItem(c.name() + " <" + c.email() + ">");
+        if (ctx.getSession().canUseExternalEmail()) {
+            for (Customer c : ctx.getCustomerDao().findAll(true)) {
+                if (c.email() != null && !c.email().isBlank()) {
+                    directoryCombo.addItem(c.name() + " <" + c.email() + ">");
+                }
             }
         }
         directoryCombo.addActionListener(e -> {
@@ -392,10 +398,16 @@ public final class EmailView extends JPanel implements NavigableView {
     @Override
     public void refreshData() {
         User me = ctx.getSession().requireCurrentUser();
+        boolean externalAllowed = ctx.getSession().canUseExternalEmail();
+        simIncomingBtn.setVisible(externalAllowed);
+
         String addr = (me.email() != null && !me.email().isBlank())
                 ? me.email()
                 : ctx.getEmailService().generateDefaultEmail(me.safeFirstName(), me.safeLastName(), me.username());
         accountLabel.setText(addr);
+        scopeBadgeLabel.setText(externalAllowed
+                ? "[ " + ctx.getI18n().t("email.scope.all").toUpperCase(Locale.ROOT) + " ]"
+                : "[ " + ctx.getI18n().t("email.scope.internal_only").toUpperCase(Locale.ROOT) + " ]");
         refreshFolderBadges();
 
         currentEmails = ctx.getEmailService().listFolder(me.id(), activeFolder);
@@ -405,7 +417,7 @@ public final class EmailView extends JPanel implements NavigableView {
                     || EmailMessage.FOLDER_DRAFTS.equalsIgnoreCase(activeFolder)
                     ? m.toAddresses()
                     : m.fromAddress();
-            String badge = m.read() ? " " : "[NEW]";
+            String badge = m.read() ? "✓" : "●";
             String subj = (m.hasAttachment() ? "[PDF] " : "") + m.subject();
             listModel.addRow(new Object[]{
                     badge,
@@ -415,11 +427,29 @@ public final class EmailView extends JPanel implements NavigableView {
                     m.createdAt() != null ? DT_FMT.format(m.createdAt()) : ""
             });
         }
+        configureTableColumnWidths();
         if (!currentEmails.isEmpty()) {
             listTable.setRowSelectionInterval(0, 0);
         } else {
             renderSelectedEmail();
         }
+    }
+
+    private void configureTableColumnWidths() {
+        if (listTable.getColumnCount() < 5) {
+            return;
+        }
+        var cm = listTable.getColumnModel();
+        cm.getColumn(0).setPreferredWidth(44);
+        cm.getColumn(0).setMaxWidth(52);
+        cm.getColumn(0).setMinWidth(40);
+        var center = new javax.swing.table.DefaultTableCellRenderer();
+        center.setHorizontalAlignment(SwingConstants.CENTER);
+        cm.getColumn(0).setCellRenderer(center);
+        cm.getColumn(1).setPreferredWidth(210);
+        cm.getColumn(2).setPreferredWidth(280);
+        cm.getColumn(3).setPreferredWidth(160);
+        cm.getColumn(4).setPreferredWidth(135);
     }
 
     @Override
@@ -434,12 +464,13 @@ public final class EmailView extends JPanel implements NavigableView {
         refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
 
         listModel.setColumnIdentifiers(new Object[]{
-                "",
+                "●",
                 i18n.t("email.from_to").toUpperCase(Locale.ROOT),
                 i18n.t("email.subject").toUpperCase(Locale.ROOT),
                 i18n.t("common.status").toUpperCase(Locale.ROOT),
                 i18n.t("common.date").toUpperCase(Locale.ROOT)
         });
+        configureTableColumnWidths();
         refreshFolderBadges();
         applyTheme();
     }
