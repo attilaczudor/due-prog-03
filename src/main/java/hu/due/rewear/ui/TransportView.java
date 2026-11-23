@@ -17,7 +17,6 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
@@ -43,13 +42,17 @@ import java.util.Locale;
  */
 public final class TransportView extends JPanel implements NavigableView {
 
+    public enum Mode {
+        PUTAWAY,
+        STAGING
+    }
+
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final AppContext ctx;
+    private final Mode mode;
 
-    private final JTabbedPane tabs = new JTabbedPane();
-
-    // Tab 1: Putaway (OPERATOR_STATION -> STORAGE)
+    // Putaway (OPERATOR_STATION -> STORAGE)
     private final JLabel putawayTargetLabel = new JLabel();
     private final JComboBox<LocChoice> storageCombo = new JComboBox<>();
     private final JButton moveToStorageBtn = new JButton();
@@ -79,7 +82,12 @@ public final class TransportView extends JPanel implements NavigableView {
     }
 
     public TransportView(AppContext ctx) {
+        this(ctx, Mode.PUTAWAY);
+    }
+
+    public TransportView(AppContext ctx, Mode mode) {
         this.ctx = ctx;
+        this.mode = mode;
         setLayout(new BorderLayout(0, 10));
         setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
         buildUi();
@@ -89,43 +97,39 @@ public final class TransportView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Tab 1: Putaway
-        JPanel putawayPanel = new JPanel(new BorderLayout(0, 8));
-        putawayPanel.setBorder(BorderFactory.createEmptyBorder(10, 4, 4, 4));
-        JPanel putawayBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
-        putawayBar.add(putawayTargetLabel);
-        putawayBar.add(storageCombo);
-        putawayBar.add(moveToStorageBtn);
-        putawayPanel.add(putawayBar, BorderLayout.NORTH);
+        if (mode == Mode.PUTAWAY) {
+            JPanel putawayPanel = new JPanel(new BorderLayout(0, 8));
+            JPanel putawayBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
+            putawayBar.add(putawayTargetLabel);
+            putawayBar.add(storageCombo);
+            putawayBar.add(moveToStorageBtn);
+            putawayPanel.add(putawayBar, BorderLayout.NORTH);
 
-        BrutalistStyle.styleTable(putawayTable);
-        putawayTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        putawayPanel.add(new JScrollPane(putawayTable), BorderLayout.CENTER);
-        putawaySummaryLabel.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
-        putawayPanel.add(putawaySummaryLabel, BorderLayout.SOUTH);
+            BrutalistStyle.styleTable(putawayTable);
+            putawayTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+            putawayPanel.add(new JScrollPane(putawayTable), BorderLayout.CENTER);
+            putawaySummaryLabel.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
+            putawayPanel.add(putawaySummaryLabel, BorderLayout.SOUTH);
+            add(putawayPanel, BorderLayout.CENTER);
+        } else {
+            JPanel stagingPanel = new JPanel(new BorderLayout(0, 8));
+            JPanel stagingBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
+            stagingBar.add(scanCollectLabel);
+            scanCollectField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
+            stagingBar.add(scanCollectField);
+            stagingBar.add(scanCollectBtn);
+            stagingBar.add(stagingTargetLabel);
+            stagingBar.add(dispatchCombo);
+            stagingBar.add(moveToDispatchBtn);
+            stagingPanel.add(stagingBar, BorderLayout.NORTH);
 
-        // Tab 2: Order Collection (Scan Barcode/QR -> Collection Site)
-        JPanel stagingPanel = new JPanel(new BorderLayout(0, 8));
-        stagingPanel.setBorder(BorderFactory.createEmptyBorder(10, 4, 4, 4));
-        JPanel stagingBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
-        stagingBar.add(scanCollectLabel);
-        scanCollectField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
-        stagingBar.add(scanCollectField);
-        stagingBar.add(scanCollectBtn);
-        stagingBar.add(stagingTargetLabel);
-        stagingBar.add(dispatchCombo);
-        stagingBar.add(moveToDispatchBtn);
-        stagingPanel.add(stagingBar, BorderLayout.NORTH);
-
-        BrutalistStyle.styleTable(stagingTable);
-        stagingTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        stagingPanel.add(new JScrollPane(stagingTable), BorderLayout.CENTER);
-        stagingSummaryLabel.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
-        stagingPanel.add(stagingSummaryLabel, BorderLayout.SOUTH);
-
-        tabs.addTab("Putaway", putawayPanel);
-        tabs.addTab("Order Staging", stagingPanel);
-        add(tabs, BorderLayout.CENTER);
+            BrutalistStyle.styleTable(stagingTable);
+            stagingTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+            stagingPanel.add(new JScrollPane(stagingTable), BorderLayout.CENTER);
+            stagingSummaryLabel.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
+            stagingPanel.add(stagingSummaryLabel, BorderLayout.SOUTH);
+            add(stagingPanel, BorderLayout.CENTER);
+        }
     }
 
     private void wireEvents() {
@@ -230,12 +234,12 @@ public final class TransportView extends JPanel implements NavigableView {
 
     @Override
     public String getViewKey() {
-        return MainFrame.VIEW_TRANSPORT;
+        return mode == Mode.PUTAWAY ? MainFrame.VIEW_PUTAWAY : MainFrame.VIEW_STAGING;
     }
 
     @Override
     public String getTitleI18nKey() {
-        return "transport.title";
+        return mode == Mode.PUTAWAY ? "transport.tab.putaway" : "transport.tab.staging";
     }
 
     @Override
@@ -248,63 +252,63 @@ public final class TransportView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         String lang = i18n.getActiveLanguage();
 
-        storageCombo.removeAllItems();
-        for (WarehouseLocation loc : ctx.getLocationDao().findByType(LocationType.STORAGE, true)) {
-            String lbl = loc.code() + " (" + FormatUtil.stripZeros(loc.usedWeightKg()) + " / "
-                    + FormatUtil.stripZeros(loc.maxCapacityKg()) + " kg)";
-            storageCombo.addItem(new LocChoice(loc, lbl));
-        }
+        if (mode == Mode.PUTAWAY) {
+            storageCombo.removeAllItems();
+            for (WarehouseLocation loc : ctx.getLocationDao().findByType(LocationType.STORAGE, true)) {
+                String lbl = loc.code() + " (" + FormatUtil.stripZeros(loc.usedWeightKg()) + " / "
+                        + FormatUtil.stripZeros(loc.maxCapacityKg()) + " kg)";
+                storageCombo.addItem(new LocChoice(loc, lbl));
+            }
 
-        dispatchCombo.removeAllItems();
-        for (WarehouseLocation loc : ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true)) {
-            String lbl = loc.code() + " (" + FormatUtil.stripZeros(loc.usedWeightKg()) + " / "
-                    + FormatUtil.stripZeros(loc.maxCapacityKg()) + " kg)";
-            dispatchCombo.addItem(new LocChoice(loc, lbl));
-        }
+            putawayRows = ctx.getTransportService().findPutawayQueue();
+            putawayModel.setRowCount(0);
+            for (InventoryPackage p : putawayRows) {
+                putawayModel.addRow(new Object[]{
+                        p.locationCode(),
+                        p.qrCode(),
+                        p.targetGroupCode() + " / " + p.localizedGarmentType(lang) + " (" + p.qualityGradeCode() + ")",
+                        FormatUtil.stripZeros(p.weightKg()) + " kg",
+                        p.createdAt() != null ? DT_FMT.format(p.createdAt()) : ""
+                });
+            }
+            putawaySummaryLabel.setText(i18n.t("transport.putaway.summary", putawayRows.size()));
+        } else {
+            dispatchCombo.removeAllItems();
+            for (WarehouseLocation loc : ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true)) {
+                String lbl = loc.code() + " (" + FormatUtil.stripZeros(loc.usedWeightKg()) + " / "
+                        + FormatUtil.stripZeros(loc.maxCapacityKg()) + " kg)";
+                dispatchCombo.addItem(new LocChoice(loc, lbl));
+            }
 
-        putawayRows = ctx.getTransportService().findPutawayQueue();
-        putawayModel.setRowCount(0);
-        for (InventoryPackage p : putawayRows) {
-            putawayModel.addRow(new Object[]{
-                    p.locationCode(),
-                    p.qrCode(),
-                    p.targetGroupCode() + " / " + p.localizedGarmentType(lang) + " (" + p.qualityGradeCode() + ")",
-                    FormatUtil.stripZeros(p.weightKg()) + " kg",
-                    p.createdAt() != null ? DT_FMT.format(p.createdAt()) : ""
-            });
+            Long driverFilter = ctx.getSession().isForklift()
+                    ? ctx.getSession().requireCurrentUser().id()
+                    : null;
+            stagingRows = ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter);
+            stagingModel.setRowCount(0);
+            int pending = 0;
+            for (TransportService.StagingTask t : stagingRows) {
+                if (!t.isAtDispatchZone()) pending++;
+                String custCol = (t.customerArrived() ? "[!] " : "") + t.customerName();
+                String dockCol = t.targetDispatchLocationCode() != null ? t.targetDispatchLocationCode() : "DOCK-01";
+                stagingModel.addRow(new Object[]{
+                        t.orderNumber(),
+                        custCol,
+                        t.qrCode(),
+                        FormatUtil.stripZeros(t.weightKg()) + " kg",
+                        t.currentLocationCode() + " -> " + dockCol,
+                        t.isAtDispatchZone() ? i18n.t("transport.status.staged") : i18n.t("transport.status.pickup")
+                });
+            }
+            if (stagingTable.getColumnCount() >= 6) {
+                stagingTable.getColumnModel().getColumn(5).setCellRenderer(new StagingStatusRenderer());
+            }
+            stagingSummaryLabel.setText(i18n.t("transport.staging.summary", pending, stagingRows.size()));
         }
-        putawaySummaryLabel.setText(i18n.t("transport.putaway.summary", putawayRows.size()));
-
-        Long driverFilter = ctx.getSession().isForklift()
-                ? ctx.getSession().requireCurrentUser().id()
-                : null;
-        stagingRows = ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter);
-        stagingModel.setRowCount(0);
-        int pending = 0;
-        for (TransportService.StagingTask t : stagingRows) {
-            if (!t.isAtDispatchZone()) pending++;
-            String custCol = (t.customerArrived() ? "[!] " : "") + t.customerName();
-            String dockCol = t.targetDispatchLocationCode() != null ? t.targetDispatchLocationCode() : "DOCK-01";
-            stagingModel.addRow(new Object[]{
-                    t.orderNumber(),
-                    custCol,
-                    t.qrCode(),
-                    FormatUtil.stripZeros(t.weightKg()) + " kg",
-                    t.currentLocationCode() + " -> " + dockCol,
-                    t.isAtDispatchZone() ? i18n.t("transport.status.staged") : i18n.t("transport.status.pickup")
-            });
-        }
-        if (stagingTable.getColumnCount() >= 6) {
-            stagingTable.getColumnModel().getColumn(5).setCellRenderer(new StagingStatusRenderer());
-        }
-        stagingSummaryLabel.setText(i18n.t("transport.staging.summary", pending, stagingRows.size()));
     }
 
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
-        tabs.setTitleAt(0, i18n.t("transport.tab.putaway"));
-        tabs.setTitleAt(1, i18n.t("transport.tab.staging"));
 
         putawayTargetLabel.setText(i18n.t("transport.target_shelf") + ":");
         moveToStorageBtn.setText(i18n.t("transport.btn.move_storage"));

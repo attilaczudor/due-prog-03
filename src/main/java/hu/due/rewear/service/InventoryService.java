@@ -185,7 +185,7 @@ public final class InventoryService {
                     hu.due.rewear.model.AppNotification.CAT_PUTAWAY,
                     "Putaway Pickup: " + location.code(),
                     saved.size() + " package(s) created at " + location.code() + " (" + saved.get(0).qrCode() + ") ready for shelf putaway.",
-                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+                    hu.due.rewear.ui.MainFrame.VIEW_PUTAWAY);
         }
         return saved;
     }

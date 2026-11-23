@@ -79,7 +79,7 @@ public final class OrderService {
                     hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
                     "New Order: " + created.orderNumber(),
                     "Order " + created.orderNumber() + " (" + created.customerName() + ") created — prepare for dispatch collection.",
-                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+                    hu.due.rewear.ui.MainFrame.VIEW_STAGING);
         }
         return created;
     }
@@ -124,12 +124,12 @@ public final class OrderService {
             if (order.assignedForkliftId() != null) {
                 notificationService.notifyUser(order.assignedForkliftId(),
                         hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
-                        title, msg, hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+                        title, msg, hu.due.rewear.ui.MainFrame.VIEW_STAGING);
             } else {
                 notificationService.notifyRoles(
                         java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
                         hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
-                        title, msg, hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+                        title, msg, hu.due.rewear.ui.MainFrame.VIEW_STAGING);
             }
         }
         return orderDao.findById(orderId).orElseThrow();
@@ -147,7 +147,7 @@ public final class OrderService {
                     hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
                     "Assigned Order: " + updated.orderNumber(),
                     "Collect packages for " + updated.orderNumber() + " (" + updated.customerName() + ") and stage at " + dock + ".",
-                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+                    hu.due.rewear.ui.MainFrame.VIEW_STAGING);
         }
         return updated;
     }
@@ -174,7 +174,7 @@ public final class OrderService {
                         hu.due.rewear.model.AppNotification.CAT_ORDER_READY,
                         "CUSTOMER ARRIVED: " + updated.orderNumber(),
                         updated.customerName() + " is here! Ensure all packages for " + updated.orderNumber() + " are at " + dock + ".",
-                        hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+                        hu.due.rewear.ui.MainFrame.VIEW_STAGING);
             }
         }
         return updated;

@@ -34,7 +34,8 @@ public final class SidebarIcons {
             case MainFrame.VIEW_DASHBOARD -> makeIcon(size, SidebarIcons::paintDashboard);
             case MainFrame.VIEW_TODO -> makeIcon(size, SidebarIcons::paintTodo);
             case MainFrame.VIEW_INTAKE -> makeIcon(size, SidebarIcons::paintIntake);
-            case MainFrame.VIEW_TRANSPORT -> makeIcon(size, SidebarIcons::paintTransport);
+            case MainFrame.VIEW_PUTAWAY -> makeIcon(size, SidebarIcons::paintPutaway);
+            case MainFrame.VIEW_STAGING, MainFrame.VIEW_TRANSPORT -> makeIcon(size, SidebarIcons::paintTransport);
             case MainFrame.VIEW_SCANNER -> makeIcon(size, SidebarIcons::paintScanner);
             case MainFrame.VIEW_INVENTORY -> makeIcon(size, SidebarIcons::paintInventory);
             case MainFrame.VIEW_LOCATIONS -> makeIcon(size, SidebarIcons::paintLocations);
@@ -217,6 +218,18 @@ public final class SidebarIcons {
         g.draw(shield);
         g.draw(new Line2D.Double(9, 12, 11.2, 14.2));
         g.draw(new Line2D.Double(11.2, 14.2, 15.5, 9.5));
+    }
+
+    // Putaway icon: box with downward arrow onto shelf
+    private static void paintPutaway(Graphics2D g) {
+        g.draw(new Line2D.Double(12, 3, 12, 13));
+        Path2D arrow = new Path2D.Double();
+        arrow.moveTo(8.5, 9.5);
+        arrow.lineTo(12, 13);
+        arrow.lineTo(15.5, 9.5);
+        g.draw(arrow);
+        g.draw(new Rectangle2D.Double(4, 15, 16, 4.5));
+        g.draw(new Line2D.Double(3, 19.5, 21, 19.5));
     }
 
     // Forklift / pallet transport arrows icon

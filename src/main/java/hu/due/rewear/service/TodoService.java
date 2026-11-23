@@ -96,7 +96,7 @@ public final class TodoService {
                     arrived ? 0 : 1, "P1", i18n.t("todo.cat.order_staging"),
                     (arrived ? "[CUSTOMER HERE] " : "") + i18n.t("todo.sys.stage_order", e.getKey(), list.size()),
                     i18n.t("todo.sys.stage_order_detail", firstLoc),
-                    MainFrame.VIEW_TRANSPORT
+                    MainFrame.VIEW_STAGING
             ));
         }
 
@@ -111,7 +111,7 @@ public final class TodoService {
                     2, "P2", i18n.t("todo.cat.putaway"),
                     i18n.t("todo.sys.putaway_station", e.getKey(), e.getValue().size(), FormatUtil.stripZeros(totalKg)),
                     i18n.t("todo.sys.putaway_detail"),
-                    MainFrame.VIEW_TRANSPORT
+                    MainFrame.VIEW_PUTAWAY
             ));
         }
     }
@@ -219,7 +219,7 @@ public final class TodoService {
                     3, "P3", i18n.t("todo.cat.putaway"),
                     i18n.t("todo.sys.putaway_backlog", putawayCount),
                     i18n.t("todo.sys.putaway_detail"),
-                    MainFrame.VIEW_TRANSPORT
+                    MainFrame.VIEW_PUTAWAY
             ));
         }
     }

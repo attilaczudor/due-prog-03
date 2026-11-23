@@ -51,6 +51,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public static final String VIEW_DASHBOARD = "dashboard";
     public static final String VIEW_TODO = "todo";
     public static final String VIEW_INTAKE = "intake";
+    public static final String VIEW_PUTAWAY = "putaway";
+    public static final String VIEW_STAGING = "staging";
     public static final String VIEW_TRANSPORT = "transport";
     public static final String VIEW_SCANNER = "scanner";
     public static final String VIEW_INVENTORY = "inventory";
@@ -94,6 +96,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
     private final JLabel activeViewTitleLabel = new JLabel();
+    private final JButton notificationBellBtn = new JButton();
     private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshSidebarBadges);
     private final javax.swing.Timer autoRefreshTimer;
     private final JPanel statusBar = new JPanel(new BorderLayout());
@@ -207,6 +210,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
         topBar.add(activeViewTitleLabel, BorderLayout.WEST);
+        notificationBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        notificationBellBtn.addActionListener(e -> navigateTo(VIEW_NOTIFICATIONS));
+        topBar.add(notificationBellBtn, BorderLayout.EAST);
         rightArea.add(topBar, BorderLayout.NORTH);
 
         rightArea.add(contentHost, BorderLayout.CENTER);
@@ -241,7 +247,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             addNavButton(navList, VIEW_INTAKE, "nav.intake");
         }
         if (session.canUseTransportQueue()) {
-            addNavButton(navList, VIEW_TRANSPORT, "nav.transport");
+            addNavButton(navList, VIEW_PUTAWAY, "nav.putaway");
+            addNavButton(navList, VIEW_STAGING, "nav.staging");
         }
         addNavButton(navList, VIEW_SCANNER, "nav.scanner");
         addNavButton(navList, VIEW_INVENTORY, "nav.inventory");
@@ -453,7 +460,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerViewFactory(VIEW_SCANNER, () -> new QrScannerView(ctx));
         registerViewFactory(VIEW_INVENTORY, () -> new InventoryView(ctx));
         registerViewFactory(VIEW_TODO, () -> new TodoView(ctx, this::navigateTo));
-        registerViewFactory(VIEW_TRANSPORT, () -> new TransportView(ctx));
+        registerViewFactory(VIEW_PUTAWAY, () -> new TransportView(ctx, TransportView.Mode.PUTAWAY));
+        registerViewFactory(VIEW_STAGING, () -> new TransportView(ctx, TransportView.Mode.STAGING));
         registerViewFactory(VIEW_LOCATIONS, () -> new LocationsView(ctx));
         registerViewFactory(VIEW_DICTIONARIES, () -> new DictionariesView(ctx));
         registerViewFactory(VIEW_CUSTOMERS, () -> new CustomersView(ctx));
@@ -475,6 +483,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     }
 
     public void navigateTo(String viewKey) {
+        if (VIEW_TRANSPORT.equals(viewKey)) {
+            viewKey = VIEW_PUTAWAY;
+        }
         NavigableView view = views.get(viewKey);
         if (view == null) {
             Supplier<NavigableView> factory = viewFactories.get(viewKey);
@@ -491,6 +502,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
         updateNavButtonStyles();
         activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()).toUpperCase(Locale.ROOT));
+        notificationBellBtn.setVisible(VIEW_DASHBOARD.equals(viewKey));
         view.refreshData();
         cardLayout.show(contentHost, viewKey);
         refreshSidebarBadges();
@@ -500,7 +512,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                                  int unreadEmails,
                                  int unreadMessages,
                                  int todoCount,
-                                 int transportCount,
+                                 int putawayCount,
+                                 int stagingCount,
                                  int openOrders,
                                  int overdueInvoices) {
     }
@@ -511,7 +524,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
         final User me = ctx.getSession().requireCurrentUser();
         final boolean hasTodo = navButtons.containsKey(VIEW_TODO);
-        final boolean hasTransport = navButtons.containsKey(VIEW_TRANSPORT);
+        final boolean hasPutaway = navButtons.containsKey(VIEW_PUTAWAY);
+        final boolean hasStaging = navButtons.containsKey(VIEW_STAGING);
         final boolean hasOrders = navButtons.containsKey(VIEW_ORDERS);
         final boolean hasInvoices = navButtons.containsKey(VIEW_INVOICES);
         final boolean isForklift = ctx.getSession().isForklift();
@@ -527,13 +541,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                         .filter(t -> !t.completed()).count();
                 todoCount = sysCount + openPersonal;
             }
-            int transportCount = 0;
-            if (hasTransport) {
-                int putaway = ctx.getTransportService().findPutawayQueue().size();
+            int putawayCount = hasPutaway ? ctx.getTransportService().findPutawayQueue().size() : 0;
+            int stagingCount = 0;
+            if (hasStaging) {
                 Long driverFilter = isForklift ? me.id() : null;
-                int pendingStaging = (int) ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter).stream()
+                stagingCount = (int) ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter).stream()
                         .filter(t -> !t.isAtDispatchZone()).count();
-                transportCount = putaway + pendingStaging;
             }
             int openOrders = hasOrders ? ctx.getOrderDao().countOpenOrders() : 0;
             int overdueInvoices = hasInvoices
@@ -542,10 +555,18 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                     : 0;
             return new BadgeSnapshot(
                     unreadNotifs, unreadEmails, unreadMessages,
-                    todoCount, transportCount, openOrders, overdueInvoices);
+                    todoCount, putawayCount, stagingCount, openOrders, overdueInvoices);
         }, snap -> {
             if (!ctx.getSession().isAuthenticated()) {
                 return;
+            }
+            String label = ctx.getI18n().t("todo.tab.notifications").toUpperCase(Locale.ROOT);
+            if (snap.unreadNotifications() > 0) {
+                notificationBellBtn.setText("[ ! " + snap.unreadNotifications() + " ]  " + label);
+                BrutalistStyle.stylePrimaryButton(notificationBellBtn);
+            } else {
+                notificationBellBtn.setText("[ 0 ]  " + label);
+                BrutalistStyle.styleSecondaryButton(notificationBellBtn);
             }
             setNavBadge(VIEW_NOTIFICATIONS, snap.unreadNotifications());
             setNavBadge(VIEW_EMAIL, snap.unreadEmails());
@@ -553,8 +574,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             if (hasTodo) {
                 setNavBadge(VIEW_TODO, snap.todoCount());
             }
-            if (hasTransport) {
-                setNavBadge(VIEW_TRANSPORT, snap.transportCount());
+            if (hasPutaway) {
+                setNavBadge(VIEW_PUTAWAY, snap.putawayCount());
+            }
+            if (hasStaging) {
+                setNavBadge(VIEW_STAGING, snap.stagingCount());
             }
             if (hasOrders) {
                 setNavBadge(VIEW_ORDERS, snap.openOrders());
@@ -763,7 +787,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         refreshSidebarBadges();
         if (currentViewKey != null && views.containsKey(currentViewKey)) {
             switch (currentViewKey) {
-                case VIEW_NOTIFICATIONS, VIEW_TODO, VIEW_TRANSPORT, VIEW_EMAIL, VIEW_MESSAGES ->
+                case VIEW_NOTIFICATIONS, VIEW_TODO, VIEW_PUTAWAY, VIEW_STAGING, VIEW_EMAIL, VIEW_MESSAGES ->
                         views.get(currentViewKey).refreshData();
                 default -> { }
             }

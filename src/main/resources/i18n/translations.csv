@@ -403,6 +403,8 @@ common.date,Date,Dátum
 common.info,Information,Információ
 role.FORKLIFT,Forklift Driver,Targoncás
 nav.transport,Forklift & Transport,Targonca és szállítás
+nav.putaway,Putaway,Betárolás
+nav.staging,Order Staging,Összekészítés
 nav.email,Email,E-mail
 nav.messages,Messages,Üzenetek
 locations.type,Location Type,Hely típusa
