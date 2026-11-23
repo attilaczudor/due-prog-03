@@ -13,7 +13,6 @@ import javax.swing.Box;
 import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
-import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JFileChooser;
 import javax.swing.JLabel;
@@ -42,6 +41,7 @@ import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -322,8 +322,29 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private void openComposeDialog(String initialTo, String initialCc, String initialSubject, String initialBody) {
         I18nManager i18n = ctx.getI18n();
-        JTextField toField = new JTextField(initialTo, 34);
-        JTextField ccField = new JTextField(initialCc, 34);
+        boolean externalAllowed = ctx.getSession().canUseExternalEmail();
+
+        // Build searchable recipient directory (company teammates; B2B partners only for external-capable roles)
+        List<RecipientMultiSelectField.ContactOption> contacts = new ArrayList<>();
+        for (User u : ctx.getUserDao().findAll()) {
+            if (u.email() != null && !u.email().isBlank()) {
+                contacts.add(new RecipientMultiSelectField.ContactOption(u.displayName(), u.email()));
+            }
+        }
+        if (externalAllowed) {
+            for (Customer c : ctx.getCustomerDao().findAll(true)) {
+                if (c.email() != null && !c.email().isBlank()) {
+                    contacts.add(new RecipientMultiSelectField.ContactOption(c.name(), c.email()));
+                }
+            }
+        }
+
+        String searchPlaceholder = i18n.t("email.recipient_search_placeholder");
+        RecipientMultiSelectField toField = new RecipientMultiSelectField(
+                contacts, externalAllowed, searchPlaceholder, initialTo);
+        RecipientMultiSelectField ccField = new RecipientMultiSelectField(
+                contacts, externalAllowed, searchPlaceholder, initialCc);
+
         JTextField subjField = new JTextField(initialSubject, 34);
         JTextArea bodyArea = new JTextArea(initialBody, 10, 34);
         bodyArea.setLineWrap(true);
@@ -340,36 +361,12 @@ public final class EmailView extends JPanel implements NavigableView {
             }
         });
 
-        // Quick-pick recipient directory (company teammates; B2B external partners only for Manager/Admin/SuperAdmin)
-        JComboBox<String> directoryCombo = new JComboBox<>();
-        directoryCombo.addItem("— " + i18n.t("email.quick_pick") + " —");
-        for (User u : ctx.getUserDao().findAll()) {
-            if (u.email() != null && !u.email().isBlank()) {
-                directoryCombo.addItem(u.displayName() + " <" + u.email() + ">");
-            }
-        }
-        if (ctx.getSession().canUseExternalEmail()) {
-            for (Customer c : ctx.getCustomerDao().findAll(true)) {
-                if (c.email() != null && !c.email().isBlank()) {
-                    directoryCombo.addItem(c.name() + " <" + c.email() + ">");
-                }
-            }
-        }
-        directoryCombo.addActionListener(e -> {
-            String sel = (String) directoryCombo.getSelectedItem();
-            if (sel != null && sel.contains("<") && sel.contains(">")) {
-                String addr = sel.substring(sel.indexOf('<') + 1, sel.indexOf('>'));
-                String cur = toField.getText().trim();
-                toField.setText(cur.isEmpty() ? addr : cur + ", " + addr);
-            }
-        });
-
         JPanel form = new JPanel(new GridBagLayout());
+        form.setPreferredSize(new Dimension(540, 420));
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 4, 4, 4);
         gbc.fill = GridBagConstraints.HORIZONTAL;
         int r = 0;
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("email.directory"), directoryCombo);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("email.to") + " *", toField);
         BrutalistStyle.addFormRow(form, gbc, r++, "CC", ccField);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("email.subject") + " *", subjField);
@@ -388,13 +385,13 @@ public final class EmailView extends JPanel implements NavigableView {
         String attach = attachField.getText().isBlank() ? null : attachField.getText().trim();
         try {
             if (res == 0) {
-                ctx.getEmailService().sendEmail(me, toField.getText(), ccField.getText(),
+                ctx.getEmailService().sendEmail(me, toField.getSelectedAddressesCsv(), ccField.getSelectedAddressesCsv(),
                         subjField.getText(), bodyArea.getText(), attach);
                 refreshData();
                 JOptionPane.showMessageDialog(this, i18n.t("email.sent_ok"),
                         i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
             } else if (res == 1) {
-                ctx.getEmailService().saveDraft(me, toField.getText(), ccField.getText(),
+                ctx.getEmailService().saveDraft(me, toField.getSelectedAddressesCsv(), ccField.getSelectedAddressesCsv(),
                         subjField.getText(), bodyArea.getText(), attach);
                 refreshData();
             }

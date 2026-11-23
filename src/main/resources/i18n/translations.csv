@@ -457,6 +457,7 @@ email.attachment,Attachment,Csatolmány
 email.attach,Attach File,Fájl csatolása
 email.directory,Directory,Címjegyzék
 email.quick_pick,Insert teammate or partner email,Csapattag vagy partner e-mail beszúrása
+email.recipient_search_placeholder,Type to search or pick recipients...,Keresés név vagy e-mail alapján...
 email.send,Send,Küldés
 email.save_draft,Save Draft,Piszkozat mentése
 email.sent_ok,Email sent successfully.,E-mail sikeresen elküldve.
