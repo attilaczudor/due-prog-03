@@ -270,9 +270,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         navList.add(Box.createVerticalStrut(7));
         navList.add(createHairlineSeparator());
         navList.add(Box.createVerticalStrut(7));
-        addNavButton(navList, VIEW_EMAIL, "nav.email");
         addNavButton(navList, VIEW_NOTIFICATIONS, "nav.notifications");
         addNavButton(navList, VIEW_MESSAGES, "nav.messages");
+        addNavButton(navList, VIEW_EMAIL, "nav.email");
 
         if (session.canManageUsersAndMaintenance()) {
             navList.add(Box.createVerticalStrut(7));
