@@ -168,8 +168,8 @@ public final class ThemeManager {
         extra.put("ToggleButton.pressedBackground", pressHex);
         extra.put("ToggleButton.selectedBackground", fgHex);
         extra.put("ToggleButton.selectedForeground", bgHex);
-        extra.put("ToggleButton.selectedHoverBackground", defaultHoverHex);
-        extra.put("ToggleButton.selectedPressedBackground", defaultPressHex);
+        extra.put("ToggleButton.selectedHoverBackground", fgHex);
+        extra.put("ToggleButton.selectedPressedBackground", fgHex);
         extra.put("TextField.background", bgHex);
         extra.put("TextField.foreground", fgHex);
         extra.put("TextField.caretForeground", fgHex);
@@ -198,6 +198,7 @@ public final class ThemeManager {
         extra.put("TableHeader.foreground", fgHex);
         extra.put("TableHeader.bottomSeparatorColor", borderHex);
         extra.put("TableHeader.separatorColor", gridHex);
+        extra.put("TabbedPaneUI", BrutalistTabbedPaneUI.class.getName());
         extra.put("TabbedPane.background", bgHex);
         extra.put("TabbedPane.foreground", fgHex);
         extra.put("TabbedPane.selectedBackground", fgHex);

@@ -649,8 +649,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         boolean dark = ThemeManager.isDarkMode();
         String selBg = dark ? "#FFFFFF" : "#000000";
         String selFg = dark ? "#000000" : "#FFFFFF";
-        String selHover = dark ? "#DCDCDC" : "#2A2A2A";
-        String selPress = dark ? "#BDBDBD" : "#424242";
         String unselBg = dark ? "#000000" : "#FFFFFF";
         String unselFg = dark ? "#FFFFFF" : "#000000";
         String unselHover = dark ? "#1C1C1C" : "#EAEAEA";
@@ -659,6 +657,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         for (Map.Entry<String, BadgeNavButton> entry : navButtons.entrySet()) {
             BadgeNavButton btn = entry.getValue();
             boolean selected = entry.getKey().equals(currentViewKey);
+            btn.setCursor(Cursor.getPredefinedCursor(selected ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
             btn.setBorder(BorderFactory.createCompoundBorder(
                     BorderFactory.createLineBorder(ThemeManager.border(), 1),
                     BorderFactory.createEmptyBorder(6, padH, 6, padH)
@@ -669,8 +668,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 btn.putClientProperty(FlatClientProperties.STYLE,
                         "background:" + selBg + "; foreground:" + selFg
                                 + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + selHover + "; hoverForeground:" + selFg
-                                + "; pressedBackground:" + selPress + "; pressedForeground:" + selFg
+                                + "; hoverBackground:" + selBg + "; hoverForeground:" + selFg
+                                + "; pressedBackground:" + selBg + "; pressedForeground:" + selFg
                                 + "; focusedBackground:" + selBg + "; focusedForeground:" + selFg);
             } else {
                 btn.setBackground(ThemeManager.bg());
