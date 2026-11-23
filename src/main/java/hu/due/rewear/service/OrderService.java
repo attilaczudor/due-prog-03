@@ -117,14 +117,115 @@ public final class OrderService {
 
         LOG.info("Added package {} to order {} ({} {}/kg)", pkg.qrCode(), order.orderNumber(), unitPrice, cur);
         if (notificationService != null) {
-            notificationService.notifyRoles(
-                    java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
-                    hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
-                    "Collect for " + order.orderNumber(),
-                    "Collect " + pkg.qrCode() + " from " + pkg.locationCode() + " to Dispatch Zone for " + order.customerName() + ".",
-                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+            String title = "Collect for " + order.orderNumber();
+            String msg = "Collect " + pkg.qrCode() + " from " + pkg.locationCode()
+                    + " to " + (order.dispatchLocationCode() != null ? order.dispatchLocationCode() : "Dispatch Zone")
+                    + " for " + order.customerName() + ".";
+            if (order.assignedForkliftId() != null) {
+                notificationService.notifyUser(order.assignedForkliftId(),
+                        hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
+                        title, msg, hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+            } else {
+                notificationService.notifyRoles(
+                        java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
+                        hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
+                        title, msg, hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+            }
         }
         return orderDao.findById(orderId).orElseThrow();
+    }
+
+    /** Assigns a Forklift Driver and target Collection/Dispatch Zone to an order and notifies that driver. */
+    public Order assignForkliftAndDock(long orderId, Long forkliftUserId, Long dispatchLocationId) {
+        Order order = orderDao.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        orderDao.updateAssignment(orderId, forkliftUserId, dispatchLocationId);
+        Order updated = orderDao.findById(orderId).orElseThrow();
+        if (notificationService != null && forkliftUserId != null) {
+            String dock = updated.dispatchLocationCode() != null ? updated.dispatchLocationCode() : "Dispatch Zone";
+            notificationService.notifyUser(forkliftUserId,
+                    hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
+                    "Assigned Order: " + updated.orderNumber(),
+                    "Collect packages for " + updated.orderNumber() + " (" + updated.customerName() + ") and stage at " + dock + ".",
+                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+        }
+        return updated;
+    }
+
+    /** Marks that the customer has arrived on site for pickup and alerts Managers &amp; the assigned Forklift Driver. */
+    public Order markCustomerArrived(long orderId) {
+        Order order = orderDao.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (order.status() == OrderStatus.SHIPPED || order.status() == OrderStatus.CANCELLED) {
+            throw new IllegalStateException("Cannot mark customer arrived for order in status: " + order.status());
+        }
+        orderDao.updateCustomerArrivedAt(orderId, LocalDateTime.now());
+        Order updated = orderDao.findById(orderId).orElseThrow();
+        if (notificationService != null) {
+            String dock = updated.dispatchLocationCode() != null ? updated.dispatchLocationCode() : "DOCK-01";
+            notificationService.notifyRoles(
+                    java.util.Set.of(hu.due.rewear.model.RoleCode.MANAGER, hu.due.rewear.model.RoleCode.ADMIN, hu.due.rewear.model.RoleCode.SUPER_ADMIN),
+                    hu.due.rewear.model.AppNotification.CAT_ORDER_READY,
+                    "CUSTOMER ARRIVED: " + updated.orderNumber(),
+                    updated.customerName() + " has arrived for pickup (" + updated.orderNumber() + " at " + dock + "). Scan all items to hand over.",
+                    hu.due.rewear.ui.MainFrame.VIEW_ORDERS);
+            if (updated.assignedForkliftId() != null) {
+                notificationService.notifyUser(updated.assignedForkliftId(),
+                        hu.due.rewear.model.AppNotification.CAT_ORDER_READY,
+                        "CUSTOMER ARRIVED: " + updated.orderNumber(),
+                        updated.customerName() + " is here! Ensure all packages for " + updated.orderNumber() + " are at " + dock + ".",
+                        hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+            }
+        }
+        return updated;
+    }
+
+    /**
+     * Manager scans a package barcode/QR code during customer handover to verify it belongs to this order.
+     */
+    public OrderItem scanOrderItemForHandover(long orderId, String rawQrCode, long managerUserId) {
+        if (rawQrCode == null || rawQrCode.isBlank()) {
+            throw new IllegalArgumentException("Scan or enter a package QR code.");
+        }
+        Order order = orderDao.findById(orderId)
+                .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
+        if (order.status() != OrderStatus.DRAFT && order.status() != OrderStatus.PACKING) {
+            throw new IllegalStateException("Order is not open for handover (status: " + order.status() + ").");
+        }
+        String code = rawQrCode.trim().toUpperCase(Locale.ROOT);
+        List<OrderItem> items = orderItemDao.findByOrderId(orderId);
+        OrderItem match = items.stream()
+                .filter(i -> i.packageQrCode().equalsIgnoreCase(code))
+                .findFirst()
+                .orElseThrow(() -> new IllegalArgumentException(
+                        "Package " + code + " does NOT belong to order " + order.orderNumber() + "!"));
+
+        LocalDateTime now = LocalDateTime.now();
+        db.runInTransaction(conn -> {
+            orderItemDao.markHandoverScanned(conn, match.id(), true);
+            InventoryPackage pkg = packageDao.findById(conn, match.packageId()).orElseThrow();
+            movementDao.insert(conn, match.packageId(), MovementType.SCAN_VERIFY,
+                    pkg.locationId(), pkg.locationId(), managerUserId,
+                    "Customer handover scan verified for " + order.orderNumber(), now);
+        });
+        return orderItemDao.findByOrderId(orderId).stream()
+                .filter(i -> i.id() == match.id()).findFirst().orElseThrow();
+    }
+
+    /**
+     * Completes customer handover and ships the order ONLY after 100% of allocated packages have been scanned.
+     */
+    public Order completeVerifiedHandover(long orderId, long managerUserId) {
+        List<OrderItem> items = orderItemDao.findByOrderId(orderId);
+        if (items.isEmpty()) {
+            throw new IllegalStateException("Cannot hand over an empty order.");
+        }
+        long unscanned = items.stream().filter(i -> !i.handoverScanned()).count();
+        if (unscanned > 0) {
+            throw new IllegalStateException(
+                    unscanned + " package(s) still need to be scanned before handing over this order.");
+        }
+        return shipOrder(orderId, managerUserId);
     }
 
     public Order changeOrderCurrency(long orderId, CurrencyCode targetCurrency) {

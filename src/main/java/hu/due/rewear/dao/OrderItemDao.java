@@ -29,9 +29,11 @@ public final class OrderItemDao {
                 SELECT oi.id, oi.order_id, oi.package_id, ip.qr_code,
                        (tg.name_en || ' | ' || gt.name_en || ' | ' || qg.name_en || ' | ' || pt.name_en) AS summary_en,
                        (tg.name_hu || ' | ' || gt.name_hu || ' | ' || qg.name_hu || ' | ' || pt.name_hu) AS summary_hu,
-                       ip.weight_kg, oi.price_per_kg, oi.line_total
+                       ip.weight_kg, oi.price_per_kg, oi.line_total,
+                       wl.code AS current_location_code, oi.handover_scanned
                 FROM order_items oi
                 JOIN inventory_packages ip ON ip.id = oi.package_id
+                JOIN warehouse_locations wl ON wl.id = ip.location_id
                 JOIN target_groups tg ON tg.id = ip.target_group_id
                 JOIN garment_types gt ON gt.id = ip.garment_type_id
                 JOIN quality_grades qg ON qg.id = ip.quality_grade_id
@@ -54,7 +56,9 @@ public final class OrderItemDao {
                             rs.getString("summary_hu"),
                             BigDecimal.valueOf(rs.getDouble("weight_kg")),
                             BigDecimal.valueOf(rs.getDouble("price_per_kg")),
-                            BigDecimal.valueOf(rs.getDouble("line_total"))
+                            BigDecimal.valueOf(rs.getDouble("line_total")),
+                            rs.getString("current_location_code"),
+                            rs.getInt("handover_scanned") == 1
                     ));
                 }
                 return list;
@@ -89,6 +93,15 @@ public final class OrderItemDao {
             ps.setDouble(1, pricePerKg.doubleValue());
             ps.setDouble(2, lineTotal.doubleValue());
             ps.setLong(3, orderItemId);
+            ps.executeUpdate();
+        }
+    }
+
+    public void markHandoverScanned(Connection conn, long orderItemId, boolean scanned) throws SQLException {
+        String sql = "UPDATE order_items SET handover_scanned = ? WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, scanned ? 1 : 0);
+            ps.setLong(2, orderItemId);
             ps.executeUpdate();
         }
     }

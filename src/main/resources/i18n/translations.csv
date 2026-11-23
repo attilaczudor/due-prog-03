@@ -514,3 +514,24 @@ todo.sys.order_ready_detail,All {0} package(s) ready at Dispatch Zone,Mind a(z) 
 todo.sys.open_order,Open order {0} — {1},Nyitott rendelés: {0} — {1}
 todo.sys.loc_near_full,Location {0} is {1}% full,{0} raktárhely telítettsége: {1}%
 todo.sys.putaway_backlog,{0} package(s) waiting at Operator Stations for forklift,{0} csomag vár betárolásra az operátori állomásokon
+todo.cat.customer_arrived,Customer Arrived,Ügyfél megérkezett
+todo.sys.customer_arrived,CUSTOMER HERE: Hand over {0} ({1}),ÜGYFÉL ITT VAN: {0} ({1}) átadása
+todo.sys.customer_arrived_detail,Open Orders and scan all items at {0} to hand over,Nyisd meg a Rendeléseket és szkenneld be az összes csomagot ({0})
+transport.scan_collect_label,Scan QR to Collect,QR beolvasás összekészítéshez
+transport.scan_collect_btn,Scan & Collect,Beolvasás és kiadóba
+transport.scan_collected_ok,Scanned {0} for {1} -> placed at {2}.,Beolvasva ({0} — {1}) -> elhelyezve: {2}.
+orders.assign_forklift,Assign Forklift & Dock,Targoncás és zóna
+orders.customer_arrived.btn,Customer Arrived,Ügyfél megérkezett
+orders.customer_arrived.badge,Customer Here,Ügyfél itt van
+orders.customer_arrived.notified,Customer arrival alert sent for {0}.,Ügyfél érkezési értesítés elküldve: {0}.
+order.handover.btn,Customer Handover (QR),Ügyfél átadás (QR)
+order.handover.title,Verified Customer Handover (QR Scan),Ellenőrzött ügyfél átadás (QR szkennelés)
+order.handover.scan_label,Scan Package QR,Csomag QR beolvasása
+order.handover.scan_btn,Verify Scan,Ellenőrzés
+order.handover.scan_selected,Scan Selected,Kijelölt beolvasása
+order.handover.scan_ok,Verified package {0} for handover.,Ellenőrizve az átadáshoz: {0}.
+order.handover.complete_btn,Complete Handover & Ship,Átadás befejezése és kiadás
+order.handover.completed,Order {0} verified & handed over to customer!,A(z) {0} rendelés ellenőrizve és átadva az ügyfélnek!
+order.handover.progress,{0} / {1} scanned,{0} / {1} ellenőrizve
+order.handover.status.scanned,SCANNED,ELLENŐRIZVE
+order.handover.status.pending,PENDING,HÁTRAVAN

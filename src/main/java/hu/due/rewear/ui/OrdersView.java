@@ -90,6 +90,9 @@ public final class OrdersView extends JPanel implements NavigableView {
     private final JLabel statusSelectLabel = new JLabel();
     private final JComboBox<StatusStepOption> statusDropdown = new JComboBox<>();
     private final JButton applyStatusBtn = new JButton();
+    private final JButton assignForkliftBtn = new JButton();
+    private final JButton customerArrivedBtn = new JButton();
+    private final JButton handoverScanBtn = new JButton();
     private final JButton previewDocsBtn = new JButton();
 
     private List<Order> orders = List.of();
@@ -161,6 +164,9 @@ public final class OrdersView extends JPanel implements NavigableView {
         rightPanel.add(itemsContainer, BorderLayout.CENTER);
 
         JPanel lifecycleBar = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
+        lifecycleBar.add(assignForkliftBtn);
+        lifecycleBar.add(customerArrivedBtn);
+        lifecycleBar.add(handoverScanBtn);
         lifecycleBar.add(statusSelectLabel);
         lifecycleBar.add(statusDropdown);
         lifecycleBar.add(applyStatusBtn);
@@ -198,6 +204,9 @@ public final class OrdersView extends JPanel implements NavigableView {
         });
 
         applyStatusBtn.addActionListener(e -> handleApplyStatus());
+        assignForkliftBtn.addActionListener(e -> handleAssignForklift());
+        customerArrivedBtn.addActionListener(e -> handleCustomerArrived());
+        handoverScanBtn.addActionListener(e -> handleCustomerHandover());
         previewDocsBtn.addActionListener(e -> handlePreviewDocuments());
         orderCurrencyCombo.addActionListener(e -> {
             if (!syncingCurrencyCombo) {
@@ -209,6 +218,92 @@ public final class OrdersView extends JPanel implements NavigableView {
     private Order getSelectedOrder() {
         int r = ordersTable.getSelectedRow();
         return (r >= 0 && r < orders.size()) ? orders.get(r) : null;
+    }
+
+    private void handleAssignForklift() {
+        Order order = getSelectedOrder();
+        if (order == null) return;
+        I18nManager i18n = ctx.getI18n();
+        var drivers = ctx.getUserDao().findAll().stream()
+                .filter(u -> u.active() && u.roleCode() == hu.due.rewear.model.RoleCode.FORKLIFT)
+                .toList();
+        var docks = ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.DISPATCH_ZONE, true);
+
+        JComboBox<hu.due.rewear.model.User> driverCombo = new JComboBox<>(drivers.toArray(new hu.due.rewear.model.User[0]));
+        driverCombo.setRenderer((l, v, idx, sel, foc) -> {
+            JLabel lbl = new JLabel(v != null ? v.displayName() + " (@" + v.username() + ")" : "—");
+            lbl.setOpaque(true);
+            lbl.setBackground(sel ? l.getSelectionBackground() : l.getBackground());
+            lbl.setForeground(sel ? l.getSelectionForeground() : l.getForeground());
+            lbl.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            return lbl;
+        });
+        for (var d : drivers) {
+            if (order.assignedForkliftId() != null && order.assignedForkliftId().equals(d.id())) {
+                driverCombo.setSelectedItem(d);
+                break;
+            }
+        }
+        JComboBox<hu.due.rewear.model.WarehouseLocation> dockCombo = new JComboBox<>(docks.toArray(new hu.due.rewear.model.WarehouseLocation[0]));
+        dockCombo.setRenderer((l, v, idx, sel, foc) -> {
+            JLabel lbl = new JLabel(v != null ? v.code() + " (" + v.zone() + "-" + v.aisle() + ")" : "—");
+            lbl.setOpaque(true);
+            lbl.setBackground(sel ? l.getSelectionBackground() : l.getBackground());
+            lbl.setForeground(sel ? l.getSelectionForeground() : l.getForeground());
+            lbl.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            return lbl;
+        });
+        for (var d : docks) {
+            if (order.dispatchLocationId() != null && order.dispatchLocationId().equals(d.id())) {
+                dockCombo.setSelectedItem(d);
+                break;
+            }
+        }
+
+        JPanel form = new JPanel(new GridBagLayout());
+        GridBagConstraints gbc = new GridBagConstraints();
+        gbc.insets = new Insets(4, 4, 4, 4);
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        BrutalistStyle.addFormRow(form, gbc, 0, i18n.t("role.FORKLIFT"), driverCombo);
+        BrutalistStyle.addFormRow(form, gbc, 1, i18n.t("transport.target_dock"), dockCombo);
+
+        if (JOptionPane.showConfirmDialog(this, form, i18n.t("orders.assign_forklift") + " — " + order.orderNumber(),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
+            return;
+        }
+        Long fkId = driverCombo.getSelectedItem() instanceof hu.due.rewear.model.User u ? u.id() : null;
+        Long dockId = dockCombo.getSelectedItem() instanceof hu.due.rewear.model.WarehouseLocation wl ? wl.id() : null;
+        try {
+            ctx.getOrderService().assignForkliftAndDock(order.id(), fkId, dockId);
+            refreshDataSelecting(order.id());
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleCustomerArrived() {
+        Order order = getSelectedOrder();
+        if (order == null) return;
+        I18nManager i18n = ctx.getI18n();
+        try {
+            ctx.getOrderService().markCustomerArrived(order.id());
+            refreshDataSelecting(order.id());
+            JOptionPane.showMessageDialog(this, i18n.t("orders.customer_arrived.notified", order.orderNumber()),
+                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void handleCustomerHandover() {
+        Order order = getSelectedOrder();
+        if (order == null) return;
+        java.awt.Window owner = SwingUtilities.getWindowAncestor(this);
+        if (OrderHandoverDialog.showDialog(owner, ctx, order)) {
+            refreshDataSelecting(order.id());
+        } else {
+            renderSelectedOrder();
+        }
     }
 
     private void handleNewOrder() {
@@ -525,10 +620,13 @@ public final class OrdersView extends JPanel implements NavigableView {
                 cur
         });
 
+        String assignInfo = (order.assignedForkliftName() != null ? "   |   " + i18n.t("role.FORKLIFT") + ": " + order.assignedForkliftName() : "")
+                + (order.dispatchLocationCode() != null ? " (" + order.dispatchLocationCode() + ")" : "")
+                + (order.isCustomerArrived() ? "   |   [ " + i18n.t("orders.customer_arrived.badge").toUpperCase(Locale.ROOT) + " ]" : "");
         orderMetaLabel.setText(
                 i18n.t("orders.total_weight") + ": " + FormatUtil.stripZeros(order.totalWeightKg()) + " kg   |   "
-                        + i18n.t("orders.total_price") + ": " + CurrencyDef.formatAmount(order.totalPrice(), cur, dec) + "   |   "
-                        + i18n.t("common.created_at") + ": " + (order.createdAt() != null ? DT_FMT.format(order.createdAt()) : "—")
+                        + i18n.t("orders.total_price") + ": " + CurrencyDef.formatAmount(order.totalPrice(), cur, dec)
+                        + assignInfo
         );
 
         currentItems = ctx.getOrderItemDao().findByOrderId(order.id());
@@ -553,6 +651,9 @@ public final class OrdersView extends JPanel implements NavigableView {
         editPriceBtn.setEnabled(editable);
         removeItemBtn.setEnabled(editable);
         orderCurrencyCombo.setEnabled(editable);
+        assignForkliftBtn.setEnabled(editable);
+        customerArrivedBtn.setEnabled(editable);
+        handoverScanBtn.setEnabled(editable);
         statusDropdown.setEnabled(hasOrder);
         applyStatusBtn.setEnabled(hasOrder);
         previewDocsBtn.setEnabled(hasOrder);
@@ -579,8 +680,10 @@ public final class OrdersView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(detailHeaderPanel, 12, 14);
         BrutalistStyle.applyBoxCard(scanBarPanel, 8, 10);
         BrutalistStyle.stylePrimaryButton(newOrderBtn);
+        BrutalistStyle.stylePrimaryButton(handoverScanBtn);
         BrutalistStyle.stylePrimaryButton(previewDocsBtn);
-        BrutalistStyle.styleSecondaryButtons(refreshBtn, scanAddBtn, pickStockBtn, editPriceBtn, removeItemBtn, applyStatusBtn);
+        BrutalistStyle.styleSecondaryButtons(refreshBtn, scanAddBtn, pickStockBtn, editPriceBtn, removeItemBtn,
+                assignForkliftBtn, customerArrivedBtn, applyStatusBtn);
         BrutalistStyle.styleTable(ordersTable);
         BrutalistStyle.styleTable(itemsTable);
     }
@@ -649,6 +752,9 @@ public final class OrdersView extends JPanel implements NavigableView {
         statusDropdown.addItem(new StatusStepOption(OrderStatus.SHIPPED, "3. " + i18n.t("status.order.SHIPPED").toUpperCase()));
         statusDropdown.addItem(new StatusStepOption(OrderStatus.CANCELLED, "4. " + i18n.t("status.order.CANCELLED").toUpperCase()));
         applyStatusBtn.setText(i18n.t("orders.status.apply").toUpperCase());
+        assignForkliftBtn.setText(i18n.t("orders.assign_forklift").toUpperCase(Locale.ROOT));
+        customerArrivedBtn.setText(i18n.t("orders.customer_arrived.btn").toUpperCase(Locale.ROOT));
+        handoverScanBtn.setText(i18n.t("order.handover.btn").toUpperCase(Locale.ROOT));
         previewDocsBtn.setText(i18n.t("orders.documents.preview").toUpperCase());
 
         ordersModel.setColumnIdentifiers(new Object[]{

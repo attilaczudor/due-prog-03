@@ -64,7 +64,7 @@ public final class TodoService {
         RoleCode role = user.roleCode();
 
         if (role == RoleCode.FORKLIFT) {
-            appendForkliftTodos(items, i18n);
+            appendForkliftTodos(user, items, i18n);
         } else if (role == RoleCode.OPERATOR) {
             appendOperatorTodos(user, items, i18n);
         } else if (role == RoleCode.MANAGER) {
@@ -80,10 +80,10 @@ public final class TodoService {
         return items;
     }
 
-    private void appendForkliftTodos(List<SystemTodoItem> items, I18nManager i18n) {
-        // P1: Order Staging (collect reserved packages from shelves -> DISPATCH_ZONE), grouped by order
+    private void appendForkliftTodos(User driver, List<SystemTodoItem> items, I18nManager i18n) {
+        // P1: Assigned Order Collection (scan & move reserved packages from shelves -> DISPATCH_ZONE), grouped by order
         Map<String, List<TransportService.StagingTask>> pendingByOrder = new LinkedHashMap<>();
-        for (TransportService.StagingTask t : transportService.findOrderStagingTasks()) {
+        for (TransportService.StagingTask t : transportService.findOrderStagingTasksForDriver(driver.id())) {
             if (!t.isAtDispatchZone()) {
                 pendingByOrder.computeIfAbsent(t.orderNumber() + " — " + t.customerName(), k -> new ArrayList<>()).add(t);
             }
@@ -91,9 +91,10 @@ public final class TodoService {
         for (Map.Entry<String, List<TransportService.StagingTask>> e : pendingByOrder.entrySet()) {
             List<TransportService.StagingTask> list = e.getValue();
             String firstLoc = list.get(0).currentLocationCode();
+            boolean arrived = list.get(0).customerArrived();
             items.add(new SystemTodoItem(
-                    1, "P1", i18n.t("todo.cat.order_staging"),
-                    i18n.t("todo.sys.stage_order", e.getKey(), list.size()),
+                    arrived ? 0 : 1, "P1", i18n.t("todo.cat.order_staging"),
+                    (arrived ? "[CUSTOMER HERE] " : "") + i18n.t("todo.sys.stage_order", e.getKey(), list.size()),
                     i18n.t("todo.sys.stage_order_detail", firstLoc),
                     MainFrame.VIEW_TRANSPORT
             ));
@@ -170,7 +171,15 @@ public final class TodoService {
             }
             List<TransportService.StagingTask> ordTasks = staging.stream()
                     .filter(t -> t.orderId() == ord.id()).toList();
-            if (!ordTasks.isEmpty() && ordTasks.stream().allMatch(TransportService.StagingTask::isAtDispatchZone)) {
+            if (ord.isCustomerArrived()) {
+                items.add(new SystemTodoItem(
+                        0, "P1", i18n.t("todo.cat.customer_arrived"),
+                        i18n.t("todo.sys.customer_arrived", ord.orderNumber(), ord.customerName()),
+                        i18n.t("todo.sys.customer_arrived_detail",
+                                ord.dispatchLocationCode() != null ? ord.dispatchLocationCode() : "DOCK-01"),
+                        MainFrame.VIEW_ORDERS
+                ));
+            } else if (!ordTasks.isEmpty() && ordTasks.stream().allMatch(TransportService.StagingTask::isAtDispatchZone)) {
                 items.add(new SystemTodoItem(
                         2, "P2", i18n.t("todo.cat.ready_ship"),
                         i18n.t("todo.sys.order_ready_ship", ord.orderNumber(), ord.customerName()),

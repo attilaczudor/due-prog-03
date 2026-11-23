@@ -70,9 +70,11 @@ class V23NotificationsTodoAndStationTest {
         List<AppNotification> fkNotifs = ctx.getNotificationService().listForUser(forklift.id(), 10);
         assertEquals(AppNotification.CAT_PUTAWAY, fkNotifs.get(0).category());
 
-        // 2. Manager creates an order & allocates a shelf package -> Forklift gets ORDER_STAGING notifications
+        // 2. Manager creates an order, assigns it to Forklift + DOCK-01, & allocates a shelf package
         long custId = ctx.getCustomerDao().findAll(true).get(0).id();
+        WarehouseLocation dock = ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true).get(0);
         Order ord = ctx.getOrderService().createOrder(custId, "EUR", null, manager.id());
+        ctx.getOrderService().assignForkliftAndDock(ord.id(), forklift.id(), dock.id());
         InventoryPackage shelfPkg = ctx.getPackageDao().findByFilter(hu.due.rewear.model.PackageFilter.empty())
                 .stream()
                 .filter(p -> p.status() == hu.due.rewear.model.PackageStatus.IN_STOCK && p.locationId() != station.id())
@@ -93,7 +95,6 @@ class V23NotificationsTodoAndStationTest {
 
         // 5. Forklift stages package to DOCK-01 -> Manager receives ORDER_READY notification
         int mgrNotifsBefore = ctx.getNotificationService().countUnread(manager.id());
-        WarehouseLocation dock = ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true).get(0);
         ctx.getTransportService().stageToDispatchZone(List.of(shelfPkg.id()), dock.id(), forklift.id());
         assertEquals(mgrNotifsBefore + 1, ctx.getNotificationService().countUnread(manager.id()));
     }

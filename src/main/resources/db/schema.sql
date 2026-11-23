@@ -163,10 +163,15 @@ CREATE TABLE IF NOT EXISTS orders (
     total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0),
     notes TEXT,
     created_by INTEGER NOT NULL,
+    assigned_forklift_id INTEGER,
+    dispatch_location_id INTEGER,
+    customer_arrived_at TEXT,
     created_at TEXT NOT NULL,
     shipped_at TEXT,
     FOREIGN KEY (customer_id) REFERENCES customers(id),
-    FOREIGN KEY (created_by) REFERENCES users(id)
+    FOREIGN KEY (created_by) REFERENCES users(id),
+    FOREIGN KEY (assigned_forklift_id) REFERENCES users(id) ON DELETE SET NULL,
+    FOREIGN KEY (dispatch_location_id) REFERENCES warehouse_locations(id) ON DELETE SET NULL
 );
 
 -- 11. Order Line Items (Exact Physical Packages Allocated to Orders)
@@ -176,6 +181,7 @@ CREATE TABLE IF NOT EXISTS order_items (
     package_id INTEGER NOT NULL,
     price_per_kg REAL NOT NULL CHECK (price_per_kg >= 0),
     line_total REAL NOT NULL CHECK (line_total >= 0),
+    handover_scanned INTEGER NOT NULL DEFAULT 0 CHECK (handover_scanned IN (0, 1)),
     UNIQUE (order_id, package_id),
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (package_id) REFERENCES inventory_packages(id)

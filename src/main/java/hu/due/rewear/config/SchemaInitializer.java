@@ -177,9 +177,13 @@ public final class SchemaInitializer {
     }
 
     private void ensureV22OperationsAndCommsSchema(Connection conn) throws SQLException {
-        // 1. Add location_type to warehouse_locations & assigned_station_id to users if upgrading an older DB
+        // 1. Add location_type, assigned_station_id, and order assignment/arrival/handover columns if upgrading
         addColumnIfMissing(conn, "warehouse_locations", "location_type", "TEXT NOT NULL DEFAULT 'STORAGE'");
         addColumnIfMissing(conn, "users", "assigned_station_id", "INTEGER");
+        addColumnIfMissing(conn, "orders", "assigned_forklift_id", "INTEGER");
+        addColumnIfMissing(conn, "orders", "dispatch_location_id", "INTEGER");
+        addColumnIfMissing(conn, "orders", "customer_arrived_at", "TEXT");
+        addColumnIfMissing(conn, "order_items", "handover_scanned", "INTEGER NOT NULL DEFAULT 0");
 
         // 2. Seed default email domain & SMTP/IMAP settings if missing
         try (Statement stmt = conn.createStatement()) {
@@ -256,6 +260,13 @@ public final class SchemaInitializer {
                         UPDATE users
                         SET assigned_station_id = (SELECT id FROM warehouse_locations WHERE code = 'ST-OP-01' LIMIT 1)
                         WHERE lower(username) = 'operator' AND assigned_station_id IS NULL
+                        """);
+                // Assign open demo orders to demo forklift driver & DOCK-01 if unassigned
+                stmt.execute("""
+                        UPDATE orders
+                        SET assigned_forklift_id = (SELECT id FROM users WHERE lower(username) = 'forklift' LIMIT 1),
+                            dispatch_location_id = (SELECT id FROM warehouse_locations WHERE code = 'DOCK-01' LIMIT 1)
+                        WHERE status IN ('DRAFT', 'PACKING') AND assigned_forklift_id IS NULL
                         """);
             }
 
