@@ -480,7 +480,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     public void navigateTo(String viewKey) {
         NavigableView view = views.get(viewKey);
-        boolean newlyCreated = false;
         if (view == null) {
             Supplier<NavigableView> factory = viewFactories.get(viewKey);
             if (factory == null) {
@@ -488,7 +487,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             }
             view = factory.get();
             registerView(view);
-            newlyCreated = true;
         }
         currentViewKey = viewKey;
         JToggleButton btn = navButtons.get(viewKey);
@@ -497,56 +495,88 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
         updateNavButtonStyles();
         activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()).toUpperCase(Locale.ROOT));
+        view.refreshData();
         cardLayout.show(contentHost, viewKey);
-        if (!newlyCreated) {
-            view.refreshData();
-        }
         refreshNotificationBell();
+    }
+
+    private record BadgeSnapshot(int unreadNotifications,
+                                 int unreadEmails,
+                                 int unreadMessages,
+                                 int todoCount,
+                                 int transportCount,
+                                 int openOrders,
+                                 int overdueInvoices) {
     }
 
     private void refreshNotificationBell() {
         if (!ctx.getSession().isAuthenticated()) {
             return;
         }
-        User me = ctx.getSession().requireCurrentUser();
-        int unread = ctx.getNotificationService().countUnread(me.id());
-        String label = ctx.getI18n().t("todo.tab.notifications").toUpperCase(Locale.ROOT);
-        if (unread > 0) {
-            notificationBellBtn.setText("[ ! " + unread + " ]  " + label);
-            BrutalistStyle.stylePrimaryButton(notificationBellBtn);
-        } else {
-            notificationBellBtn.setText("[ 0 ]  " + label);
-            BrutalistStyle.styleSecondaryButton(notificationBellBtn);
-        }
-        refreshSidebarBadges(me, unread);
-    }
+        final User me = ctx.getSession().requireCurrentUser();
+        final boolean hasTodo = navButtons.containsKey(VIEW_TODO);
+        final boolean hasTransport = navButtons.containsKey(VIEW_TRANSPORT);
+        final boolean hasOrders = navButtons.containsKey(VIEW_ORDERS);
+        final boolean hasInvoices = navButtons.containsKey(VIEW_INVOICES);
+        final boolean isForklift = ctx.getSession().isForklift();
 
-    private void refreshSidebarBadges(User me, int unreadNotifications) {
-        setNavBadge(VIEW_NOTIFICATIONS, unreadNotifications);
-        setNavBadge(VIEW_EMAIL, ctx.getEmailService().countUnreadInbox(me.id()));
-        setNavBadge(VIEW_MESSAGES, ctx.getChatService().countTotalUnread(me.id()));
-
-        if (navButtons.containsKey(VIEW_TODO)) {
-            int sysCount = ctx.getTodoService().buildSystemTodosFor(me, ctx.getI18n()).size();
-            int openPersonal = (int) ctx.getTodoService().listPersonalTodos(me.id()).stream()
-                    .filter(t -> !t.completed()).count();
-            setNavBadge(VIEW_TODO, sysCount + openPersonal);
-        }
-        if (navButtons.containsKey(VIEW_TRANSPORT)) {
-            int putaway = ctx.getTransportService().findPutawayQueue().size();
-            Long driverFilter = ctx.getSession().isForklift() ? me.id() : null;
-            int pendingStaging = (int) ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter).stream()
-                    .filter(t -> !t.isAtDispatchZone()).count();
-            setNavBadge(VIEW_TRANSPORT, putaway + pendingStaging);
-        }
-        if (navButtons.containsKey(VIEW_ORDERS)) {
-            setNavBadge(VIEW_ORDERS, ctx.getOrderDao().countOpenOrders());
-        }
-        if (navButtons.containsKey(VIEW_INVOICES)) {
-            int overdue = (int) ctx.getInvoiceDao().findAll().stream()
-                    .filter(inv -> inv.status() == hu.due.rewear.model.InvoiceStatus.OVERDUE).count();
-            setNavBadge(VIEW_INVOICES, overdue);
-        }
+        AsyncUiRunner.runLatest("mainframe.badges", null, () -> {
+            int unreadNotifs = ctx.getNotificationService().countUnread(me.id());
+            int unreadEmails = ctx.getEmailService().countUnreadInbox(me.id());
+            int unreadMessages = ctx.getChatService().countTotalUnread(me.id());
+            int todoCount = 0;
+            if (hasTodo) {
+                int sysCount = ctx.getTodoService().buildSystemTodosFor(me, ctx.getI18n()).size();
+                int openPersonal = (int) ctx.getTodoService().listPersonalTodos(me.id()).stream()
+                        .filter(t -> !t.completed()).count();
+                todoCount = sysCount + openPersonal;
+            }
+            int transportCount = 0;
+            if (hasTransport) {
+                int putaway = ctx.getTransportService().findPutawayQueue().size();
+                Long driverFilter = isForklift ? me.id() : null;
+                int pendingStaging = (int) ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter).stream()
+                        .filter(t -> !t.isAtDispatchZone()).count();
+                transportCount = putaway + pendingStaging;
+            }
+            int openOrders = hasOrders ? ctx.getOrderDao().countOpenOrders() : 0;
+            int overdueInvoices = hasInvoices
+                    ? (int) ctx.getInvoiceDao().findAll().stream()
+                            .filter(inv -> inv.status() == hu.due.rewear.model.InvoiceStatus.OVERDUE).count()
+                    : 0;
+            return new BadgeSnapshot(
+                    unreadNotifs, unreadEmails, unreadMessages,
+                    todoCount, transportCount, openOrders, overdueInvoices);
+        }, snap -> {
+            if (!ctx.getSession().isAuthenticated()) {
+                return;
+            }
+            String label = ctx.getI18n().t("todo.tab.notifications").toUpperCase(Locale.ROOT);
+            if (snap.unreadNotifications() > 0) {
+                notificationBellBtn.setText("[ ! " + snap.unreadNotifications() + " ]  " + label);
+                BrutalistStyle.stylePrimaryButton(notificationBellBtn);
+            } else {
+                notificationBellBtn.setText("[ 0 ]  " + label);
+                BrutalistStyle.styleSecondaryButton(notificationBellBtn);
+            }
+            setNavBadge(VIEW_NOTIFICATIONS, snap.unreadNotifications());
+            setNavBadge(VIEW_EMAIL, snap.unreadEmails());
+            setNavBadge(VIEW_MESSAGES, snap.unreadMessages());
+            if (hasTodo) {
+                setNavBadge(VIEW_TODO, snap.todoCount());
+            }
+            if (hasTransport) {
+                setNavBadge(VIEW_TRANSPORT, snap.transportCount());
+            }
+            if (hasOrders) {
+                setNavBadge(VIEW_ORDERS, snap.openOrders());
+            }
+            if (hasInvoices) {
+                setNavBadge(VIEW_INVOICES, snap.overdueInvoices());
+            }
+        }, err -> {
+            // Silently ignore transient background badge errors
+        });
     }
 
     private void setNavBadge(String viewKey, int count) {
