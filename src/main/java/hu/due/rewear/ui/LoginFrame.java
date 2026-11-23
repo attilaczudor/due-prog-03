@@ -53,6 +53,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final JButton adminBtn = new JButton("ADMIN");
     private final JButton managerBtn = new JButton("MANAGER");
     private final JButton operatorBtn = new JButton("OPERATOR");
+    private final JButton forkliftBtn = new JButton("FORKLIFT");
 
     private final JComboBox<String> langCombo = new JComboBox<>();
 
@@ -73,7 +74,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
         pack();
-        setMinimumSize(new Dimension(560, 460));
+        setMinimumSize(new Dimension(650, 460));
         setLocationRelativeTo(null);
     }
 
@@ -168,11 +169,13 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         adminBtn.addActionListener(e -> fill.accept(new String[]{"admin", "admin123"}));
         managerBtn.addActionListener(e -> fill.accept(new String[]{"manager", "manager123"}));
         operatorBtn.addActionListener(e -> fill.accept(new String[]{"operator", "operator123"}));
+        forkliftBtn.addActionListener(e -> fill.accept(new String[]{"forklift", "forklift123"}));
 
         quickFillPanel.add(superAdminBtn);
         quickFillPanel.add(adminBtn);
         quickFillPanel.add(managerBtn);
         quickFillPanel.add(operatorBtn);
+        quickFillPanel.add(forkliftBtn);
         footer.add(quickFillPanel);
 
         outer.add(footer, BorderLayout.SOUTH);
@@ -191,11 +194,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         usernameLabel.setForeground(ThemeManager.fg());
         passwordLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
-        BrutalistStyle.styleSecondaryButton(superAdminBtn);
-        BrutalistStyle.styleSecondaryButton(adminBtn);
-        BrutalistStyle.styleSecondaryButton(managerBtn);
-        BrutalistStyle.styleSecondaryButton(operatorBtn);
-        BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn);
+        BrutalistStyle.styleSecondaryButtons(superAdminBtn, adminBtn, managerBtn, operatorBtn, forkliftBtn);
+        BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn, forkliftBtn);
         loginAsLabel.setForeground(ThemeManager.muted());
     }
 
