@@ -60,7 +60,6 @@ public final class MessagesView extends JPanel implements NavigableView {
     private final JLabel activeRoomTitle = new JLabel("—");
     private final JLabel activeRoomTopic = new JLabel(" ");
     private final JButton addMemberBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
     private final JTextArea feedArea = new JTextArea();
     private final JTextField messageInput = new JTextField();
     private final JButton sendBtn = new JButton();
@@ -139,7 +138,6 @@ public final class MessagesView extends JPanel implements NavigableView {
         JPanel headerBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         headerBtns.setOpaque(false);
         headerBtns.add(addMemberBtn);
-        headerBtns.add(refreshBtn);
         chatHeader.add(headerBtns, BorderLayout.EAST);
         chatPane.add(chatHeader, BorderLayout.NORTH);
 
@@ -187,7 +185,6 @@ public final class MessagesView extends JPanel implements NavigableView {
         newRoomBtn.addActionListener(e -> handleCreateRoom());
         newDmBtn.addActionListener(e -> handleNewDirectMessage());
         addMemberBtn.addActionListener(e -> handleAddMember());
-        refreshBtn.addActionListener(e -> refreshData());
         sendBtn.addActionListener(e -> handleSendMessage());
         messageInput.addActionListener(e -> handleSendMessage());
     }
@@ -434,7 +431,6 @@ public final class MessagesView extends JPanel implements NavigableView {
         dmHeader.setText(i18n.t("chat.direct_messages").toUpperCase(Locale.ROOT));
         newDmBtn.setText("+ DM");
         addMemberBtn.setText("+ " + i18n.t("chat.add_member").toUpperCase(Locale.ROOT));
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
         sendBtn.setText(i18n.t("email.send").toUpperCase(Locale.ROOT));
         applyTheme();
     }
@@ -442,7 +438,7 @@ public final class MessagesView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(sendBtn);
-        BrutalistStyle.styleSecondaryButtons(newRoomBtn, newDmBtn, addMemberBtn, refreshBtn);
+        BrutalistStyle.styleSecondaryButtons(newRoomBtn, newDmBtn, addMemberBtn);
         BrutalistStyle.applyBoxCard(chatPane, 10, 12);
         feedArea.setBackground(ThemeManager.bg());
         feedArea.setForeground(ThemeManager.fg());

@@ -44,7 +44,6 @@ public final class DictionariesView extends JPanel implements NavigableView {
     private final JButton editBtn = new JButton();
     private final JButton toggleActiveBtn = new JButton();
     private final JButton deleteBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
 
     private final DefaultTableModel targetModel = BrutalistStyle.nonEditableTableModel();
     private final DefaultTableModel garmentModel = BrutalistStyle.nonEditableTableModel();
@@ -86,7 +85,6 @@ public final class DictionariesView extends JPanel implements NavigableView {
         toolbar.add(editBtn);
         toolbar.add(toggleActiveBtn);
         toolbar.add(deleteBtn);
-        toolbar.add(refreshBtn);
         add(toolbar, BorderLayout.NORTH);
 
         tabs.addTab("", new JScrollPane(targetTable));
@@ -101,7 +99,6 @@ public final class DictionariesView extends JPanel implements NavigableView {
         editBtn.addActionListener(e -> handleEdit());
         toggleActiveBtn.addActionListener(e -> handleToggleActive());
         deleteBtn.addActionListener(e -> handleDelete());
-        refreshBtn.addActionListener(e -> refreshData());
     }
 
     private void handleAdd() {
@@ -538,7 +535,6 @@ public final class DictionariesView extends JPanel implements NavigableView {
         editBtn.setText(i18n.t("common.edit"));
         toggleActiveBtn.setText(i18n.t("common.activate") + " / " + i18n.t("common.deactivate"));
         deleteBtn.setText(i18n.t("common.delete"));
-        refreshBtn.setText(i18n.t("common.refresh"));
 
         tabs.setTitleAt(0, i18n.t("dictionaries.tab.targets"));
         tabs.setTitleAt(1, i18n.t("dictionaries.tab.garments"));
@@ -565,7 +561,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(addBtn);
-        BrutalistStyle.styleSecondaryButtons(editBtn, toggleActiveBtn, deleteBtn, refreshBtn);
+        BrutalistStyle.styleSecondaryButtons(editBtn, toggleActiveBtn, deleteBtn);
         BrutalistStyle.styleTable(targetTable);
         BrutalistStyle.styleTable(garmentTable);
         BrutalistStyle.styleTable(qualityTable);

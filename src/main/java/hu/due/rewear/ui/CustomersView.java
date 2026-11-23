@@ -56,7 +56,6 @@ public final class CustomersView extends JPanel implements NavigableView {
     private final JButton addBtn = new JButton();
     private final JButton editBtn = new JButton();
     private final JButton statementBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
 
     private final JButton filterAllBtn = new JButton();
     private final JButton filterBuyersBtn = new JButton();
@@ -96,7 +95,6 @@ public final class CustomersView extends JPanel implements NavigableView {
         toolbar.add(addBtn);
         toolbar.add(editBtn);
         toolbar.add(statementBtn);
-        toolbar.add(refreshBtn);
         toolbar.add(new JLabel("   |   "));
         toolbar.add(filterAllBtn);
         toolbar.add(filterBuyersBtn);
@@ -126,7 +124,6 @@ public final class CustomersView extends JPanel implements NavigableView {
             if (c != null) openCustomerDialog(c);
         });
         statementBtn.addActionListener(e -> handlePreviewPartnerStatement());
-        refreshBtn.addActionListener(e -> refreshData());
 
         filterAllBtn.addActionListener(e -> { filterMode = FilterMode.ALL; styleFilterButtons(); refreshData(); });
         filterBuyersBtn.addActionListener(e -> { filterMode = FilterMode.BUYERS; styleFilterButtons(); refreshData(); });
@@ -309,7 +306,7 @@ public final class CustomersView extends JPanel implements NavigableView {
 
     public void applyBrutalistTheme() {
         BrutalistStyle.stylePrimaryButton(addBtn);
-        BrutalistStyle.styleSecondaryButtons(editBtn, statementBtn, refreshBtn);
+        BrutalistStyle.styleSecondaryButtons(editBtn, statementBtn);
         styleFilterButtons();
         BrutalistStyle.styleTable(customerTable);
         BrutalistStyle.styleTable(historyTable);
@@ -364,7 +361,6 @@ public final class CustomersView extends JPanel implements NavigableView {
         addBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
         editBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
         statementBtn.setText(i18n.t("partners.statement.btn").toUpperCase(Locale.ROOT));
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
         filterAllBtn.setText(i18n.t("partners.filter.all").toUpperCase(Locale.ROOT));
         filterBuyersBtn.setText(i18n.t("partners.filter.buyers").toUpperCase(Locale.ROOT));
         filterSuppliersBtn.setText(i18n.t("partners.filter.suppliers").toUpperCase(Locale.ROOT));

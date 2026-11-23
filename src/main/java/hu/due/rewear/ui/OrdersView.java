@@ -60,7 +60,6 @@ public final class OrdersView extends JPanel implements NavigableView {
 
     // Top bar
     private final JButton newOrderBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
 
     // Left: Orders list
     private final DefaultTableModel ordersModel = BrutalistStyle.nonEditableTableModel();
@@ -120,7 +119,6 @@ public final class OrdersView extends JPanel implements NavigableView {
     private void buildUi() {
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         topBar.add(newOrderBtn);
-        topBar.add(refreshBtn);
         add(topBar, BorderLayout.NORTH);
 
         // Left Orders Table
@@ -181,7 +179,6 @@ public final class OrdersView extends JPanel implements NavigableView {
 
     private void wireEvents() {
         newOrderBtn.addActionListener(e -> handleNewOrder());
-        refreshBtn.addActionListener(e -> refreshData());
 
         ordersTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -682,7 +679,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(newOrderBtn);
         BrutalistStyle.stylePrimaryButton(handoverScanBtn);
         BrutalistStyle.stylePrimaryButton(previewDocsBtn);
-        BrutalistStyle.styleSecondaryButtons(refreshBtn, scanAddBtn, pickStockBtn, editPriceBtn, removeItemBtn,
+        BrutalistStyle.styleSecondaryButtons(scanAddBtn, pickStockBtn, editPriceBtn, removeItemBtn,
                 assignForkliftBtn, customerArrivedBtn, applyStatusBtn);
         BrutalistStyle.styleTable(ordersTable);
         BrutalistStyle.styleTable(itemsTable);
@@ -737,7 +734,6 @@ public final class OrdersView extends JPanel implements NavigableView {
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         newOrderBtn.setText("+ " + i18n.t("orders.new_order").toUpperCase());
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase());
         scanLabel.setText(i18n.t("orders.add_by_scan").toUpperCase() + ":");
         scanQrField.putClientProperty("JTextField.placeholderText", i18n.t("orders.scan_placeholder"));
         scanAddBtn.setText(i18n.t("common.add").toUpperCase());

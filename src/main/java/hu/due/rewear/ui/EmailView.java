@@ -66,7 +66,6 @@ public final class EmailView extends JPanel implements NavigableView {
     private final JButton toggleReadBtn = new JButton();
     private final JButton deleteBtn = new JButton();
     private final JButton simIncomingBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
 
     private final DefaultTableModel listModel = BrutalistStyle.nonEditableTableModel();
     private final JTable listTable = new JTable(listModel);
@@ -99,7 +98,6 @@ public final class EmailView extends JPanel implements NavigableView {
         topBar.add(toggleReadBtn);
         topBar.add(deleteBtn);
         topBar.add(simIncomingBtn);
-        topBar.add(refreshBtn);
         add(topBar, BorderLayout.NORTH);
 
         // Left folder rail
@@ -198,7 +196,6 @@ public final class EmailView extends JPanel implements NavigableView {
             }
         });
         simIncomingBtn.addActionListener(e -> handleSimulateExternalIncoming());
-        refreshBtn.addActionListener(e -> refreshData());
 
         listTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -461,7 +458,6 @@ public final class EmailView extends JPanel implements NavigableView {
         toggleReadBtn.setText(i18n.t("email.toggle_read").toUpperCase(Locale.ROOT));
         deleteBtn.setText(i18n.t("common.delete").toUpperCase(Locale.ROOT));
         simIncomingBtn.setText(i18n.t("email.sim_btn").toUpperCase(Locale.ROOT));
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
 
         listModel.setColumnIdentifiers(new Object[]{
                 "●",
@@ -479,7 +475,7 @@ public final class EmailView extends JPanel implements NavigableView {
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(composeBtn);
         BrutalistStyle.styleSecondaryButtons(replyBtn, forwardBtn, toggleReadBtn, deleteBtn,
-                simIncomingBtn, refreshBtn, openAttachmentBtn);
+                simIncomingBtn, openAttachmentBtn);
         BrutalistStyle.applyBoxCard(readerCard, 10, 12);
         BrutalistStyle.styleTable(listTable);
         readerBodyArea.setBackground(ThemeManager.bg());

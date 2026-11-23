@@ -60,6 +60,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public static final String VIEW_ORDERS = "orders";
     public static final String VIEW_INVOICES = "invoices";
     public static final String VIEW_EMAIL = "email";
+    public static final String VIEW_NOTIFICATIONS = "notifications";
     public static final String VIEW_MESSAGES = "messages";
     public static final String VIEW_ADMIN = "admin";
 
@@ -95,6 +96,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JLabel activeViewTitleLabel = new JLabel();
     private final JButton notificationBellBtn = new JButton();
     private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshNotificationBell);
+    private final javax.swing.Timer autoRefreshTimer;
     private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel statusBarLabel = new JLabel();
 
@@ -120,6 +122,10 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         ThemeManager.addListener(this);
         ctx.getNotificationService().addChangeListener(notifListener);
         refreshNotificationBell();
+        // Automatic background refresh every 10s for live notification bell & live operational feeds
+        this.autoRefreshTimer = new javax.swing.Timer(10_000, e -> performBackgroundAutoRefresh());
+        this.autoRefreshTimer.setRepeats(true);
+        this.autoRefreshTimer.start();
         navigateTo(VIEW_DASHBOARD);
 
         pack();
@@ -203,12 +209,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
         topBar.add(activeViewTitleLabel, BorderLayout.WEST);
         notificationBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        notificationBellBtn.addActionListener(e -> {
-            navigateTo(VIEW_TODO);
-            if (views.get(VIEW_TODO) instanceof TodoView tv) {
-                tv.showNotificationsTab();
-            }
-        });
+        notificationBellBtn.addActionListener(e -> navigateTo(VIEW_NOTIFICATIONS));
         topBar.add(notificationBellBtn, BorderLayout.EAST);
         rightArea.add(topBar, BorderLayout.NORTH);
 
@@ -267,6 +268,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         navList.add(createHairlineSeparator());
         navList.add(Box.createVerticalStrut(7));
         addNavButton(navList, VIEW_EMAIL, "nav.email");
+        addNavButton(navList, VIEW_NOTIFICATIONS, "nav.notifications");
         addNavButton(navList, VIEW_MESSAGES, "nav.messages");
 
         if (session.canManageUsersAndMaintenance()) {
@@ -461,6 +463,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerViewFactory(VIEW_ORDERS, () -> new OrdersView(ctx));
         registerViewFactory(VIEW_INVOICES, () -> new InvoicesView(ctx));
         registerViewFactory(VIEW_EMAIL, () -> new EmailView(ctx));
+        registerViewFactory(VIEW_NOTIFICATIONS, () -> new NotificationsView(ctx, this::navigateTo));
         registerViewFactory(VIEW_MESSAGES, () -> new MessagesView(ctx));
         registerViewFactory(VIEW_ADMIN, () -> new AdminView(ctx));
     }
@@ -639,7 +642,22 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         statusBarLabel.setToolTipText(dbPath.toString());
     }
 
+    private void performBackgroundAutoRefresh() {
+        if (!isVisible() || !isActive() || !ctx.getSession().isAuthenticated()) {
+            return;
+        }
+        refreshNotificationBell();
+        if (currentViewKey != null && views.containsKey(currentViewKey)) {
+            switch (currentViewKey) {
+                case VIEW_NOTIFICATIONS, VIEW_TODO, VIEW_TRANSPORT, VIEW_EMAIL, VIEW_MESSAGES ->
+                        views.get(currentViewKey).refreshData();
+                default -> { }
+            }
+        }
+    }
+
     private void performLogout() {
+        autoRefreshTimer.stop();
         ctx.getI18n().removeListener(this);
         ThemeManager.removeListener(this);
         ctx.getNotificationService().removeChangeListener(notifListener);

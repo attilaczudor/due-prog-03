@@ -43,6 +43,7 @@ public final class SidebarIcons {
             case MainFrame.VIEW_ORDERS -> makeIcon(size, SidebarIcons::paintOrders);
             case MainFrame.VIEW_INVOICES -> makeIcon(size, SidebarIcons::paintInvoices);
             case MainFrame.VIEW_EMAIL -> makeIcon(size, SidebarIcons::paintEmail);
+            case MainFrame.VIEW_NOTIFICATIONS -> makeIcon(size, SidebarIcons::paintNotifications);
             case MainFrame.VIEW_MESSAGES -> makeIcon(size, SidebarIcons::paintMessages);
             case MainFrame.VIEW_ADMIN -> makeIcon(size, SidebarIcons::paintAdmin);
             default -> makeIcon(size, SidebarIcons::paintDashboard);
@@ -254,11 +255,26 @@ public final class SidebarIcons {
         g.draw(new Line2D.Double(7, 12.5, 14, 12.5));
     }
 
-    // Checklist icon for To-Do & Notifications
+    // Checklist icon for To-Do
     private static void paintTodo(Graphics2D g) {
         g.draw(new Rectangle2D.Double(3.5, 4, 5, 5));
         g.draw(new Line2D.Double(11, 6.5, 20.5, 6.5));
         g.draw(new Rectangle2D.Double(3.5, 13.5, 5, 5));
         g.draw(new Line2D.Double(11, 16, 20.5, 16));
+    }
+
+    // Bell icon for Notifications
+    private static void paintNotifications(Graphics2D g) {
+        Path2D bell = new Path2D.Double();
+        bell.moveTo(18, 15);
+        bell.lineTo(18, 10);
+        bell.quadTo(18, 4, 12, 4);
+        bell.quadTo(6, 4, 6, 10);
+        bell.lineTo(6, 15);
+        bell.lineTo(4, 17.5);
+        bell.lineTo(20, 17.5);
+        bell.closePath();
+        g.draw(bell);
+        g.draw(new Line2D.Double(10, 20.5, 14, 20.5));
     }
 }

@@ -473,10 +473,12 @@ chat.all_members_in,All active users are already members of this room.,Minden ak
 chat.members_count,{0} member(s),{0} résztvevő
 email.scope.all,Internal & External Mail,Belső és külső levelezés
 email.scope.internal_only,Internal Team Mail Only,Csak belső céges levelezés
-nav.todo,To-Do & Alerts,Teendők és értesítések
+nav.todo,To-Do,Teendők
+nav.notifications,Notifications,Értesítések
+notifications.title,Operational Notifications,Raktári értesítések
 admin.user.assigned_station,Assigned Operator Station,Hozzárendelt operátori állomás
 intake.station_locked_hint,Locked to your assigned Operator Station.,A hozzád rendelt operátori állomáshoz rögzítve.
-todo.title,To-Do & Operational Notifications,Teendők és raktári értesítések
+todo.title,To-Do Lists,Teendők
 todo.kpi.system,System To-Do Tasks,Rendszer teendők
 todo.kpi.personal,Personal To-Dos (Open / Total),Saját teendők (Nyitott / Összes)
 todo.kpi.notifications,Unread Notifications,Olvasatlan értesítések

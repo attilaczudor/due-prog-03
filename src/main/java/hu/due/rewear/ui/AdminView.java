@@ -59,12 +59,10 @@ public final class AdminView extends JPanel implements NavigableView {
     private final JButton addUserBtn = new JButton();
     private final JButton editUserBtn = new JButton();
     private final JButton resetPwBtn = new JButton();
-    private final JButton refreshUsersBtn = new JButton();
     private final DefaultTableModel usersModel = BrutalistStyle.nonEditableTableModel();
     private final JTable usersTable = new JTable(usersModel);
 
     // Tab 2: Audit Log
-    private final JButton refreshAuditBtn = new JButton();
     private final JButton exportAuditBtn = new JButton();
     private final DefaultTableModel auditModel = BrutalistStyle.nonEditableTableModel();
     private final JTable auditTable = new JTable(auditModel);
@@ -117,7 +115,6 @@ public final class AdminView extends JPanel implements NavigableView {
         usersBar.add(addUserBtn);
         usersBar.add(editUserBtn);
         usersBar.add(resetPwBtn);
-        usersBar.add(refreshUsersBtn);
         usersPanel.add(usersBar, BorderLayout.NORTH);
         BrutalistStyle.styleTable(usersTable);
         usersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -127,7 +124,6 @@ public final class AdminView extends JPanel implements NavigableView {
         JPanel auditPanel = new JPanel(new BorderLayout(0, 8));
         auditPanel.setBorder(BorderFactory.createEmptyBorder(10, 4, 4, 4));
         JPanel auditBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
-        auditBar.add(refreshAuditBtn);
         auditBar.add(exportAuditBtn);
         auditPanel.add(auditBar, BorderLayout.NORTH);
         BrutalistStyle.styleTable(auditTable);
@@ -207,9 +203,7 @@ public final class AdminView extends JPanel implements NavigableView {
         addUserBtn.addActionListener(e -> openCreateUserDialog());
         editUserBtn.addActionListener(e -> openEditUserDialog());
         resetPwBtn.addActionListener(e -> handleResetPassword());
-        refreshUsersBtn.addActionListener(e -> refreshData());
 
-        refreshAuditBtn.addActionListener(e -> refreshData());
         exportAuditBtn.addActionListener(e -> handleExportAuditCsv());
 
         backupDbBtn.addActionListener(e -> handleBackupDb());
@@ -655,9 +649,7 @@ public final class AdminView extends JPanel implements NavigableView {
         addUserBtn.setText("+ " + i18n.t("common.add").toUpperCase());
         editUserBtn.setText(i18n.t("common.edit").toUpperCase());
         resetPwBtn.setText(i18n.t("admin.user.reset_pw").toUpperCase());
-        refreshUsersBtn.setText(i18n.t("common.refresh").toUpperCase());
 
-        refreshAuditBtn.setText(i18n.t("common.refresh").toUpperCase());
         exportAuditBtn.setText(i18n.t("common.export.csv").toUpperCase());
 
         dbCardTitle.setText("SQLITE DATABASE");
@@ -695,8 +687,8 @@ public final class AdminView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(backupDbBtn);
         BrutalistStyle.stylePrimaryButton(loadI18nBtn);
         BrutalistStyle.styleSecondaryButtons(
-                editUserBtn, resetPwBtn, refreshUsersBtn,
-                refreshAuditBtn, exportAuditBtn,
+                editUserBtn, resetPwBtn,
+                exportAuditBtn,
                 restoreDbBtn, exportI18nBtn, resetI18nBtn);
         BrutalistStyle.applyBoxCard(dbCard, 14, 16);
         BrutalistStyle.applyBoxCard(i18nCard, 14, 16);

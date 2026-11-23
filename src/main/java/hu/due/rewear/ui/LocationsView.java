@@ -52,7 +52,6 @@ public final class LocationsView extends JPanel implements NavigableView {
 
     private final JButton addBtn = new JButton();
     private final JButton editBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
 
     private final DefaultTableModel locModel = BrutalistStyle.nonEditableTableModel();
     private final JTable locTable = new JTable(locModel);
@@ -80,7 +79,6 @@ public final class LocationsView extends JPanel implements NavigableView {
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         toolbar.add(addBtn);
         toolbar.add(editBtn);
-        toolbar.add(refreshBtn);
         add(toolbar, BorderLayout.NORTH);
 
         locTable.setRowHeight(28);
@@ -113,8 +111,6 @@ public final class LocationsView extends JPanel implements NavigableView {
                 openLocationDialog(sel);
             }
         });
-        refreshBtn.addActionListener(e -> refreshData());
-
         locTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
                 loadStoredPackagesForSelected();
@@ -292,7 +288,6 @@ public final class LocationsView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         addBtn.setText(i18n.t("common.add"));
         editBtn.setText(i18n.t("common.edit"));
-        refreshBtn.setText(i18n.t("common.refresh"));
         storedTitleLabel.setText(i18n.t("locations.packages_here"));
         reprintStoredBtn.setText(i18n.t("scanner.action.reprint"));
 
@@ -322,7 +317,7 @@ public final class LocationsView extends JPanel implements NavigableView {
     @Override
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(addBtn);
-        BrutalistStyle.styleSecondaryButtons(editBtn, refreshBtn, reprintStoredBtn);
+        BrutalistStyle.styleSecondaryButtons(editBtn, reprintStoredBtn);
         BrutalistStyle.styleTable(locTable);
         BrutalistStyle.styleTable(storedTable);
         locTable.repaint();

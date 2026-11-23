@@ -75,7 +75,6 @@ public final class DashboardView extends JPanel implements NavigableView {
     private final JPanel garmentChartHost = new JPanel(new BorderLayout());
 
     private final JLabel recentTitleLabel = new JLabel();
-    private final JButton refreshBtn = new JButton();
     private final DefaultTableModel recentModel = BrutalistStyle.nonEditableTableModel();
     private final JTable recentTable = new JTable(recentModel);
     private List<StockMovement> recentMovements = List.of();
@@ -116,9 +115,7 @@ public final class DashboardView extends JPanel implements NavigableView {
         JPanel recentPanel = new JPanel(new BorderLayout(0, 6));
         JPanel recentHeader = new JPanel(new BorderLayout());
         recentTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
-        refreshBtn.addActionListener(e -> refreshData());
         recentHeader.add(recentTitleLabel, BorderLayout.WEST);
-        recentHeader.add(refreshBtn, BorderLayout.EAST);
         recentPanel.add(recentHeader, BorderLayout.NORTH);
 
         BrutalistStyle.styleTable(recentTable);
@@ -307,7 +304,6 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiTitle4.setText(i18n.t("dashboard.kpi.open_orders").toUpperCase());
 
         recentTitleLabel.setText(i18n.t("dashboard.recent_movements").toUpperCase());
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase());
 
         recentModel.setColumnIdentifiers(new Object[]{
                 i18n.t("common.created_at").toUpperCase(),
@@ -339,7 +335,6 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiSub4.setForeground(ThemeManager.fg());
         recentTitleLabel.setForeground(ThemeManager.fg());
 
-        BrutalistStyle.styleSecondaryButton(refreshBtn);
         BrutalistStyle.applyBoxCard(qualityChartHost, 8, 8);
         BrutalistStyle.applyBoxCard(garmentChartHost, 8, 8);
         BrutalistStyle.styleTable(recentTable);

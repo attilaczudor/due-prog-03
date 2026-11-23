@@ -53,7 +53,6 @@ public final class TransportView extends JPanel implements NavigableView {
     private final JLabel putawayTargetLabel = new JLabel();
     private final JComboBox<LocChoice> storageCombo = new JComboBox<>();
     private final JButton moveToStorageBtn = new JButton();
-    private final JButton refreshPutawayBtn = new JButton();
     private final DefaultTableModel putawayModel = BrutalistStyle.nonEditableTableModel();
     private final JTable putawayTable = new JTable(putawayModel);
     private final JLabel putawaySummaryLabel = new JLabel();
@@ -65,7 +64,6 @@ public final class TransportView extends JPanel implements NavigableView {
     private final JLabel stagingTargetLabel = new JLabel();
     private final JComboBox<LocChoice> dispatchCombo = new JComboBox<>();
     private final JButton moveToDispatchBtn = new JButton();
-    private final JButton refreshStagingBtn = new JButton();
     private final DefaultTableModel stagingModel = BrutalistStyle.nonEditableTableModel();
     private final JTable stagingTable = new JTable(stagingModel);
     private final JLabel stagingSummaryLabel = new JLabel();
@@ -98,7 +96,6 @@ public final class TransportView extends JPanel implements NavigableView {
         putawayBar.add(putawayTargetLabel);
         putawayBar.add(storageCombo);
         putawayBar.add(moveToStorageBtn);
-        putawayBar.add(refreshPutawayBtn);
         putawayPanel.add(putawayBar, BorderLayout.NORTH);
 
         BrutalistStyle.styleTable(putawayTable);
@@ -118,7 +115,6 @@ public final class TransportView extends JPanel implements NavigableView {
         stagingBar.add(stagingTargetLabel);
         stagingBar.add(dispatchCombo);
         stagingBar.add(moveToDispatchBtn);
-        stagingBar.add(refreshStagingBtn);
         stagingPanel.add(stagingBar, BorderLayout.NORTH);
 
         BrutalistStyle.styleTable(stagingTable);
@@ -133,8 +129,6 @@ public final class TransportView extends JPanel implements NavigableView {
     }
 
     private void wireEvents() {
-        refreshPutawayBtn.addActionListener(e -> refreshData());
-        refreshStagingBtn.addActionListener(e -> refreshData());
         moveToStorageBtn.addActionListener(e -> handleMoveToStorage());
         moveToDispatchBtn.addActionListener(e -> handleMoveToDispatch());
         scanCollectField.addActionListener(e -> handleScanCollect());
@@ -314,7 +308,6 @@ public final class TransportView extends JPanel implements NavigableView {
 
         putawayTargetLabel.setText(i18n.t("transport.target_shelf") + ":");
         moveToStorageBtn.setText(i18n.t("transport.btn.move_storage"));
-        refreshPutawayBtn.setText(i18n.t("common.refresh"));
         putawayModel.setColumnIdentifiers(new Object[]{
                 i18n.t("location.type.OPERATOR_STATION"),
                 i18n.t("intake.generated_code"),
@@ -327,7 +320,6 @@ public final class TransportView extends JPanel implements NavigableView {
         scanCollectBtn.setText(i18n.t("transport.scan_collect_btn"));
         stagingTargetLabel.setText(i18n.t("transport.target_dock") + ":");
         moveToDispatchBtn.setText(i18n.t("transport.btn.move_dock"));
-        refreshStagingBtn.setText(i18n.t("common.refresh"));
         stagingModel.setColumnIdentifiers(new Object[]{
                 i18n.t("order.number"),
                 i18n.t("order.customer"),
@@ -343,7 +335,7 @@ public final class TransportView extends JPanel implements NavigableView {
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(moveToStorageBtn);
         BrutalistStyle.stylePrimaryButton(scanCollectBtn);
-        BrutalistStyle.styleSecondaryButtons(moveToDispatchBtn, refreshPutawayBtn, refreshStagingBtn);
+        BrutalistStyle.styleSecondaryButtons(moveToDispatchBtn);
         BrutalistStyle.styleTable(putawayTable);
         BrutalistStyle.styleTable(stagingTable);
     }

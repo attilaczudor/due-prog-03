@@ -105,7 +105,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private final JComboBox<FilterItem<InvoiceDirection>> directionFilter = new JComboBox<>();
     private final JComboBox<FilterItem<InvoiceStatus>> statusFilter = new JComboBox<>();
     private final JComboBox<FilterItem<InvoiceCategory>> categoryFilter = new JComboBox<>();
-    private final JButton refreshBtn = new JButton();
 
     private final JPanel actionBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
     private final JButton newOutgoingBtn = new JButton();
@@ -185,7 +184,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         filterCard.add(directionFilter);
         filterCard.add(statusFilter);
         filterCard.add(categoryFilter);
-        filterCard.add(refreshBtn);
         northStack.add(filterCard);
         northStack.add(Box.createVerticalStrut(8));
 
@@ -240,7 +238,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         directionFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         statusFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
         categoryFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
-        refreshBtn.addActionListener(e -> refreshData());
 
         newOutgoingBtn.addActionListener(e -> InvoiceFormDialogs
                 .showNewOutgoingDialog(this, ctx, selectedLedgerCurrency)
@@ -755,7 +752,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         kpiTitleBalance.setText(i18n.t("invoice.kpi.balance").toUpperCase(Locale.ROOT));
         kpiTitleUnpaid.setText(i18n.t("invoice.kpi.unpaid").toUpperCase(Locale.ROOT));
 
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
         newOutgoingBtn.setText("+ " + i18n.t("invoice.new_outgoing").toUpperCase(Locale.ROOT));
         newIncomingBtn.setText("+ " + i18n.t("invoice.new_incoming").toUpperCase(Locale.ROOT));
         applyStatusBtn.setText(i18n.t("invoice.status_update").toUpperCase(Locale.ROOT));
@@ -810,7 +806,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(newOutgoingBtn);
         BrutalistStyle.stylePrimaryButton(previewDocBtn);
         BrutalistStyle.styleSecondaryButtons(
-                newIncomingBtn, applyStatusBtn, sendReminderBtn, receiptBtn, creditNoteBtn, pnlReportBtn, exportCsvBtn, refreshBtn);
+                newIncomingBtn, applyStatusBtn, sendReminderBtn, receiptBtn, creditNoteBtn, pnlReportBtn, exportCsvBtn);
         BrutalistStyle.styleTable(table);
 
         settingsPanel.applyTheme();

@@ -72,7 +72,6 @@ public final class InventoryView extends JPanel implements NavigableView {
 
     private final JButton searchBtn = new JButton();
     private final JButton clearBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
 
     private final JButton detailsBtn = new JButton();
     private final JButton editBtn = new JButton();
@@ -118,7 +117,6 @@ public final class InventoryView extends JPanel implements NavigableView {
         searchRow.add(locationFilter);
         searchRow.add(searchBtn);
         searchRow.add(clearBtn);
-        searchRow.add(refreshBtn);
 
         JPanel dropdownRow = new JPanel(new GridLayout(1, 5, 6, 0));
         dropdownRow.add(statusFilter);
@@ -172,7 +170,6 @@ public final class InventoryView extends JPanel implements NavigableView {
     private void wireEvents() {
         searchField.addActionListener(e -> loadTableRows());
         searchBtn.addActionListener(e -> loadTableRows());
-        refreshBtn.addActionListener(e -> refreshData());
         clearBtn.addActionListener(e -> {
             searchField.setText("");
             statusFilter.setSelectedIndex(0);
@@ -575,7 +572,6 @@ public final class InventoryView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         searchBtn.setText(i18n.t("common.search"));
         clearBtn.setText(i18n.t("common.clear"));
-        refreshBtn.setText(i18n.t("common.refresh"));
         editBtn.setText(i18n.t("common.edit"));
         detailsBtn.setText(i18n.t("inventory.view_details"));
         relocateBtn.setText(i18n.t("scanner.action.relocate"));
@@ -607,7 +603,7 @@ public final class InventoryView extends JPanel implements NavigableView {
         }
         BrutalistStyle.stylePrimaryButton(batchPrintBtn);
         BrutalistStyle.styleSecondaryButtons(
-                searchBtn, clearBtn, refreshBtn,
+                searchBtn, clearBtn,
                 detailsBtn, editBtn, relocateBtn, printSingleBtn, discardBtn, exportCsvBtn);
         BrutalistStyle.styleTable(table);
         table.repaint();

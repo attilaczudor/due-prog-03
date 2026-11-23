@@ -3,7 +3,6 @@ package hu.due.rewear.ui;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
-import hu.due.rewear.model.AppNotification;
 import hu.due.rewear.model.PersonalTodo;
 import hu.due.rewear.model.SystemTodoItem;
 import hu.due.rewear.model.User;
@@ -17,7 +16,6 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -35,23 +33,19 @@ import java.awt.Insets;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
 import java.util.function.Consumer;
 
 /**
- * Unified To-Do &amp; Notifications workspace available to all roles:
+ * Dedicated To-Do workspace available to all roles:
  * <ul>
- *     <li>Top summary KPI cards (System Tasks, Personal To-Dos, Unread Notifications).</li>
+ *     <li>Top summary KPI cards (System Tasks &amp; Personal To-Dos).</li>
  *     <li><b>System To-Do List</b> (read-only, logically ordered P1..P4 for the signed-in user's role).</li>
- *     <li><b>Personal To-Do List</b> (separate user-managed checklist persisted in SQLite).</li>
- *     <li><b>Notifications Inbox</b> (targeted operational alerts with 1-click navigation).</li>
+ *     <li><b>Personal To-Do List</b> (separate private user checklist persisted in SQLite).</li>
  * </ul>
  */
 public final class TodoView extends JPanel implements NavigableView {
-
-    private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
     private final AppContext ctx;
     private final Consumer<String> navigator;
@@ -65,19 +59,13 @@ public final class TodoView extends JPanel implements NavigableView {
     private final JLabel kpiPersTitle = new JLabel();
     private final JLabel kpiPersValue = new JLabel("0");
 
-    private final JPanel kpiNotifCard = new JPanel(new BorderLayout(0, 4));
-    private final JLabel kpiNotifTitle = new JLabel();
-    private final JLabel kpiNotifValue = new JLabel("0");
-
-    private final JTabbedPane tabs = new JTabbedPane();
-
-    // Tab 1: Split System To-Dos (top) + Personal To-Dos (bottom)
+    // Top: System To-Dos
     private final JLabel sysSectionTitle = new JLabel();
     private final JButton openSysTargetBtn = new JButton();
-    private final JButton refreshBtn = new JButton();
     private final DefaultTableModel sysModel = BrutalistStyle.nonEditableTableModel();
     private final JTable sysTable = new JTable(sysModel);
 
+    // Bottom: Personal To-Dos
     private final JLabel persSectionTitle = new JLabel();
     private final JButton addPersBtn = new JButton();
     private final JButton togglePersBtn = new JButton();
@@ -85,16 +73,8 @@ public final class TodoView extends JPanel implements NavigableView {
     private final DefaultTableModel persModel = BrutalistStyle.nonEditableTableModel();
     private final JTable persTable = new JTable(persModel);
 
-    // Tab 2: Notifications Feed
-    private final JButton openNotifTargetBtn = new JButton();
-    private final JButton markReadBtn = new JButton();
-    private final JButton markAllReadBtn = new JButton();
-    private final DefaultTableModel notifModel = BrutalistStyle.nonEditableTableModel();
-    private final JTable notifTable = new JTable(notifModel);
-
     private List<SystemTodoItem> systemItems = List.of();
     private List<PersonalTodo> personalItems = List.of();
-    private List<AppNotification> notifications = List.of();
 
     public TodoView(AppContext ctx, Consumer<String> navigator) {
         this.ctx = ctx;
@@ -108,25 +88,20 @@ public final class TodoView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Top Summary KPI strip
-        JPanel kpiStrip = new JPanel(new GridLayout(1, 3, 12, 0));
+        JPanel kpiStrip = new JPanel(new GridLayout(1, 2, 12, 0));
         configureKpiCard(kpiSysCard, kpiSysTitle, kpiSysValue);
         configureKpiCard(kpiPersCard, kpiPersTitle, kpiPersValue);
-        configureKpiCard(kpiNotifCard, kpiNotifTitle, kpiNotifValue);
         kpiStrip.add(kpiSysCard);
         kpiStrip.add(kpiPersCard);
-        kpiStrip.add(kpiNotifCard);
         add(kpiStrip, BorderLayout.NORTH);
 
-        // Tab 1: System To-Dos (top) + Personal To-Dos (bottom)
         JPanel sysPanel = new JPanel(new BorderLayout(0, 6));
-        sysPanel.setBorder(BorderFactory.createEmptyBorder(8, 2, 4, 2));
+        sysPanel.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 0));
         JPanel sysHeader = new JPanel(new BorderLayout(8, 0));
         sysSectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
         sysHeader.add(sysSectionTitle, BorderLayout.WEST);
         JPanel sysBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         sysBtns.add(openSysTargetBtn);
-        sysBtns.add(refreshBtn);
         sysHeader.add(sysBtns, BorderLayout.EAST);
         sysPanel.add(sysHeader, BorderLayout.NORTH);
 
@@ -135,7 +110,7 @@ public final class TodoView extends JPanel implements NavigableView {
         sysPanel.add(new JScrollPane(sysTable), BorderLayout.CENTER);
 
         JPanel persPanel = new JPanel(new BorderLayout(0, 6));
-        persPanel.setBorder(BorderFactory.createEmptyBorder(8, 2, 2, 2));
+        persPanel.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
         JPanel persHeader = new JPanel(new BorderLayout(8, 0));
         persSectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
         persHeader.add(persSectionTitle, BorderLayout.WEST);
@@ -152,24 +127,8 @@ public final class TodoView extends JPanel implements NavigableView {
 
         JSplitPane todoSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT, sysPanel, persPanel);
         todoSplit.setResizeWeight(0.54);
-        todoSplit.setDividerLocation(260);
-
-        // Tab 2: Notifications
-        JPanel notifPanel = new JPanel(new BorderLayout(0, 8));
-        notifPanel.setBorder(BorderFactory.createEmptyBorder(8, 2, 2, 2));
-        JPanel notifBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
-        notifBar.add(openNotifTargetBtn);
-        notifBar.add(markReadBtn);
-        notifBar.add(markAllReadBtn);
-        notifPanel.add(notifBar, BorderLayout.NORTH);
-
-        BrutalistStyle.styleTable(notifTable);
-        notifTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        notifPanel.add(new JScrollPane(notifTable), BorderLayout.CENTER);
-
-        tabs.addTab("To-Do", todoSplit);
-        tabs.addTab("Notifications", notifPanel);
-        add(tabs, BorderLayout.CENTER);
+        todoSplit.setDividerLocation(270);
+        add(todoSplit, BorderLayout.CENTER);
     }
 
     private static void configureKpiCard(JPanel card, JLabel title, JLabel value) {
@@ -180,7 +139,6 @@ public final class TodoView extends JPanel implements NavigableView {
     }
 
     private void wireEvents() {
-        refreshBtn.addActionListener(e -> refreshData());
         openSysTargetBtn.addActionListener(e -> openSelectedSystemTarget());
         sysTable.addMouseListener(new MouseAdapter() {
             @Override
@@ -202,23 +160,6 @@ public final class TodoView extends JPanel implements NavigableView {
                 }
             }
         });
-
-        openNotifTargetBtn.addActionListener(e -> handleOpenNotificationTarget());
-        markReadBtn.addActionListener(e -> {
-            int row = notifTable.getSelectedRow();
-            if (row >= 0 && row < notifications.size()) {
-                ctx.getNotificationService().markRead(notifications.get(row).id());
-                refreshData();
-            }
-        });
-        markAllReadBtn.addActionListener(e -> {
-            ctx.getNotificationService().markAllRead(ctx.getSession().requireCurrentUser().id());
-            refreshData();
-        });
-    }
-
-    public void showNotificationsTab() {
-        tabs.setSelectedIndex(1);
     }
 
     private void openSelectedSystemTarget() {
@@ -227,19 +168,6 @@ public final class TodoView extends JPanel implements NavigableView {
             String target = systemItems.get(row).targetView();
             if (target != null && !target.isBlank()) {
                 navigator.accept(target);
-            }
-        }
-    }
-
-    private void handleOpenNotificationTarget() {
-        int row = notifTable.getSelectedRow();
-        if (row >= 0 && row < notifications.size()) {
-            AppNotification n = notifications.get(row);
-            ctx.getNotificationService().markRead(n.id());
-            if (n.targetView() != null && !n.targetView().isBlank() && navigator != null) {
-                navigator.accept(n.targetView());
-            } else {
-                refreshData();
             }
         }
     }
@@ -355,33 +283,8 @@ public final class TodoView extends JPanel implements NavigableView {
             persTable.getColumnModel().getColumn(1).setMaxWidth(100);
         }
 
-        notifications = ctx.getNotificationService().listForUser(me.id(), 100);
-        notifModel.setRowCount(0);
-        int unread = 0;
-        for (AppNotification n : notifications) {
-            if (!n.read()) unread++;
-            notifModel.addRow(new Object[]{
-                    n.read() ? "✓" : "●",
-                    n.category(),
-                    n.title(),
-                    n.message(),
-                    n.createdAt() != null ? DT_FMT.format(n.createdAt()) : ""
-            });
-        }
-        if (notifTable.getColumnCount() >= 5) {
-            notifTable.getColumnModel().getColumn(0).setPreferredWidth(44);
-            notifTable.getColumnModel().getColumn(0).setMaxWidth(52);
-            notifTable.getColumnModel().getColumn(1).setPreferredWidth(120);
-            notifTable.getColumnModel().getColumn(2).setPreferredWidth(200);
-            notifTable.getColumnModel().getColumn(3).setPreferredWidth(380);
-            notifTable.getColumnModel().getColumn(4).setPreferredWidth(135);
-        }
-
         kpiSysValue.setText(String.valueOf(systemItems.size()));
         kpiPersValue.setText(openPersonal + " / " + personalItems.size());
-        kpiNotifValue.setText(String.valueOf(unread));
-        tabs.setTitleAt(1, i18n.t("todo.tab.notifications").toUpperCase(Locale.ROOT)
-                + (unread > 0 ? " [" + unread + "]" : ""));
     }
 
     @Override
@@ -389,23 +292,14 @@ public final class TodoView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         kpiSysTitle.setText(i18n.t("todo.kpi.system").toUpperCase(Locale.ROOT));
         kpiPersTitle.setText(i18n.t("todo.kpi.personal").toUpperCase(Locale.ROOT));
-        kpiNotifTitle.setText(i18n.t("todo.kpi.notifications").toUpperCase(Locale.ROOT));
-
-        tabs.setTitleAt(0, i18n.t("todo.tab.lists").toUpperCase(Locale.ROOT));
-        tabs.setTitleAt(1, i18n.t("todo.tab.notifications").toUpperCase(Locale.ROOT));
 
         sysSectionTitle.setText(i18n.t("todo.system.header").toUpperCase(Locale.ROOT));
         openSysTargetBtn.setText(i18n.t("todo.btn.open_target").toUpperCase(Locale.ROOT));
-        refreshBtn.setText(i18n.t("common.refresh").toUpperCase(Locale.ROOT));
 
         persSectionTitle.setText(i18n.t("todo.personal.header").toUpperCase(Locale.ROOT));
         addPersBtn.setText("+ " + i18n.t("todo.personal.add").toUpperCase(Locale.ROOT));
         togglePersBtn.setText(i18n.t("todo.personal.toggle").toUpperCase(Locale.ROOT));
         deletePersBtn.setText(i18n.t("common.delete").toUpperCase(Locale.ROOT));
-
-        openNotifTargetBtn.setText(i18n.t("todo.btn.open_target").toUpperCase(Locale.ROOT));
-        markReadBtn.setText(i18n.t("todo.notif.mark_read").toUpperCase(Locale.ROOT));
-        markAllReadBtn.setText(i18n.t("todo.notif.mark_all").toUpperCase(Locale.ROOT));
 
         sysModel.setColumnIdentifiers(new Object[]{
                 i18n.t("todo.col.priority").toUpperCase(Locale.ROOT),
@@ -419,13 +313,6 @@ public final class TodoView extends JPanel implements NavigableView {
                 i18n.t("todo.col.task").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.due_date").toUpperCase(Locale.ROOT)
         });
-        notifModel.setColumnIdentifiers(new Object[]{
-                "●",
-                i18n.t("invoice.category").toUpperCase(Locale.ROOT),
-                i18n.t("email.subject").toUpperCase(Locale.ROOT),
-                i18n.t("todo.col.details").toUpperCase(Locale.ROOT),
-                i18n.t("common.date").toUpperCase(Locale.ROOT)
-        });
         applyTheme();
     }
 
@@ -433,14 +320,11 @@ public final class TodoView extends JPanel implements NavigableView {
     public void applyTheme() {
         BrutalistStyle.applyBoxCard(kpiSysCard, 10, 12);
         BrutalistStyle.applyBoxCard(kpiPersCard, 10, 12);
-        BrutalistStyle.applyBoxCard(kpiNotifCard, 10, 12);
         BrutalistStyle.stylePrimaryButton(addPersBtn);
         BrutalistStyle.stylePrimaryButton(openSysTargetBtn);
-        BrutalistStyle.styleSecondaryButtons(refreshBtn, togglePersBtn, deletePersBtn,
-                openNotifTargetBtn, markReadBtn, markAllReadBtn);
+        BrutalistStyle.styleSecondaryButtons(togglePersBtn, deletePersBtn);
         BrutalistStyle.styleTable(sysTable);
         BrutalistStyle.styleTable(persTable);
-        BrutalistStyle.styleTable(notifTable);
     }
 
     private static final class PriorityCellRenderer extends DefaultTableCellRenderer {
