@@ -75,6 +75,58 @@ public final class SidebarIcons {
         });
     }
 
+    public static Icon mailCompose(int size) {
+        return makeIcon(size, g -> {
+            g.draw(new Line2D.Double(12, 5, 12, 19));
+            g.draw(new Line2D.Double(5, 12, 19, 12));
+        });
+    }
+
+    public static Icon mailInbox(int size) {
+        return makeIcon(size, g -> {
+            Path2D tray = new Path2D.Double();
+            tray.moveTo(3, 13);
+            tray.lineTo(7, 13);
+            tray.lineTo(9, 16);
+            tray.lineTo(15, 16);
+            tray.lineTo(17, 13);
+            tray.lineTo(21, 13);
+            g.draw(tray);
+            g.draw(new Rectangle2D.Double(3, 5, 18, 14));
+        });
+    }
+
+    public static Icon mailSent(int size) {
+        return makeIcon(size, g -> {
+            Path2D plane = new Path2D.Double();
+            plane.moveTo(3, 11);
+            plane.lineTo(21, 4);
+            plane.lineTo(15, 20);
+            plane.lineTo(11, 13);
+            plane.closePath();
+            g.draw(plane);
+        });
+    }
+
+    public static Icon mailDrafts(int size) {
+        return makeIcon(size, g -> {
+            g.draw(new Rectangle2D.Double(5, 3, 14, 18));
+            g.draw(new Line2D.Double(8, 8, 16, 8));
+            g.draw(new Line2D.Double(8, 12, 16, 12));
+            g.draw(new Line2D.Double(8, 16, 13, 16));
+        });
+    }
+
+    public static Icon mailTrash(int size) {
+        return makeIcon(size, g -> {
+            g.draw(new Line2D.Double(4, 6, 20, 6));
+            g.draw(new Rectangle2D.Double(9, 3, 6, 3));
+            g.draw(new Rectangle2D.Double(6, 6, 12, 15));
+            g.draw(new Line2D.Double(10, 10, 10, 17));
+            g.draw(new Line2D.Double(14, 10, 14, 17));
+        });
+    }
+
     private static Icon makeIcon(int size, GlyphPainter painter) {
         return new Icon() {
             @Override

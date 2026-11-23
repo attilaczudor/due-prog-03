@@ -1,5 +1,6 @@
 package hu.due.rewear.ui;
 
+import com.formdev.flatlaf.FlatClientProperties;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
@@ -29,6 +30,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
+import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
@@ -51,9 +53,18 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
+    private static final int RAIL_EXPANDED_WIDTH = 210;
+    private static final int RAIL_COLLAPSED_WIDTH = 62;
+
     private final AppContext ctx;
 
+    private final JPanel folderPanel = new JPanel();
     private final JSeparator folderSeparator = new JSeparator(SwingConstants.HORIZONTAL);
+    private final JSeparator footerSeparator = new JSeparator(SwingConstants.HORIZONTAL);
+    private final JPanel collapseHost = new JPanel(new BorderLayout());
+    private final JButton collapseRailBtn = new JButton();
+    private boolean folderRailCollapsed = false;
+
     private final JToggleButton inboxBtn = new JToggleButton();
     private final JToggleButton sentBtn = new JToggleButton();
     private final JToggleButton draftsBtn = new JToggleButton();
@@ -90,15 +101,15 @@ public final class EmailView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Left folder rail (+ New Email -> padded horizontal rule -> Folders)
-        JPanel folderPanel = new JPanel();
+        // Left collapsible folder rail (+ New Email -> padded horizontal rule -> Folders -> bottom collapse arrow)
         folderPanel.setLayout(new BoxLayout(folderPanel, BoxLayout.Y_AXIS));
-        folderPanel.setPreferredSize(new Dimension(210, 0));
+        folderPanel.setPreferredSize(new Dimension(RAIL_EXPANDED_WIDTH, 0));
         BrutalistStyle.applyBoxCard(folderPanel, 10, 10);
 
         composeBtn.setAlignmentX(LEFT_ALIGNMENT);
         composeBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
         composeBtn.setPreferredSize(new Dimension(180, 36));
+        composeBtn.setIconTextGap(8);
         folderPanel.add(composeBtn);
 
         folderPanel.add(Box.createVerticalStrut(10));
@@ -107,11 +118,18 @@ public final class EmailView extends JPanel implements NavigableView {
         folderPanel.add(folderSeparator);
         folderPanel.add(Box.createVerticalStrut(10));
 
+        inboxBtn.setIcon(SidebarIcons.mailInbox(16));
+        sentBtn.setIcon(SidebarIcons.mailSent(16));
+        draftsBtn.setIcon(SidebarIcons.mailDrafts(16));
+        trashBtn.setIcon(SidebarIcons.mailTrash(16));
+
         for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
             btn.setHorizontalAlignment(SwingConstants.LEFT);
+            btn.setIconTextGap(10);
             btn.setAlignmentX(LEFT_ALIGNMENT);
             btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
             btn.setPreferredSize(new Dimension(180, 34));
+            btn.setFocusPainted(false);
             folderGroup.add(btn);
             folderPanel.add(btn);
             folderPanel.add(Box.createVerticalStrut(4));
@@ -123,6 +141,25 @@ public final class EmailView extends JPanel implements NavigableView {
         simIncomingBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
         simIncomingBtn.setPreferredSize(new Dimension(180, 32));
         folderPanel.add(simIncomingBtn);
+        folderPanel.add(Box.createVerticalStrut(8));
+
+        footerSeparator.setAlignmentX(LEFT_ALIGNMENT);
+        footerSeparator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        folderPanel.add(footerSeparator);
+        folderPanel.add(Box.createVerticalStrut(8));
+
+        Dimension sq = new Dimension(34, 34);
+        collapseRailBtn.setPreferredSize(sq);
+        collapseRailBtn.setMinimumSize(sq);
+        collapseRailBtn.setMaximumSize(sq);
+        collapseRailBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        collapseRailBtn.setFocusPainted(false);
+        collapseRailBtn.setMargin(new Insets(0, 0, 0, 0));
+
+        collapseHost.setOpaque(false);
+        collapseHost.setAlignmentX(LEFT_ALIGNMENT);
+        collapseHost.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        folderPanel.add(collapseHost);
         add(folderPanel, BorderLayout.WEST);
 
         // Center split: list + reader
@@ -169,6 +206,11 @@ public final class EmailView extends JPanel implements NavigableView {
         sentBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_SENT));
         draftsBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_DRAFTS));
         trashBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_TRASH));
+        collapseRailBtn.addActionListener(e -> {
+            folderRailCollapsed = !folderRailCollapsed;
+            applyFolderRailState();
+            applyTheme();
+        });
 
         composeBtn.addActionListener(e -> openComposeDialog("", "", "", ""));
         replyBtn.addActionListener(e -> {
@@ -230,6 +272,7 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private void switchFolder(String folder) {
         this.activeFolder = folder;
+        updateFolderButtonStyles();
         refreshData();
     }
 
@@ -381,11 +424,106 @@ public final class EmailView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         long uid = ctx.getSession().requireCurrentUser().id();
         int unread = ctx.getEmailService().countUnreadInbox(uid);
-        inboxBtn.setText(i18n.t("email.folder.inbox").toUpperCase(Locale.ROOT)
-                + (unread > 0 ? "  [" + unread + "]" : ""));
-        sentBtn.setText(i18n.t("email.folder.sent").toUpperCase(Locale.ROOT));
-        draftsBtn.setText(i18n.t("email.folder.drafts").toUpperCase(Locale.ROOT));
-        trashBtn.setText(i18n.t("email.folder.trash").toUpperCase(Locale.ROOT));
+        String inboxFull = i18n.t("email.folder.inbox").toUpperCase(Locale.ROOT)
+                + (unread > 0 ? "  [" + unread + "]" : "");
+        String sentFull = i18n.t("email.folder.sent").toUpperCase(Locale.ROOT);
+        String draftsFull = i18n.t("email.folder.drafts").toUpperCase(Locale.ROOT);
+        String trashFull = i18n.t("email.folder.trash").toUpperCase(Locale.ROOT);
+
+        inboxBtn.setToolTipText(inboxFull);
+        sentBtn.setToolTipText(sentFull);
+        draftsBtn.setToolTipText(draftsFull);
+        trashBtn.setToolTipText(trashFull);
+
+        if (folderRailCollapsed) {
+            inboxBtn.setText("");
+            sentBtn.setText("");
+            draftsBtn.setText("");
+            trashBtn.setText("");
+        } else {
+            inboxBtn.setText(inboxFull);
+            sentBtn.setText(sentFull);
+            draftsBtn.setText(draftsFull);
+            trashBtn.setText(trashFull);
+        }
+    }
+
+    private void applyFolderRailState() {
+        I18nManager i18n = ctx.getI18n();
+        int railW = folderRailCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_EXPANDED_WIDTH;
+        folderPanel.setPreferredSize(new Dimension(railW, 0));
+        BrutalistStyle.applyBoxCard(folderPanel, 10, folderRailCollapsed ? 8 : 10);
+
+        String composeFull = "+ " + i18n.t("email.compose").toUpperCase(Locale.ROOT);
+        composeBtn.setToolTipText(composeFull);
+        if (folderRailCollapsed) {
+            composeBtn.setText("");
+            composeBtn.setIcon(SidebarIcons.mailCompose(16));
+            composeBtn.setHorizontalAlignment(SwingConstants.CENTER);
+        } else {
+            composeBtn.setIcon(null);
+            composeBtn.setText(composeFull);
+            composeBtn.setHorizontalAlignment(SwingConstants.CENTER);
+        }
+
+        for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
+            btn.setHorizontalAlignment(folderRailCollapsed ? SwingConstants.CENTER : SwingConstants.LEFT);
+            btn.setIconTextGap(folderRailCollapsed ? 0 : 10);
+        }
+        refreshFolderBadges();
+
+        boolean externalAllowed = ctx.getSession().isAuthenticated() && ctx.getSession().canUseExternalEmail();
+        simIncomingBtn.setVisible(externalAllowed && !folderRailCollapsed);
+
+        collapseRailBtn.setIcon(folderRailCollapsed ? SidebarIcons.arrowRight(16) : SidebarIcons.arrowLeft(16));
+        collapseRailBtn.setToolTipText(i18n.t(folderRailCollapsed ? "sidebar.expand" : "sidebar.collapse"));
+
+        collapseHost.removeAll();
+        collapseHost.add(collapseRailBtn, folderRailCollapsed ? BorderLayout.CENTER : BorderLayout.EAST);
+
+        updateFolderButtonStyles();
+        folderPanel.revalidate();
+        folderPanel.repaint();
+        revalidate();
+    }
+
+    private void updateFolderButtonStyles() {
+        boolean dark = ThemeManager.isDarkMode();
+        String selBg = dark ? "#FFFFFF" : "#000000";
+        String selFg = dark ? "#000000" : "#FFFFFF";
+        String unselBg = dark ? "#000000" : "#FFFFFF";
+        String unselFg = dark ? "#FFFFFF" : "#000000";
+        String unselHover = dark ? "#1C1C1C" : "#EAEAEA";
+        String unselPress = dark ? "#333333" : "#CFCFCF";
+        int padH = folderRailCollapsed ? 0 : 10;
+
+        for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
+            boolean selected = btn.isSelected();
+            btn.setCursor(Cursor.getPredefinedCursor(selected ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
+            btn.setBorder(BorderFactory.createCompoundBorder(
+                    BorderFactory.createLineBorder(ThemeManager.border(), 1),
+                    BorderFactory.createEmptyBorder(6, padH, 6, padH)
+            ));
+            if (selected) {
+                btn.setBackground(ThemeManager.fg());
+                btn.setForeground(ThemeManager.bg());
+                btn.putClientProperty(FlatClientProperties.STYLE,
+                        "background:" + selBg + "; foreground:" + selFg
+                                + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
+                                + "; hoverBackground:" + selBg + "; hoverForeground:" + selFg
+                                + "; pressedBackground:" + selBg + "; pressedForeground:" + selFg
+                                + "; focusedBackground:" + selBg + "; focusedForeground:" + selFg);
+            } else {
+                btn.setBackground(ThemeManager.bg());
+                btn.setForeground(ThemeManager.fg());
+                btn.putClientProperty(FlatClientProperties.STYLE,
+                        "background:" + unselBg + "; foreground:" + unselFg
+                                + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
+                                + "; hoverBackground:" + unselHover + "; hoverForeground:" + unselFg
+                                + "; pressedBackground:" + unselPress + "; pressedForeground:" + unselFg
+                                + "; focusedBackground:" + unselBg + "; focusedForeground:" + unselFg);
+            }
+        }
     }
 
     @Override
@@ -407,7 +545,7 @@ public final class EmailView extends JPanel implements NavigableView {
     public void refreshData() {
         User me = ctx.getSession().requireCurrentUser();
         boolean externalAllowed = ctx.getSession().canUseExternalEmail();
-        simIncomingBtn.setVisible(externalAllowed);
+        simIncomingBtn.setVisible(externalAllowed && !folderRailCollapsed);
         refreshFolderBadges();
 
         currentEmails = ctx.getEmailService().listFolder(me.id(), activeFolder);
@@ -470,7 +608,7 @@ public final class EmailView extends JPanel implements NavigableView {
                 i18n.t("common.date").toUpperCase(Locale.ROOT)
         });
         configureTableColumnWidths();
-        refreshFolderBadges();
+        applyFolderRailState();
         applyTheme();
     }
 
@@ -479,8 +617,25 @@ public final class EmailView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(composeBtn);
         BrutalistStyle.styleSecondaryButtons(replyBtn, forwardBtn, toggleReadBtn, deleteBtn,
                 simIncomingBtn, openAttachmentBtn);
+        boolean dark = ThemeManager.isDarkMode();
+        String bg = dark ? "#000000" : "#FFFFFF";
+        String fg = dark ? "#FFFFFF" : "#000000";
+        String hov = dark ? "#1C1C1C" : "#EAEAEA";
+        String prs = dark ? "#333333" : "#CFCFCF";
+        collapseRailBtn.setBackground(ThemeManager.bg());
+        collapseRailBtn.setForeground(ThemeManager.fg());
+        collapseRailBtn.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
+        collapseRailBtn.putClientProperty(FlatClientProperties.STYLE,
+                "background:" + bg + "; foreground:" + fg
+                        + "; hoverBackground:" + hov + "; hoverForeground:" + fg
+                        + "; pressedBackground:" + prs + "; pressedForeground:" + fg
+                        + "; focusedBackground:" + bg + "; focusedForeground:" + fg);
         folderSeparator.setForeground(ThemeManager.border());
         folderSeparator.setBackground(ThemeManager.border());
+        footerSeparator.setForeground(ThemeManager.border());
+        footerSeparator.setBackground(ThemeManager.border());
+        BrutalistStyle.applyBoxCard(folderPanel, 10, folderRailCollapsed ? 8 : 10);
+        updateFolderButtonStyles();
         BrutalistStyle.applyBoxCard(readerCard, 10, 12);
         BrutalistStyle.styleTable(listTable);
         readerBodyArea.setBackground(ThemeManager.bg());
