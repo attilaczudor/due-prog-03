@@ -94,8 +94,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
     private final JLabel activeViewTitleLabel = new JLabel();
-    private final JButton notificationBellBtn = new JButton();
-    private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshNotificationBell);
+    private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshSidebarBadges);
     private final javax.swing.Timer autoRefreshTimer;
     private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel statusBarLabel = new JLabel();
@@ -121,8 +120,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
         ctx.getNotificationService().addChangeListener(notifListener);
-        refreshNotificationBell();
-        // Automatic background refresh every 10s for live notification bell & live operational feeds
+        refreshSidebarBadges();
+        // Automatic background refresh every 10s for live sidebar badges & operational feeds
         this.autoRefreshTimer = new javax.swing.Timer(10_000, e -> performBackgroundAutoRefresh());
         this.autoRefreshTimer.setRepeats(true);
         this.autoRefreshTimer.start();
@@ -208,9 +207,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
         topBar.add(activeViewTitleLabel, BorderLayout.WEST);
-        notificationBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        notificationBellBtn.addActionListener(e -> navigateTo(VIEW_NOTIFICATIONS));
-        topBar.add(notificationBellBtn, BorderLayout.EAST);
         rightArea.add(topBar, BorderLayout.NORTH);
 
         rightArea.add(contentHost, BorderLayout.CENTER);
@@ -497,7 +493,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()).toUpperCase(Locale.ROOT));
         view.refreshData();
         cardLayout.show(contentHost, viewKey);
-        refreshNotificationBell();
+        refreshSidebarBadges();
     }
 
     private record BadgeSnapshot(int unreadNotifications,
@@ -509,7 +505,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                                  int overdueInvoices) {
     }
 
-    private void refreshNotificationBell() {
+    private void refreshSidebarBadges() {
         if (!ctx.getSession().isAuthenticated()) {
             return;
         }
@@ -550,14 +546,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }, snap -> {
             if (!ctx.getSession().isAuthenticated()) {
                 return;
-            }
-            String label = ctx.getI18n().t("todo.tab.notifications").toUpperCase(Locale.ROOT);
-            if (snap.unreadNotifications() > 0) {
-                notificationBellBtn.setText("[ ! " + snap.unreadNotifications() + " ]  " + label);
-                BrutalistStyle.stylePrimaryButton(notificationBellBtn);
-            } else {
-                notificationBellBtn.setText("[ 0 ]  " + label);
-                BrutalistStyle.styleSecondaryButton(notificationBellBtn);
             }
             setNavBadge(VIEW_NOTIFICATIONS, snap.unreadNotifications());
             setNavBadge(VIEW_EMAIL, snap.unreadEmails());
@@ -754,7 +742,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         statusBarLabel.setForeground(ThemeManager.muted());
 
         updateNavButtonStyles();
-        refreshNotificationBell();
+        refreshSidebarBadges();
 
         for (NavigableView view : views.values()) {
             view.applyTheme();
@@ -772,7 +760,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         if (!isVisible() || !isActive() || !ctx.getSession().isAuthenticated()) {
             return;
         }
-        refreshNotificationBell();
+        refreshSidebarBadges();
         if (currentViewKey != null && views.containsKey(currentViewKey)) {
             switch (currentViewKey) {
                 case VIEW_NOTIFICATIONS, VIEW_TODO, VIEW_TRANSPORT, VIEW_EMAIL, VIEW_MESSAGES ->
@@ -798,7 +786,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         settingsButton.setToolTipText(i18n.t("profile.settings.tooltip"));
         refreshUserProfileCard();
         applySidebarState();
-        refreshNotificationBell();
+        refreshSidebarBadges();
 
         for (NavigableView view : views.values()) {
             view.applyTranslations();

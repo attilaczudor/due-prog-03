@@ -19,6 +19,7 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
+import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
@@ -52,8 +53,7 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private final AppContext ctx;
 
-    private final JLabel accountLabel = new JLabel();
-    private final JLabel scopeBadgeLabel = new JLabel();
+    private final JSeparator folderSeparator = new JSeparator(SwingConstants.HORIZONTAL);
     private final JToggleButton inboxBtn = new JToggleButton();
     private final JToggleButton sentBtn = new JToggleButton();
     private final JToggleButton draftsBtn = new JToggleButton();
@@ -90,28 +90,21 @@ public final class EmailView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Top action bar
-        JPanel topBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 4));
-        topBar.add(composeBtn);
-        topBar.add(replyBtn);
-        topBar.add(forwardBtn);
-        topBar.add(toggleReadBtn);
-        topBar.add(deleteBtn);
-        topBar.add(simIncomingBtn);
-        add(topBar, BorderLayout.NORTH);
-
-        // Left folder rail
+        // Left folder rail (+ New Email -> padded horizontal rule -> Folders)
         JPanel folderPanel = new JPanel();
         folderPanel.setLayout(new BoxLayout(folderPanel, BoxLayout.Y_AXIS));
         folderPanel.setPreferredSize(new Dimension(210, 0));
         BrutalistStyle.applyBoxCard(folderPanel, 10, 10);
 
-        accountLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
-        accountLabel.setAlignmentX(LEFT_ALIGNMENT);
-        folderPanel.add(accountLabel);
-        scopeBadgeLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 10.5f));
-        scopeBadgeLabel.setAlignmentX(LEFT_ALIGNMENT);
-        folderPanel.add(scopeBadgeLabel);
+        composeBtn.setAlignmentX(LEFT_ALIGNMENT);
+        composeBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
+        composeBtn.setPreferredSize(new Dimension(180, 36));
+        folderPanel.add(composeBtn);
+
+        folderPanel.add(Box.createVerticalStrut(10));
+        folderSeparator.setAlignmentX(LEFT_ALIGNMENT);
+        folderSeparator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
+        folderPanel.add(folderSeparator);
         folderPanel.add(Box.createVerticalStrut(10));
 
         for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
@@ -125,6 +118,11 @@ public final class EmailView extends JPanel implements NavigableView {
         }
         inboxBtn.setSelected(true);
         folderPanel.add(Box.createVerticalGlue());
+
+        simIncomingBtn.setAlignmentX(LEFT_ALIGNMENT);
+        simIncomingBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
+        simIncomingBtn.setPreferredSize(new Dimension(180, 32));
+        folderPanel.add(simIncomingBtn);
         add(folderPanel, BorderLayout.WEST);
 
         // Center split: list + reader
@@ -149,8 +147,16 @@ public final class EmailView extends JPanel implements NavigableView {
         readerBodyArea.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
         readerBodyArea.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
 
+        JPanel readerActionsBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 2));
+        readerActionsBar.setOpaque(false);
+        readerActionsBar.add(replyBtn);
+        readerActionsBar.add(forwardBtn);
+        readerActionsBar.add(toggleReadBtn);
+        readerActionsBar.add(deleteBtn);
+
         readerCard.add(readerHeader, BorderLayout.NORTH);
         readerCard.add(new JScrollPane(readerBodyArea), BorderLayout.CENTER);
+        readerCard.add(readerActionsBar, BorderLayout.SOUTH);
 
         JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, new JScrollPane(listTable), readerCard);
         split.setResizeWeight(0.45);
@@ -235,6 +241,11 @@ public final class EmailView extends JPanel implements NavigableView {
     private void renderSelectedEmail() {
         EmailMessage m = getSelectedEmail();
         I18nManager i18n = ctx.getI18n();
+        boolean hasSelection = (m != null);
+        replyBtn.setEnabled(hasSelection);
+        forwardBtn.setEnabled(hasSelection);
+        toggleReadBtn.setEnabled(hasSelection);
+        deleteBtn.setEnabled(hasSelection);
         if (m == null) {
             readerSubjectLabel.setText("—");
             readerMetaLabel.setText(" ");
@@ -397,14 +408,6 @@ public final class EmailView extends JPanel implements NavigableView {
         User me = ctx.getSession().requireCurrentUser();
         boolean externalAllowed = ctx.getSession().canUseExternalEmail();
         simIncomingBtn.setVisible(externalAllowed);
-
-        String addr = (me.email() != null && !me.email().isBlank())
-                ? me.email()
-                : ctx.getEmailService().generateDefaultEmail(me.safeFirstName(), me.safeLastName(), me.username());
-        accountLabel.setText(addr);
-        scopeBadgeLabel.setText(externalAllowed
-                ? "[ " + ctx.getI18n().t("email.scope.all").toUpperCase(Locale.ROOT) + " ]"
-                : "[ " + ctx.getI18n().t("email.scope.internal_only").toUpperCase(Locale.ROOT) + " ]");
         refreshFolderBadges();
 
         currentEmails = ctx.getEmailService().listFolder(me.id(), activeFolder);
@@ -476,6 +479,8 @@ public final class EmailView extends JPanel implements NavigableView {
         BrutalistStyle.stylePrimaryButton(composeBtn);
         BrutalistStyle.styleSecondaryButtons(replyBtn, forwardBtn, toggleReadBtn, deleteBtn,
                 simIncomingBtn, openAttachmentBtn);
+        folderSeparator.setForeground(ThemeManager.border());
+        folderSeparator.setBackground(ThemeManager.border());
         BrutalistStyle.applyBoxCard(readerCard, 10, 12);
         BrutalistStyle.styleTable(listTable);
         readerBodyArea.setBackground(ThemeManager.bg());
