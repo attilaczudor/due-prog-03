@@ -1,0 +1,114 @@
+package hu.due.rewear.dao;
+
+import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.model.AppNotification;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Data Access Object for per-user operational notifications ({@code notifications} table).
+ */
+public final class NotificationDao {
+
+    private final DatabaseManager db;
+
+    public NotificationDao(DatabaseManager db) {
+        this.db = db;
+    }
+
+    public List<AppNotification> findForUser(long userId, int limit) {
+        String sql = """
+                SELECT id, user_id, category, title, message, target_view, is_read, created_at
+                FROM notifications
+                WHERE user_id = ?
+                ORDER BY is_read ASC, created_at DESC, id DESC
+                LIMIT ?
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ps.setInt(2, Math.max(1, limit));
+            try (ResultSet rs = ps.executeQuery()) {
+                List<AppNotification> list = new ArrayList<>();
+                while (rs.next()) {
+                    list.add(new AppNotification(
+                            rs.getLong("id"),
+                            rs.getLong("user_id"),
+                            rs.getString("category"),
+                            rs.getString("title"),
+                            rs.getString("message"),
+                            rs.getString("target_view"),
+                            rs.getInt("is_read") == 1,
+                            DaoDateUtil.parse(rs.getString("created_at"))
+                    ));
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to load notifications for user " + userId, e);
+        }
+    }
+
+    public int countUnread(long userId) {
+        String sql = "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to count unread notifications", e);
+        }
+    }
+
+    public long insert(Connection conn, long userId, String category, String title,
+                       String message, String targetView, LocalDateTime createdAt) throws SQLException {
+        String sql = """
+                INSERT INTO notifications (user_id, category, title, message, target_view, is_read, created_at)
+                VALUES (?, ?, ?, ?, ?, 0, ?)
+                """;
+        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setLong(1, userId);
+            ps.setString(2, category);
+            ps.setString(3, title);
+            ps.setString(4, message);
+            ps.setString(5, targetView);
+            ps.setString(6, DaoDateUtil.format(createdAt != null ? createdAt : LocalDateTime.now()));
+            ps.executeUpdate();
+            try (ResultSet keys = ps.getGeneratedKeys()) {
+                if (keys.next()) {
+                    return keys.getLong(1);
+                }
+                throw new SQLException("No generated key returned for notifications insert");
+            }
+        }
+    }
+
+    public void markRead(long notificationId) {
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement("UPDATE notifications SET is_read = 1 WHERE id = ?")) {
+            ps.setLong(1, notificationId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to mark notification read: " + notificationId, e);
+        }
+    }
+
+    public void markAllRead(long userId) {
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement("UPDATE notifications SET is_read = 1 WHERE user_id = ?")) {
+            ps.setLong(1, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to mark all notifications read", e);
+        }
+    }
+}

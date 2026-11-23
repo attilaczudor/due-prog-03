@@ -387,6 +387,13 @@ public final class DemoDataSeeder {
         locations.put("C-01-01", locationDao.insert(conn, "C-01-01", "C", "01", "01", LocationType.STORAGE, new BigDecimal("1200")));
         locations.put("DOCK-01", locationDao.insert(conn, "DOCK-01", "DOCK", "01", "01", LocationType.DISPATCH_ZONE, new BigDecimal("2000")));
 
+        // Assign demo operator to ST-OP-01 by default
+        try (var ps = conn.prepareStatement("UPDATE users SET assigned_station_id = ? WHERE id = ?")) {
+            ps.setLong(1, locations.get("ST-OP-01"));
+            ps.setLong(2, operatorId);
+            ps.executeUpdate();
+        }
+
         // 8. Business Partners: Buyers (Customers) + Providers (Suppliers) across HU, AT, SK, DE
         long cust1 = customerDao.insert(conn, "Duna Vintage Kft.", PartnerType.CUSTOMER, "Szabó Márta", "marta@dunavintage.hu",
                 "+36 30 555 1201", "2400 Dunaújváros, Vasmű út 18.", "24891234-2-07", "HU", "HUF", now.minusDays(20));

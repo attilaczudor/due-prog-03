@@ -177,8 +177,9 @@ public final class SchemaInitializer {
     }
 
     private void ensureV22OperationsAndCommsSchema(Connection conn) throws SQLException {
-        // 1. Add location_type to warehouse_locations if upgrading an older DB
+        // 1. Add location_type to warehouse_locations & assigned_station_id to users if upgrading an older DB
         addColumnIfMissing(conn, "warehouse_locations", "location_type", "TEXT NOT NULL DEFAULT 'STORAGE'");
+        addColumnIfMissing(conn, "users", "assigned_station_id", "INTEGER");
 
         // 2. Seed default email domain & SMTP/IMAP settings if missing
         try (Statement stmt = conn.createStatement()) {
@@ -249,6 +250,12 @@ public final class SchemaInitializer {
                 stmt.execute("""
                         INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
                         VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', 2000.0, 1)
+                        """);
+                // Assign demo operator to ST-OP-01 if not yet assigned
+                stmt.execute("""
+                        UPDATE users
+                        SET assigned_station_id = (SELECT id FROM warehouse_locations WHERE code = 'ST-OP-01' LIMIT 1)
+                        WHERE lower(username) = 'operator' AND assigned_station_id IS NULL
                         """);
             }
 

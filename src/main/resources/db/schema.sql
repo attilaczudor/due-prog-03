@@ -1,4 +1,4 @@
--- ReWear WMS (due-prog-03) — 3NF SQLite Schema (21 Tables)
+-- ReWear WMS (due-prog-03) — 3NF SQLite Schema (23 Tables)
 PRAGMA foreign_keys = ON;
 
 -- 0. Portable Workspace Settings
@@ -48,9 +48,11 @@ CREATE TABLE IF NOT EXISTS users (
     phone TEXT,
     avatar_png BLOB,
     role_id INTEGER NOT NULL,
+    assigned_station_id INTEGER,
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
     created_at TEXT NOT NULL,
-    FOREIGN KEY (role_id) REFERENCES roles(id)
+    FOREIGN KEY (role_id) REFERENCES roles(id),
+    FOREIGN KEY (assigned_station_id) REFERENCES warehouse_locations(id) ON DELETE SET NULL
 );
 
 -- 3. Target Groups (WHATFOR segment, e.g. L, M, K, B, U, H)
@@ -290,6 +292,31 @@ CREATE TABLE IF NOT EXISTS chat_messages (
     FOREIGN KEY (sender_id) REFERENCES users(id)
 );
 
+-- 19. Operational Notifications (Putaway alerts, Order staging alerts, Overdue alerts)
+CREATE TABLE IF NOT EXISTS notifications (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    category TEXT NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    target_view TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0, 1)),
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 20. Personal User To-Do Items (Separate from live System To-Do queue)
+CREATE TABLE IF NOT EXISTS user_todos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'MEDIUM' CHECK (priority IN ('HIGH', 'MEDIUM', 'LOW')),
+    due_date TEXT,
+    completed INTEGER NOT NULL DEFAULT 0 CHECK (completed IN (0, 1)),
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_packages_qr_code ON inventory_packages(qr_code);
 CREATE INDEX IF NOT EXISTS idx_packages_status ON inventory_packages(status);
@@ -308,3 +335,5 @@ CREATE INDEX IF NOT EXISTS idx_order_items_package ON order_items(package_id);
 CREATE INDEX IF NOT EXISTS idx_emails_owner_folder ON emails(owner_user_id, folder);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_room ON chat_messages(room_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_room_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_todos_user ON user_todos(user_id, completed);

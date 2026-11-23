@@ -50,6 +50,7 @@ public final class TransportService {
     private final InventoryPackageDao packageDao;
     private final WarehouseLocationDao locationDao;
     private final InventoryService inventoryService;
+    private NotificationService notificationService;
 
     public TransportService(DatabaseManager db,
                             InventoryPackageDao packageDao,
@@ -59,6 +60,10 @@ public final class TransportService {
         this.packageDao = packageDao;
         this.locationDao = locationDao;
         this.inventoryService = inventoryService;
+    }
+
+    public void setNotificationService(NotificationService notificationService) {
+        this.notificationService = notificationService;
     }
 
     /** Returns all {@code IN_STOCK} packages currently waiting at any {@link LocationType#OPERATOR_STATION}. */
@@ -139,7 +144,16 @@ public final class TransportService {
         if (target.locationType() != LocationType.DISPATCH_ZONE) {
             throw new IllegalArgumentException("Order staging destination must be a DISPATCH_ZONE.");
         }
-        return inventoryService.relocatePackages(packageIds, targetDispatchLocationId,
+        int moved = inventoryService.relocatePackages(packageIds, targetDispatchLocationId,
                 "Forklift order staging -> " + target.code(), driverUserId);
+        if (notificationService != null && moved > 0) {
+            notificationService.notifyRoles(
+                    java.util.Set.of(hu.due.rewear.model.RoleCode.MANAGER),
+                    hu.due.rewear.model.AppNotification.CAT_ORDER_READY,
+                    "Staged at " + target.code(),
+                    moved + " order package(s) moved to dispatch zone " + target.code() + " by forklift.",
+                    hu.due.rewear.ui.MainFrame.VIEW_ORDERS);
+        }
+        return moved;
     }
 }

@@ -126,7 +126,7 @@ public final class MessagesView extends JPanel implements NavigableView {
         add(leftRail, BorderLayout.WEST);
 
         // Right chat workspace
-        JPanel chatHeader = new JPanel(new BorderLayout(8, 2));
+        JPanel chatHeader = new JPanel(new BorderLayout(12, 2));
         chatHeader.setOpaque(false);
         JPanel titleStack = new JPanel(new BorderLayout(0, 2));
         titleStack.setOpaque(false);
@@ -134,7 +134,7 @@ public final class MessagesView extends JPanel implements NavigableView {
         activeRoomTopic.setFont(ThemeManager.monoFont(Font.PLAIN, 11.5f));
         titleStack.add(activeRoomTitle, BorderLayout.NORTH);
         titleStack.add(activeRoomTopic, BorderLayout.SOUTH);
-        chatHeader.add(titleStack, BorderLayout.WEST);
+        chatHeader.add(titleStack, BorderLayout.CENTER);
 
         JPanel headerBtns = new JPanel(new FlowLayout(FlowLayout.RIGHT, 6, 0));
         headerBtns.setOpaque(false);

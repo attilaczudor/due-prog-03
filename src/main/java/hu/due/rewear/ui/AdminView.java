@@ -252,6 +252,13 @@ public final class AdminView extends JPanel implements NavigableView {
 
         JPasswordField pwF = new JPasswordField(18);
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
+        JComboBox<StationOption> stationCombo = buildStationCombo(null, i18n);
+        Runnable syncStationEnabled = () -> {
+            Role selRole = (Role) roleCombo.getSelectedItem();
+            stationCombo.setEnabled(selRole != null && selRole.code() == hu.due.rewear.model.RoleCode.OPERATOR);
+        };
+        roleCombo.addActionListener(e -> syncStationEnabled.run());
+        syncStationEnabled.run();
 
         JPanel form = new JPanel(new GridBagLayout());
         GridBagConstraints gbc = new GridBagConstraints();
@@ -263,7 +270,8 @@ public final class AdminView extends JPanel implements NavigableView {
         addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
         addField(form, gbc, r++, i18n.t("customer.email"), emailF);
         addField(form, gbc, r++, i18n.t("login.password") + " *", pwF);
-        addField(form, gbc, r, i18n.t("admin.user.role") + " *", roleCombo);
+        addField(form, gbc, r++, i18n.t("admin.user.role") + " *", roleCombo);
+        addField(form, gbc, r, i18n.t("admin.user.assigned_station"), stationCombo);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("common.add"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
@@ -278,6 +286,10 @@ public final class AdminView extends JPanel implements NavigableView {
                     ? ctx.getEmailService().generateDefaultEmail(firstNameF.getText(), lastNameF.getText(), userF.getText())
                     : emailF.getText().trim();
             ctx.getUserDao().updateEmail(createdId, finalEmail);
+            if (role.code() == hu.due.rewear.model.RoleCode.OPERATOR
+                    && stationCombo.getSelectedItem() instanceof StationOption so) {
+                ctx.getUserDao().updateAssignedStation(createdId, so.stationId());
+            }
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -307,6 +319,14 @@ public final class AdminView extends JPanel implements NavigableView {
                 break;
             }
         }
+        JComboBox<StationOption> stationCombo = buildStationCombo(u.assignedStationId(), i18n);
+        Runnable syncStationEnabled = () -> {
+            Role selRole = (Role) roleCombo.getSelectedItem();
+            stationCombo.setEnabled(selRole != null && selRole.code() == hu.due.rewear.model.RoleCode.OPERATOR);
+        };
+        roleCombo.addActionListener(e -> syncStationEnabled.run());
+        syncStationEnabled.run();
+
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), u.active());
         if (targetIsSuperAdmin) {
             roleCombo.setEnabled(false);
@@ -322,6 +342,7 @@ public final class AdminView extends JPanel implements NavigableView {
         addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
         addField(form, gbc, r++, i18n.t("customer.email"), emailF);
         addField(form, gbc, r++, i18n.t("admin.user.role") + " *", roleCombo);
+        addField(form, gbc, r++, i18n.t("admin.user.assigned_station"), stationCombo);
         gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("common.edit") + " — " + u.username(),
@@ -341,10 +362,37 @@ public final class AdminView extends JPanel implements NavigableView {
             if (ctx.getSession().isSuperAdmin()) {
                 ctx.getUserDao().updateEmail(u.id(), emailF.getText().trim());
             }
+            Long assignedId = (role.code() == hu.due.rewear.model.RoleCode.OPERATOR
+                    && stationCombo.getSelectedItem() instanceof StationOption so)
+                    ? so.stationId() : null;
+            ctx.getUserDao().updateAssignedStation(u.id(), assignedId);
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private record StationOption(Long stationId, String label) {
+        @Override
+        public String toString() {
+            return label;
+        }
+    }
+
+    private JComboBox<StationOption> buildStationCombo(Long selectedStationId, I18nManager i18n) {
+        JComboBox<StationOption> combo = new JComboBox<>();
+        StationOption none = new StationOption(null, "— " + i18n.t("common.all") + " —");
+        combo.addItem(none);
+        StationOption selected = none;
+        for (var loc : ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.OPERATOR_STATION, true)) {
+            StationOption opt = new StationOption(loc.id(), loc.code() + " (" + loc.zone() + "-" + loc.aisle() + ")");
+            combo.addItem(opt);
+            if (selectedStationId != null && selectedStationId.equals(loc.id())) {
+                selected = opt;
+            }
+        }
+        combo.setSelectedItem(selected);
+        return combo;
     }
 
     private void handleResetPassword() {

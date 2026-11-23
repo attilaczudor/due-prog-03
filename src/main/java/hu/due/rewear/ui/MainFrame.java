@@ -49,6 +49,7 @@ import java.util.function.Supplier;
 public final class MainFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
 
     public static final String VIEW_DASHBOARD = "dashboard";
+    public static final String VIEW_TODO = "todo";
     public static final String VIEW_INTAKE = "intake";
     public static final String VIEW_TRANSPORT = "transport";
     public static final String VIEW_SCANNER = "scanner";
@@ -92,6 +93,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
     private final JLabel activeViewTitleLabel = new JLabel();
+    private final JButton notificationBellBtn = new JButton();
+    private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshNotificationBell);
     private final JPanel statusBar = new JPanel(new BorderLayout());
     private final JLabel statusBarLabel = new JLabel();
 
@@ -115,6 +118,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         ctx.getI18n().addListener(this);
         ThemeManager.addListener(this);
+        ctx.getNotificationService().addChangeListener(notifListener);
+        refreshNotificationBell();
         navigateTo(VIEW_DASHBOARD);
 
         pack();
@@ -197,6 +202,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
         topBar.add(activeViewTitleLabel, BorderLayout.WEST);
+        notificationBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        notificationBellBtn.addActionListener(e -> {
+            navigateTo(VIEW_TODO);
+            if (views.get(VIEW_TODO) instanceof TodoView tv) {
+                tv.showNotificationsTab();
+            }
+        });
+        topBar.add(notificationBellBtn, BorderLayout.EAST);
         rightArea.add(topBar, BorderLayout.NORTH);
 
         rightArea.add(contentHost, BorderLayout.CENTER);
@@ -226,6 +239,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         SessionContext session = ctx.getSession();
         addNavButton(navList, VIEW_DASHBOARD, "nav.dashboard");
+        addNavButton(navList, VIEW_TODO, "nav.todo");
         if (session.canUseIntake()) {
             addNavButton(navList, VIEW_INTAKE, "nav.intake");
         }
@@ -439,6 +453,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerViewFactory(VIEW_INTAKE, () -> new PackageIntakeView(ctx));
         registerViewFactory(VIEW_SCANNER, () -> new QrScannerView(ctx));
         registerViewFactory(VIEW_INVENTORY, () -> new InventoryView(ctx));
+        registerViewFactory(VIEW_TODO, () -> new TodoView(ctx, this::navigateTo));
         registerViewFactory(VIEW_TRANSPORT, () -> new TransportView(ctx));
         registerViewFactory(VIEW_LOCATIONS, () -> new LocationsView(ctx));
         registerViewFactory(VIEW_DICTIONARIES, () -> new DictionariesView(ctx));
@@ -481,6 +496,23 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         cardLayout.show(contentHost, viewKey);
         if (!newlyCreated) {
             view.refreshData();
+        }
+        refreshNotificationBell();
+    }
+
+    private void refreshNotificationBell() {
+        if (!ctx.getSession().isAuthenticated()) {
+            return;
+        }
+        long uid = ctx.getSession().requireCurrentUser().id();
+        int unread = ctx.getNotificationService().countUnread(uid);
+        String label = ctx.getI18n().t("todo.tab.notifications").toUpperCase(Locale.ROOT);
+        if (unread > 0) {
+            notificationBellBtn.setText("[ ! " + unread + " ]  " + label);
+            BrutalistStyle.stylePrimaryButton(notificationBellBtn);
+        } else {
+            notificationBellBtn.setText("[ 0 ]  " + label);
+            BrutalistStyle.styleSecondaryButton(notificationBellBtn);
         }
     }
 
@@ -593,6 +625,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         statusBarLabel.setForeground(ThemeManager.muted());
 
         updateNavButtonStyles();
+        refreshNotificationBell();
 
         for (NavigableView view : views.values()) {
             view.applyTheme();
@@ -609,6 +642,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private void performLogout() {
         ctx.getI18n().removeListener(this);
         ThemeManager.removeListener(this);
+        ctx.getNotificationService().removeChangeListener(notifListener);
         ctx.getAuthService().logout();
         dispose();
         onLogout.run();
@@ -620,6 +654,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         settingsButton.setToolTipText(i18n.t("profile.settings.tooltip"));
         refreshUserProfileCard();
         applySidebarState();
+        refreshNotificationBell();
 
         for (NavigableView view : views.values()) {
             view.applyTranslations();

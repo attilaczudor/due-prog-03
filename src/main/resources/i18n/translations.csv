@@ -467,9 +467,50 @@ chat.new_room,Create New Room,Új szoba létrehozása
 chat.new_dm,Start Direct Message,Új közvetlen üzenet
 chat.room_name,Room Name,Szoba neve
 chat.room_topic,Topic,Téma
-chat.members,Members,Tagok
-chat.add_member,Add Member,Tag hozzáadása
-chat.all_members_in,All active users are already members of this room.,Minden aktív felhasználó már tagja ennek a szobának.
-chat.members_count,{0} member(s),{0} tag
+chat.members,Members,Résztvevők
+chat.add_member,Add Member,Résztvevő hozzáadása
+chat.all_members_in,All active users are already members of this room.,Minden aktív felhasználó már résztvevője ennek a szobának.
+chat.members_count,{0} member(s),{0} résztvevő
 email.scope.all,Internal & External Mail,Belső és külső levelezés
 email.scope.internal_only,Internal Team Mail Only,Csak belső céges levelezés
+nav.todo,To-Do & Alerts,Teendők és értesítések
+admin.user.assigned_station,Assigned Operator Station,Hozzárendelt operátori állomás
+intake.station_locked_hint,Locked to your assigned Operator Station.,A hozzád rendelt operátori állomáshoz rögzítve.
+todo.title,To-Do & Operational Notifications,Teendők és raktári értesítések
+todo.kpi.system,System To-Do Tasks,Rendszer teendők
+todo.kpi.personal,Personal To-Dos (Open / Total),Saját teendők (Nyitott / Összes)
+todo.kpi.notifications,Unread Notifications,Olvasatlan értesítések
+todo.tab.lists,To-Do Lists,Teendőlisták
+todo.tab.notifications,Notifications,Értesítések
+todo.system.header,System-Populated Tasks (Auto-Ordered by Priority),Rendszer által generált feladatok (prioritás szerint)
+todo.personal.header,Personal To-Do List (Private),Saját teendőlista (Privát)
+todo.personal.add,Add Personal To-Do,Új saját teendő
+todo.personal.toggle,Toggle Done,Kész / Nyitott
+todo.btn.open_target,Open Workspace →,Megnyitás →
+todo.notif.mark_read,Mark Read,Olvasottnak jelölés
+todo.notif.mark_all,Mark All Read,Összes olvasott
+todo.col.priority,Priority,Prioritás
+todo.col.task,Task,Feladat
+todo.col.details,Details,Részletek
+todo.cat.order_staging,Order Staging,Rendelés összekészítés
+todo.cat.putaway,Putaway,Betárolás
+todo.cat.station,My Station,Saját állomás
+todo.cat.intake,Daily Intake,Napi csomagfelvétel
+todo.cat.overdue,Overdue Invoice,Lejárt számla
+todo.cat.ready_ship,Ready to Ship,Kiszállításra kész
+todo.cat.open_order,Open Order,Nyitott rendelés
+todo.cat.capacity,Capacity Alert,Kapacitás figyelmeztetés
+todo.sys.stage_order,Stage {1} package(s) for {0} → Dispatch Zone,{0}: {1} csomag összekészítése a kiadó zónába
+todo.sys.stage_order_detail,Starting shelf: {0},Kiinduló polc: {0}
+todo.sys.putaway_station,Pick up {1} package(s) ({2} kg) from {0} → Shelf,{0}: {1} csomag ({2} kg) felvétele és betárolása polcra
+todo.sys.putaway_detail,Move from Operator Station to Storage Shelf,Átszállítás operátori állomásról raktárpolcra
+todo.sys.my_station,Station {0}: {1} package(s) awaiting forklift ({2}% full),{0} állomás: {1} csomag vár targoncára ({2}% telítettség)
+todo.sys.my_station_detail,Current load: {0} / {1} kg,Jelenlegi terhelés: {0} / {1} kg
+todo.sys.today_intake,Today's sorting intake: {0} package(s) recorded,Mai válogatás: {0} csomag rögzítve
+todo.sys.today_intake_detail,Open Package Intake to create and preview new QR labels,Nyisd meg a Csomagfelvételt új QR címkék létrehozásához
+todo.sys.overdue_inv,Overdue invoice {0} — {1},Lejárt számla: {0} — {1}
+todo.sys.order_ready_ship,Order {0} ({1}) is staged at Dispatch Zone,Rendelés ({0} — {1}) kiadó zónában kiszállításra kész
+todo.sys.order_ready_detail,All {0} package(s) ready at Dispatch Zone,Mind a(z) {0} csomag a kiadó zónában várakozik
+todo.sys.open_order,Open order {0} — {1},Nyitott rendelés: {0} — {1}
+todo.sys.loc_near_full,Location {0} is {1}% full,{0} raktárhely telítettsége: {1}%
+todo.sys.putaway_backlog,{0} package(s) waiting at Operator Stations for forklift,{0} csomag vár betárolásra az operátori állomásokon

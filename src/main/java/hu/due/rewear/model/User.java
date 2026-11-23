@@ -23,8 +23,16 @@ public record User(
         RoleCode roleCode,
         String roleName,
         boolean active,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        Long assignedStationId
 ) {
+    /** Backward-compatible constructor defaulting {@code assignedStationId} to {@code null}. */
+    public User(long id, String username, String passwordHash, String fullName, String lastName, String firstName,
+                String email, String phone, byte[] avatarPng, long roleId, RoleCode roleCode, String roleName,
+                boolean active, LocalDateTime createdAt) {
+        this(id, username, passwordHash, fullName, lastName, firstName, email, phone, avatarPng,
+                roleId, roleCode, roleName, active, createdAt, null);
+    }
     /**
      * Computes a crisp 1-2 character uppercase monogram from lastName + firstName,
      * falling back to fullName or username.

@@ -48,6 +48,12 @@ public final class OrderService {
         this.movementDao = movementDao;
     }
 
+    private NotificationService notificationService;
+
+    public void setNotificationService(NotificationService notificationService) {
+        this.notificationService = notificationService;
+    }
+
     public Order createOrder(long customerId, String notes, long userId) {
         return createOrder(customerId, "EUR", notes, userId);
     }
@@ -67,6 +73,14 @@ public final class OrderService {
         });
         Order created = orderDao.findById(orderId).orElseThrow();
         LOG.info("Created order {} ({}) for customerId={} by userId={}", created.orderNumber(), cur, customerId, userId);
+        if (notificationService != null) {
+            notificationService.notifyRoles(
+                    java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
+                    hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
+                    "New Order: " + created.orderNumber(),
+                    "Order " + created.orderNumber() + " (" + created.customerName() + ") created — prepare for dispatch collection.",
+                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+        }
         return created;
     }
 
@@ -102,6 +116,14 @@ public final class OrderService {
         });
 
         LOG.info("Added package {} to order {} ({} {}/kg)", pkg.qrCode(), order.orderNumber(), unitPrice, cur);
+        if (notificationService != null) {
+            notificationService.notifyRoles(
+                    java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
+                    hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
+                    "Collect for " + order.orderNumber(),
+                    "Collect " + pkg.qrCode() + " from " + pkg.locationCode() + " to Dispatch Zone for " + order.customerName() + ".",
+                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+        }
         return orderDao.findById(orderId).orElseThrow();
     }
 

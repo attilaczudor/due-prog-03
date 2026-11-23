@@ -39,6 +39,7 @@ public final class InventoryService {
     private final InventoryPackageDao packageDao;
     private final StockMovementDao movementDao;
     private final ProductCodeService codeService;
+    private NotificationService notificationService;
 
     public InventoryService(DatabaseManager db,
                             InventoryPackageDao packageDao,
@@ -48,6 +49,10 @@ public final class InventoryService {
         this.packageDao = packageDao;
         this.movementDao = movementDao;
         this.codeService = codeService;
+    }
+
+    public void setNotificationService(NotificationService notificationService) {
+        this.notificationService = notificationService;
     }
 
     /**
@@ -174,6 +179,14 @@ public final class InventoryService {
         }
         LOG.info("Committed {} previewed inventory package(s) by userId={} at location {}",
                 saved.size(), userId, location.code());
+        if (notificationService != null && location.locationType() == LocationType.OPERATOR_STATION && !saved.isEmpty()) {
+            notificationService.notifyRoles(
+                    java.util.Set.of(RoleCode.FORKLIFT),
+                    hu.due.rewear.model.AppNotification.CAT_PUTAWAY,
+                    "Putaway Pickup: " + location.code(),
+                    saved.size() + " package(s) created at " + location.code() + " (" + saved.get(0).qrCode() + ") ready for shelf putaway.",
+                    hu.due.rewear.ui.MainFrame.VIEW_TRANSPORT);
+        }
         return saved;
     }
 

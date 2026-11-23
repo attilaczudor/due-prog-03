@@ -22,7 +22,7 @@ public final class UserDao {
 
     private static final String BASE_SELECT = """
             SELECT u.id, u.username, u.password_hash, u.full_name, u.last_name, u.first_name,
-                   u.email, u.phone, u.avatar_png,
+                   u.email, u.phone, u.avatar_png, u.assigned_station_id,
                    u.role_id, r.code AS role_code, r.name AS role_name, u.active, u.created_at
             FROM users u
             JOIN roles r ON r.id = u.role_id
@@ -204,6 +204,22 @@ public final class UserDao {
         }
     }
 
+    public void updateAssignedStation(long userId, Long stationId) {
+        String sql = "UPDATE users SET assigned_station_id = ? WHERE id = ?";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            if (stationId != null && stationId > 0) {
+                ps.setLong(1, stationId);
+            } else {
+                ps.setNull(1, java.sql.Types.INTEGER);
+            }
+            ps.setLong(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to update assigned station for user: " + userId, e);
+        }
+    }
+
     public void updatePasswordHash(long userId, String passwordHash) {
         String sql = "UPDATE users SET password_hash = ? WHERE id = ?";
         try (Connection conn = db.getConnection();
@@ -217,6 +233,8 @@ public final class UserDao {
     }
 
     private static User mapRow(ResultSet rs) throws SQLException {
+        long stRaw = rs.getLong("assigned_station_id");
+        Long stationId = rs.wasNull() ? null : stRaw;
         return new User(
                 rs.getLong("id"),
                 rs.getString("username"),
@@ -231,7 +249,8 @@ public final class UserDao {
                 RoleCode.valueOf(rs.getString("role_code")),
                 rs.getString("role_name"),
                 rs.getInt("active") == 1,
-                DaoDateUtil.parse(rs.getString("created_at"))
+                DaoDateUtil.parse(rs.getString("created_at")),
+                stationId
         );
     }
 }

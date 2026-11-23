@@ -7,11 +7,13 @@ import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.InvoiceDao;
+import hu.due.rewear.dao.NotificationDao;
 import hu.due.rewear.dao.OrderDao;
 import hu.due.rewear.dao.OrderItemDao;
 import hu.due.rewear.dao.RoleDao;
 import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.dao.StockMovementDao;
+import hu.due.rewear.dao.TodoDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
@@ -26,6 +28,7 @@ import hu.due.rewear.service.InventoryService;
 import hu.due.rewear.service.InvoicePdfExporter;
 import hu.due.rewear.service.InvoiceService;
 import hu.due.rewear.service.LabelPdfExporter;
+import hu.due.rewear.service.NotificationService;
 import hu.due.rewear.service.OrderService;
 import hu.due.rewear.service.PartnerStatementService;
 import hu.due.rewear.service.ProductCodeService;
@@ -34,6 +37,7 @@ import hu.due.rewear.service.ReceiptVaultService;
 import hu.due.rewear.service.ScannerService;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.TicketLabelPainter;
+import hu.due.rewear.service.TodoService;
 import hu.due.rewear.service.TransportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,6 +73,8 @@ public final class AppContext {
     private final FinanceConfigDao financeConfigDao;
     private final EmailDao emailDao;
     private final ChatDao chatDao;
+    private final NotificationDao notificationDao;
+    private final TodoDao todoDao;
 
     private final AuthService authService;
     private final QrCodeService qrCodeService;
@@ -87,6 +93,8 @@ public final class AppContext {
     private final EmailService emailService;
     private final ChatService chatService;
     private final TransportService transportService;
+    private final NotificationService notificationService;
+    private final TodoService todoService;
     private final BackupService backupService;
 
     public AppContext() {
@@ -117,6 +125,8 @@ public final class AppContext {
         this.financeConfigDao = new FinanceConfigDao(databaseManager);
         this.emailDao = new EmailDao(databaseManager);
         this.chatDao = new ChatDao(databaseManager);
+        this.notificationDao = new NotificationDao(databaseManager);
+        this.todoDao = new TodoDao(databaseManager);
 
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
@@ -138,6 +148,11 @@ public final class AppContext {
         this.emailService = new EmailService(databaseManager, emailDao, settingsDao, userDao);
         this.chatService = new ChatService(databaseManager, chatDao, userDao);
         this.transportService = new TransportService(databaseManager, packageDao, locationDao, inventoryService);
+        this.notificationService = new NotificationService(databaseManager, notificationDao, userDao);
+        this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao, invoiceDao);
+        this.inventoryService.setNotificationService(notificationService);
+        this.orderService.setNotificationService(notificationService);
+        this.transportService.setNotificationService(notificationService);
         this.backupService = new BackupService(databaseManager);
 
         invoiceService.syncOverdueStatuses();
@@ -304,6 +319,14 @@ public final class AppContext {
 
     public TransportService getTransportService() {
         return transportService;
+    }
+
+    public NotificationService getNotificationService() {
+        return notificationService;
+    }
+
+    public TodoService getTodoService() {
+        return todoService;
     }
 
     public BackupService getBackupService() {

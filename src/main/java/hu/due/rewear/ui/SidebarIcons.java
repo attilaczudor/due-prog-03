@@ -32,6 +32,7 @@ public final class SidebarIcons {
     public static Icon forView(String viewKey, int size) {
         return switch (viewKey) {
             case MainFrame.VIEW_DASHBOARD -> makeIcon(size, SidebarIcons::paintDashboard);
+            case MainFrame.VIEW_TODO -> makeIcon(size, SidebarIcons::paintTodo);
             case MainFrame.VIEW_INTAKE -> makeIcon(size, SidebarIcons::paintIntake);
             case MainFrame.VIEW_TRANSPORT -> makeIcon(size, SidebarIcons::paintTransport);
             case MainFrame.VIEW_SCANNER -> makeIcon(size, SidebarIcons::paintScanner);
@@ -251,5 +252,13 @@ public final class SidebarIcons {
         g.draw(bubble);
         g.draw(new Line2D.Double(7, 9.5, 17, 9.5));
         g.draw(new Line2D.Double(7, 12.5, 14, 12.5));
+    }
+
+    // Checklist icon for To-Do & Notifications
+    private static void paintTodo(Graphics2D g) {
+        g.draw(new Rectangle2D.Double(3.5, 4, 5, 5));
+        g.draw(new Line2D.Double(11, 6.5, 20.5, 6.5));
+        g.draw(new Rectangle2D.Double(3.5, 13.5, 5, 5));
+        g.draw(new Line2D.Double(11, 16, 20.5, 16));
     }
 }

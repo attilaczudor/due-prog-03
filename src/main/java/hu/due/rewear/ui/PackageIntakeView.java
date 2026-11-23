@@ -380,20 +380,29 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
             }
 
             locationCombo.removeAllItems();
+            var currentUser = ctx.getSession().requireCurrentUser();
             boolean operatorOnly = ctx.getSession().isOperator();
             List<WarehouseLocation> availableLocations = operatorOnly
                     ? ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.OPERATOR_STATION, true)
                     : ctx.getLocationDao().findAll(true);
+            Long effectiveLocId = (operatorOnly && currentUser.assignedStationId() != null)
+                    ? currentUser.assignedStationId()
+                    : locationId;
             for (WarehouseLocation item : availableLocations) {
                 String typeTag = ctx.getI18n().t("location.type." + item.locationType().name());
                 String label = item.code() + " [" + typeTag + "] (" + FormatUtil.stripZeros(item.usedWeightKg())
                         + " / " + FormatUtil.stripZeros(item.maxCapacityKg()) + " kg)";
                 ComboEntry<WarehouseLocation> entry = new ComboEntry<>(item, label);
                 locationCombo.addItem(entry);
-                if (locationId != null && item.id() == locationId) {
+                if (effectiveLocId != null && item.id() == effectiveLocId) {
                     locationCombo.setSelectedItem(entry);
                 }
             }
+            boolean lockedToAssignedStation = operatorOnly && currentUser.assignedStationId() != null;
+            locationCombo.setEnabled(!lockedToAssignedStation);
+            locationCombo.setToolTipText(lockedToAssignedStation
+                    ? ctx.getI18n().t("intake.station_locked_hint")
+                    : null);
         } finally {
             loadingCombos = false;
         }
