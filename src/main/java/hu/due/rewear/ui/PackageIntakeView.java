@@ -311,25 +311,27 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
 
         int qty = (Integer) quantitySpinner.getValue();
         try {
-            List<InventoryPackage> created = ctx.getInventoryService().createPackages(
+            var currentUser = ctx.getSession().requireCurrentUser();
+            List<InventoryPackage> previews = ctx.getInventoryService().buildPreviewPackages(
                     tg, gt, qg, pt, loc, weight, qty,
                     null,
                     currentHexSuffix,
-                    ctx.getSession().requireCurrentUser().id()
+                    currentUser.id(),
+                    currentUser.roleCode()
             );
 
-            // Prepare fresh hex suffix for next entry
-            currentHexSuffix = ctx.getProductCodeService().generateHexSuffix();
-            quantitySpinner.setValue(1);
-            refreshData();
+            // Always show Pre-Save Preview BEFORE committing anything to SQLite
+            Window owner = SwingUtilities.getWindowAncestor(this);
+            LabelPreset defaultPreset = previews.size() > 1 ? LabelPreset.A4_4UP : LabelPreset.THERMAL_100X150;
+            List<InventoryPackage> committed = PrintPreviewDialog.showPreSavePreview(
+                    owner, ctx, previews, defaultPreset,
+                    () -> ctx.getInventoryService().commitPreviewedPackages(
+                            previews, loc, currentUser.id(), currentUser.roleCode()));
 
-            if (openPrintPreview && !created.isEmpty()) {
-                Window owner = SwingUtilities.getWindowAncestor(this);
-                LabelPreset defaultPreset = created.size() > 1 ? LabelPreset.A4_4UP : LabelPreset.THERMAL_100X150;
-                PrintPreviewDialog.showPreview(owner, ctx, created, defaultPreset);
-            } else {
-                JOptionPane.showMessageDialog(this, i18n.t("intake.saved_success", created.size()),
-                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+            if (committed != null && !committed.isEmpty()) {
+                currentHexSuffix = ctx.getProductCodeService().generateHexSuffix();
+                quantitySpinner.setValue(1);
+                refreshData();
             }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -378,8 +380,14 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
             }
 
             locationCombo.removeAllItems();
-            for (WarehouseLocation item : ctx.getLocationDao().findAll(true)) {
-                String label = item.code() + " (" + FormatUtil.stripZeros(item.usedWeightKg()) + " / " + FormatUtil.stripZeros(item.maxCapacityKg()) + " kg)";
+            boolean operatorOnly = ctx.getSession().isOperator();
+            List<WarehouseLocation> availableLocations = operatorOnly
+                    ? ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.OPERATOR_STATION, true)
+                    : ctx.getLocationDao().findAll(true);
+            for (WarehouseLocation item : availableLocations) {
+                String typeTag = ctx.getI18n().t("location.type." + item.locationType().name());
+                String label = item.code() + " [" + typeTag + "] (" + FormatUtil.stripZeros(item.usedWeightKg())
+                        + " / " + FormatUtil.stripZeros(item.maxCapacityKg()) + " kg)";
                 ComboEntry<WarehouseLocation> entry = new ComboEntry<>(item, label);
                 locationCombo.addItem(entry);
                 if (locationId != null && item.id() == locationId) {

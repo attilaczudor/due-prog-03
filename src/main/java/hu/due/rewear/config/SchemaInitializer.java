@@ -51,6 +51,7 @@ public final class SchemaInitializer {
             ensureSuperAdminRoleAndAccount(conn);
             ensureMultiCurrencySchema(conn);
             ensureTaxAndPartnerSchema(conn);
+            ensureV22OperationsAndCommsSchema(conn);
         });
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
     }
@@ -170,6 +171,112 @@ public final class SchemaInitializer {
                     ps.setString(9, (String) row[8]);
                     ps.setString(10, created);
                     ps.executeUpdate();
+                }
+            }
+        }
+    }
+
+    private void ensureV22OperationsAndCommsSchema(Connection conn) throws SQLException {
+        // 1. Add location_type to warehouse_locations if upgrading an older DB
+        addColumnIfMissing(conn, "warehouse_locations", "location_type", "TEXT NOT NULL DEFAULT 'STORAGE'");
+
+        // 2. Seed default email domain & SMTP/IMAP settings if missing
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.domain', 'rewear-wms.hu')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.smtp.host', 'smtp.rewear-wms.hu')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.smtp.port', '587')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.smtp.security', 'STARTTLS')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.imap.host', 'imap.rewear-wms.hu')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.imap.port', '993')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.imap.security', 'SSL/TLS')");
+            stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.simulation_mode', '1')");
+        }
+
+        // 3. Ensure FORKLIFT role & demo account exist on already-seeded DBs
+        long userCount = 0;
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
+            if (rs.next()) userCount = rs.getLong(1);
+        }
+        if (userCount > 0) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("INSERT OR IGNORE INTO roles (code, name) VALUES ('FORKLIFT', 'Forklift Driver')");
+            }
+            long forkliftRoleId = -1;
+            try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM roles WHERE code = 'FORKLIFT'");
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) forkliftRoleId = rs.getLong(1);
+            }
+            if (forkliftRoleId > 0) {
+                boolean hasForklift = false;
+                try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM users WHERE lower(username) = 'forklift'");
+                     ResultSet rs = ps.executeQuery()) {
+                    hasForklift = rs.next();
+                }
+                if (!hasForklift) {
+                    String hash = BCrypt.hashpw("forklift123", BCrypt.gensalt(10));
+                    String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now());
+                    try (PreparedStatement ps = conn.prepareStatement(
+                            "INSERT INTO users (username, password_hash, full_name, last_name, first_name, email, role_id, active, created_at) "
+                                    + "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)")) {
+                        ps.setString(1, "forklift");
+                        ps.setString(2, hash);
+                        ps.setString(3, "Tóth Márk");
+                        ps.setString(4, "Tóth");
+                        ps.setString(5, "Márk");
+                        ps.setString(6, "mark.toth@rewear-wms.hu");
+                        ps.setLong(7, forkliftRoleId);
+                        ps.setString(8, created);
+                        ps.executeUpdate();
+                    }
+                }
+            }
+
+            // 4. Seed multiple OPERATOR_STATIONs & DISPATCH_ZONE if upgrading an existing DB
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("""
+                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                        VALUES ('ST-OP-01', 'OP', '01', '01', 'OPERATOR_STATION', 400.0, 1)
+                        """);
+                stmt.execute("""
+                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                        VALUES ('ST-OP-02', 'OP', '02', '01', 'OPERATOR_STATION', 400.0, 1)
+                        """);
+                stmt.execute("""
+                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                        VALUES ('ST-OP-03', 'OP', '03', '01', 'OPERATOR_STATION', 400.0, 1)
+                        """);
+                stmt.execute("""
+                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                        VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', 2000.0, 1)
+                        """);
+            }
+
+            // 5. Backfill corporate email addresses (firstname.lastname@<domain>) for any existing user missing an email
+            String domain = hu.due.rewear.model.EmailSettings.DEFAULT_DOMAIN;
+            try (PreparedStatement ps = conn.prepareStatement("SELECT setting_value FROM app_settings WHERE setting_key = 'mail.domain'");
+                 ResultSet rs = ps.executeQuery()) {
+                if (rs.next() && rs.getString(1) != null && !rs.getString(1).isBlank()) {
+                    domain = hu.due.rewear.model.EmailSettings.sanitizeDomain(rs.getString(1));
+                }
+            }
+            hu.due.rewear.model.EmailSettings helper = new hu.due.rewear.model.EmailSettings(
+                    domain, null, 587, "STARTTLS", "", "", null, 993, "SSL/TLS", "", "", true);
+            try (PreparedStatement sel = conn.prepareStatement(
+                    "SELECT id, username, first_name, last_name, email FROM users");
+                 ResultSet rs = sel.executeQuery();
+                 PreparedStatement upd = conn.prepareStatement("UPDATE users SET email = ? WHERE id = ?")) {
+                while (rs.next()) {
+                    String em = rs.getString("email");
+                    if (em == null || em.isBlank()) {
+                        String gen = helper.generateUserEmail(
+                                rs.getString("first_name"),
+                                rs.getString("last_name"),
+                                rs.getString("username"));
+                        upd.setString(1, gen);
+                        upd.setLong(2, rs.getLong("id"));
+                        upd.executeUpdate();
+                    }
                 }
             }
         }

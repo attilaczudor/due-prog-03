@@ -1,7 +1,9 @@
 package hu.due.rewear.config;
 
+import hu.due.rewear.dao.ChatDao;
 import hu.due.rewear.dao.CustomerDao;
 import hu.due.rewear.dao.DictionaryDao;
+import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.OrderDao;
@@ -10,13 +12,17 @@ import hu.due.rewear.dao.RoleDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
+import hu.due.rewear.model.ChatRoom;
 import hu.due.rewear.model.CountryDirectory;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
+import hu.due.rewear.model.EmailMessage;
+import hu.due.rewear.model.EmailSettings;
 import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceStatus;
+import hu.due.rewear.model.LocationType;
 import hu.due.rewear.model.MovementType;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
@@ -24,6 +30,7 @@ import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.RoleCode;
+import hu.due.rewear.model.User;
 import hu.due.rewear.service.ProductCodeService;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
@@ -57,6 +64,8 @@ public final class DemoDataSeeder {
     private final OrderDao orderDao;
     private final OrderItemDao orderItemDao;
     private final InvoiceDao invoiceDao;
+    private final EmailDao emailDao;
+    private final ChatDao chatDao;
     private final ProductCodeService codeService;
 
     public DemoDataSeeder(DatabaseManager db) {
@@ -71,6 +80,8 @@ public final class DemoDataSeeder {
         this.orderDao = new OrderDao(db);
         this.orderItemDao = new OrderItemDao(db);
         this.invoiceDao = new InvoiceDao(db);
+        this.emailDao = new EmailDao(db);
+        this.chatDao = new ChatDao(db);
         this.codeService = new ProductCodeService();
     }
 
@@ -83,6 +94,96 @@ public final class DemoDataSeeder {
             LOG.debug("Database already populated; skipping core demo data seed.");
         }
         seedStarterInvoicesIfEmpty();
+        seedStarterEmailsAndChatsIfEmpty();
+    }
+
+    private void seedStarterEmailsAndChatsIfEmpty() {
+        List<User> users = userDao.findAll();
+        if (users.isEmpty()) {
+            return;
+        }
+        User superAdmin = users.stream().filter(u -> "superadmin".equalsIgnoreCase(u.username())).findFirst().orElse(users.get(0));
+        User manager = users.stream().filter(u -> "manager".equalsIgnoreCase(u.username())).findFirst().orElse(superAdmin);
+        User operator = users.stream().filter(u -> "operator".equalsIgnoreCase(u.username())).findFirst().orElse(superAdmin);
+        User forklift = users.stream().filter(u -> "forklift".equalsIgnoreCase(u.username())).findFirst().orElse(superAdmin);
+        LocalDateTime now = LocalDateTime.now();
+
+        if (emailDao.countAll() == 0) {
+            db.runInTransaction(conn -> {
+                for (User u : users) {
+                    String toAddr = u.email() != null && !u.email().isBlank()
+                            ? u.email()
+                            : EmailSettings.defaults().generateUserEmail(u.safeFirstName(), u.safeLastName(), u.username());
+                    emailDao.insert(conn, u.id(), EmailMessage.FOLDER_INBOX,
+                            "attila.czudor@rewear-wms.hu", toAddr, "",
+                            "Üdvözlünk a ReWear WMS vállalati levelezőben (@rewear-wms.hu)",
+                            "Szia " + u.displayName() + ",\n\n"
+                                    + "Elkészült a vállalati e-mail fiókod: " + toAddr + "\n"
+                                    + "Innen tudsz belső csapattagoknak és külső partnereknek/beszállítóknak is e-mailt küldeni.\n\n"
+                                    + "Üdvözlettel,\nCzudor Attila — ReWear Logistics Kft.",
+                            null, false, false, "DELIVERED", now.minusHours(5));
+                }
+                emailDao.insert(conn, superAdmin.id(), EmailMessage.FOLDER_INBOX,
+                        "office@alpinesecondhand.at", "attila.czudor@rewear-wms.hu", "eszter.kovacs@rewear-wms.hu",
+                        "Re: Weekly Cream & Grade-A Textile Order (EUR)",
+                        "Dear Attila & Eszter,\n\n"
+                                + "Could you please confirm availability of 400 kg Ladies Cream Dresses and Grade A T-Shirts for next Tuesday's pickup?\n"
+                                + "Please send the EUR 0% EU B2B invoice once packed at DOCK-01.\n\n"
+                                + "Best regards,\nLukas Gruber — Alpine Second-Hand GmbH",
+                        null, false, true, "RECEIVED (IMAP: imap.rewear-wms.hu:993)", now.minusHours(2));
+                emailDao.insert(conn, manager.id(), EmailMessage.FOLDER_INBOX,
+                        "office@alpinesecondhand.at", "eszter.kovacs@rewear-wms.hu", "attila.czudor@rewear-wms.hu",
+                        "Re: Weekly Cream & Grade-A Textile Order (EUR)",
+                        "Dear Eszter,\n\n"
+                                + "Please let us know when the next EUR shipment is staged at DOCK-01.\n\n"
+                                + "Best regards,\nLukas Gruber — Alpine Second-Hand GmbH",
+                        null, false, true, "RECEIVED (IMAP: imap.rewear-wms.hu:993)", now.minusHours(2));
+            });
+            LOG.info("Seeded starter internal & external demo emails.");
+        }
+
+        if (chatDao.countRooms() == 0) {
+            db.runInTransaction(conn -> {
+                long generalId = chatDao.createRoom(conn, "#általános", ChatRoom.TYPE_ROOM,
+                        "Céges közlemények és napi egyeztetés", superAdmin.id(), now.minusDays(2));
+                long opsId = chatDao.createRoom(conn, "#raktár-logisztika", ChatRoom.TYPE_ROOM,
+                        "Válogató állomások (ST-OP) ↔ Targonca ↔ Kiadó zóna (DOCK-01)", manager.id(), now.minusDays(2));
+                long financeId = chatDao.createRoom(conn, "#számlázás", ChatRoom.TYPE_ROOM,
+                        "EUR / HUF számlák, ÁFA és kintlévőségek", superAdmin.id(), now.minusDays(2));
+
+                for (User u : users) {
+                    chatDao.addMember(conn, generalId, u.id());
+                    chatDao.addMember(conn, opsId, u.id());
+                    if (u.roleCode() == RoleCode.SUPER_ADMIN || u.roleCode() == RoleCode.ADMIN || u.roleCode() == RoleCode.MANAGER) {
+                        chatDao.addMember(conn, financeId, u.id());
+                    }
+                }
+
+                chatDao.insertMessage(conn, generalId, superAdmin.id(),
+                        "Sziasztok! Elindult a belső üzenetküldő — a raktári mozgatásokat a #raktár-logisztika szobában egyeztessük.",
+                        now.minusHours(4));
+                chatDao.insertMessage(conn, opsId, operator.id(),
+                        "Kész a reggeli válogatás az ST-OP-01 és ST-OP-02 állomáson, vihető a polcokra!",
+                        now.minusHours(2));
+                chatDao.insertMessage(conn, opsId, forklift.id(),
+                        "Vettem, indulok az ST-OP-01 felé, utána viszem a nyitott rendelés báláit a DOCK-01 zónába.",
+                        now.minusHours(1));
+                chatDao.insertMessage(conn, financeId, manager.id(),
+                        "Az Alpine Second-Hand GmbH rendelése 0% EU-0 ÁFA-val, EUR főkönyvben számlázható.",
+                        now.minusMinutes(45));
+
+                if (operator.id() != forklift.id()) {
+                    long dmId = chatDao.createRoom(conn, operator.displayName() + " ↔ " + forklift.displayName(),
+                            ChatRoom.TYPE_DIRECT, "Direct Message", operator.id(), now.minusHours(3));
+                    chatDao.addMember(conn, dmId, operator.id());
+                    chatDao.addMember(conn, dmId, forklift.id());
+                    chatDao.insertMessage(conn, dmId, operator.id(),
+                            "Szia Márk, az ST-OP-01-en lévő 35 kg-os krém farmer bálát légy szíves az A-01-02-re tedd!",
+                            now.minusMinutes(30));
+                }
+            });
+            LOG.info("Seeded starter Element-style team chat rooms & DMs.");
+        }
     }
 
     private void seedStarterInvoicesIfEmpty() {
@@ -202,9 +303,10 @@ public final class DemoDataSeeder {
         long adminRoleId = roleDao.insert(conn, RoleCode.ADMIN, "Administrator");
         long managerRoleId = roleDao.insert(conn, RoleCode.MANAGER, "Warehouse Manager");
         long operatorRoleId = roleDao.insert(conn, RoleCode.OPERATOR, "Sorting Operator");
+        long forkliftRoleId = roleDao.insert(conn, RoleCode.FORKLIFT, "Forklift Driver");
 
-        // 2. Demo Users (BCrypt)
-        userDao.insert(conn, "superadmin", BCrypt.hashpw("superadmin123", BCrypt.gensalt(10)),
+        // 2. Demo Users (BCrypt) with auto-populated @rewear-wms.hu corporate emails
+        long superId = userDao.insert(conn, "superadmin", BCrypt.hashpw("superadmin123", BCrypt.gensalt(10)),
                 "Czudor Attila", superAdminRoleId, true, now.minusDays(15));
         long adminId = userDao.insert(conn, "admin", BCrypt.hashpw("admin123", BCrypt.gensalt(10)),
                 "Szabó Gábor", adminRoleId, true, now.minusDays(14));
@@ -212,6 +314,23 @@ public final class DemoDataSeeder {
                 "Kovács Eszter", managerRoleId, true, now.minusDays(12));
         long operatorId = userDao.insert(conn, "operator", BCrypt.hashpw("operator123", BCrypt.gensalt(10)),
                 "Nagy Bence", operatorRoleId, true, now.minusDays(10));
+        long forkliftId = userDao.insert(conn, "forklift", BCrypt.hashpw("forklift123", BCrypt.gensalt(10)),
+                "Tóth Márk", forkliftRoleId, true, now.minusDays(9));
+
+        try (var ps = conn.prepareStatement("UPDATE users SET email = ? WHERE id = ?")) {
+            Object[][] emails = {
+                    {superId, "attila.czudor@rewear-wms.hu"},
+                    {adminId, "gabor.szabo@rewear-wms.hu"},
+                    {managerId, "eszter.kovacs@rewear-wms.hu"},
+                    {operatorId, "bence.nagy@rewear-wms.hu"},
+                    {forkliftId, "mark.toth@rewear-wms.hu"}
+            };
+            for (Object[] row : emails) {
+                ps.setString(1, (String) row[1]);
+                ps.setLong(2, (Long) row[0]);
+                ps.executeUpdate();
+            }
+        }
 
         // 3. Target Groups (WHATFOR)
         Map<String, Long> targets = new HashMap<>();
@@ -255,14 +374,18 @@ public final class DemoDataSeeder {
         packages.put("C", dictionaryDao.insertPackageType(conn, "C", "Cardboard Box", "Kartondoboz", new BigDecimal("1.00"), new BigDecimal("35")));
         packages.put("P", dictionaryDao.insertPackageType(conn, "P", "Pallet", "Raklap", new BigDecimal("15.00"), new BigDecimal("500")));
 
-        // 7. Warehouse Locations
+        // 7. Warehouse Locations (Operator Stations + Storage Shelves + Dispatch/Connection Zone)
         Map<String, Long> locations = new HashMap<>();
-        locations.put("A-01-01", locationDao.insert(conn, "A-01-01", "A", "01", "01", new BigDecimal("600")));
-        locations.put("A-01-02", locationDao.insert(conn, "A-01-02", "A", "01", "02", new BigDecimal("600")));
-        locations.put("A-02-01", locationDao.insert(conn, "A-02-01", "A", "02", "01", new BigDecimal("500")));
-        locations.put("B-01-01", locationDao.insert(conn, "B-01-01", "B", "01", "01", new BigDecimal("800")));
-        locations.put("B-01-02", locationDao.insert(conn, "B-01-02", "B", "01", "02", new BigDecimal("800")));
-        locations.put("C-01-01", locationDao.insert(conn, "C-01-01", "C", "01", "01", new BigDecimal("1200")));
+        locations.put("ST-OP-01", locationDao.insert(conn, "ST-OP-01", "OP", "01", "01", LocationType.OPERATOR_STATION, new BigDecimal("400")));
+        locations.put("ST-OP-02", locationDao.insert(conn, "ST-OP-02", "OP", "02", "01", LocationType.OPERATOR_STATION, new BigDecimal("400")));
+        locations.put("ST-OP-03", locationDao.insert(conn, "ST-OP-03", "OP", "03", "01", LocationType.OPERATOR_STATION, new BigDecimal("400")));
+        locations.put("A-01-01", locationDao.insert(conn, "A-01-01", "A", "01", "01", LocationType.STORAGE, new BigDecimal("600")));
+        locations.put("A-01-02", locationDao.insert(conn, "A-01-02", "A", "01", "02", LocationType.STORAGE, new BigDecimal("600")));
+        locations.put("A-02-01", locationDao.insert(conn, "A-02-01", "A", "02", "01", LocationType.STORAGE, new BigDecimal("500")));
+        locations.put("B-01-01", locationDao.insert(conn, "B-01-01", "B", "01", "01", LocationType.STORAGE, new BigDecimal("800")));
+        locations.put("B-01-02", locationDao.insert(conn, "B-01-02", "B", "01", "02", LocationType.STORAGE, new BigDecimal("800")));
+        locations.put("C-01-01", locationDao.insert(conn, "C-01-01", "C", "01", "01", LocationType.STORAGE, new BigDecimal("1200")));
+        locations.put("DOCK-01", locationDao.insert(conn, "DOCK-01", "DOCK", "01", "01", LocationType.DISPATCH_ZONE, new BigDecimal("2000")));
 
         // 8. Business Partners: Buyers (Customers) + Providers (Suppliers) across HU, AT, SK, DE
         long cust1 = customerDao.insert(conn, "Duna Vintage Kft.", PartnerType.CUSTOMER, "Szabó Márta", "marta@dunavintage.hu",
@@ -301,8 +424,8 @@ public final class DemoDataSeeder {
                 new SeedBale(now.minusDays(2).withHour(15).withMinute(12), "H", "MIX", "B", "A", "50", "E1", "C-01-01", PackageStatus.IN_STOCK, operatorId, "Curtains & bed linens"),
                 new SeedBale(now.minusDays(1).withHour(8).withMinute(50), "L", "SWT", "CR", "B", "20", "2F", "A-01-01", PackageStatus.IN_STOCK, operatorId, "Knitwear wool blend"),
                 new SeedBale(now.minusDays(1).withHour(11).withMinute(35), "U", "MIX", "C", "P", "180", "B6", "C-01-01", PackageStatus.IN_STOCK, adminId, "Industrial wiper cotton pallet"),
-                new SeedBale(now.withHour(8).withMinute(15), "L", "JNS", "CR", "A", "35", "88", "A-01-02", PackageStatus.IN_STOCK, operatorId, "Today's morning sort"),
-                new SeedBale(now.withHour(9).withMinute(40), "K", "SHO", "A", "C", "16", "F0", "A-02-01", PackageStatus.IN_STOCK, operatorId, "Kids paired shoes"),
+                new SeedBale(now.withHour(8).withMinute(15), "L", "JNS", "CR", "A", "35", "88", "ST-OP-01", PackageStatus.IN_STOCK, operatorId, "Today's morning sort — awaiting forklift putaway"),
+                new SeedBale(now.withHour(9).withMinute(40), "K", "SHO", "A", "C", "16", "F0", "ST-OP-02", PackageStatus.IN_STOCK, operatorId, "Kids paired shoes — awaiting forklift putaway"),
                 new SeedBale(now.withHour(10).withMinute(55), "M", "SWT", "A", "B", "25", "63", "B-01-02", PackageStatus.IN_STOCK, managerId, "Men fleece & knit"),
                 // Reserved for PACKING order
                 new SeedBale(now.minusDays(3).withHour(11).withMinute(5), "L", "TSH", "CR", "B", "20", "19", "A-01-01", PackageStatus.RESERVED, operatorId, "Reserved for Duna Vintage"),

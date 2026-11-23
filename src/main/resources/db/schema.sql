@@ -1,4 +1,4 @@
--- ReWear WMS (due-prog-03) — 3NF SQLite Schema (17 Tables)
+-- ReWear WMS (due-prog-03) — 3NF SQLite Schema (21 Tables)
 PRAGMA foreign_keys = ON;
 
 -- 0. Portable Workspace Settings
@@ -95,13 +95,15 @@ CREATE TABLE IF NOT EXISTS package_types (
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
--- 7. Warehouse Storage Locations
+-- 7. Warehouse Storage Locations (Operator Stations, Storage Shelves, Dispatch/Connection Zones)
 CREATE TABLE IF NOT EXISTS warehouse_locations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     code TEXT NOT NULL UNIQUE,
     zone TEXT NOT NULL,
     aisle TEXT NOT NULL,
     shelf TEXT NOT NULL,
+    location_type TEXT NOT NULL DEFAULT 'STORAGE'
+        CHECK (location_type IN ('OPERATOR_STATION', 'STORAGE', 'DISPATCH_ZONE')),
     max_capacity_kg REAL NOT NULL CHECK (max_capacity_kg > 0),
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
@@ -238,6 +240,56 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
 
+-- 15. User Email Mailboxes (External SMTP/IMAP & Internal Company Mail)
+CREATE TABLE IF NOT EXISTS emails (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL,
+    folder TEXT NOT NULL DEFAULT 'INBOX' CHECK (folder IN ('INBOX', 'SENT', 'DRAFTS', 'TRASH')),
+    from_address TEXT NOT NULL,
+    to_addresses TEXT NOT NULL,
+    cc_addresses TEXT,
+    subject TEXT NOT NULL,
+    body TEXT NOT NULL,
+    attachment_path TEXT,
+    is_read INTEGER NOT NULL DEFAULT 0 CHECK (is_read IN (0, 1)),
+    is_external INTEGER NOT NULL DEFAULT 0 CHECK (is_external IN (0, 1)),
+    delivery_status TEXT NOT NULL DEFAULT 'DELIVERED',
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 16. Internal Team Messaging Rooms & Direct Messages (Element-style)
+CREATE TABLE IF NOT EXISTS chat_rooms (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    room_type TEXT NOT NULL DEFAULT 'ROOM' CHECK (room_type IN ('ROOM', 'DIRECT')),
+    topic TEXT,
+    created_by INTEGER NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (created_by) REFERENCES users(id)
+);
+
+-- 17. Chat Room Membership & Read Cursors
+CREATE TABLE IF NOT EXISTS chat_room_members (
+    room_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    last_read_at TEXT,
+    PRIMARY KEY (room_id, user_id),
+    FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- 18. Chat Messages
+CREATE TABLE IF NOT EXISTS chat_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    room_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (room_id) REFERENCES chat_rooms(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id)
+);
+
 -- Performance Indexes
 CREATE INDEX IF NOT EXISTS idx_packages_qr_code ON inventory_packages(qr_code);
 CREATE INDEX IF NOT EXISTS idx_packages_status ON inventory_packages(status);
@@ -253,3 +305,6 @@ CREATE INDEX IF NOT EXISTS idx_orders_customer ON orders(customer_id);
 CREATE INDEX IF NOT EXISTS idx_orders_status ON orders(status);
 CREATE INDEX IF NOT EXISTS idx_order_items_order ON order_items(order_id);
 CREATE INDEX IF NOT EXISTS idx_order_items_package ON order_items(package_id);
+CREATE INDEX IF NOT EXISTS idx_emails_owner_folder ON emails(owner_user_id, folder);
+CREATE INDEX IF NOT EXISTS idx_chat_messages_room ON chat_messages(room_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_chat_members_user ON chat_room_members(user_id);

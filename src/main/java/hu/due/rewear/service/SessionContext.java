@@ -57,6 +57,22 @@ public final class SessionContext {
         return isAdmin() || hasRole(RoleCode.MANAGER);
     }
 
+    public synchronized boolean isOperator() {
+        return hasRole(RoleCode.OPERATOR);
+    }
+
+    public synchronized boolean isForklift() {
+        return hasRole(RoleCode.FORKLIFT);
+    }
+
+    public boolean canUseIntake() {
+        return isManagerOrAdmin() || isOperator();
+    }
+
+    public boolean canUseTransportQueue() {
+        return isManagerOrAdmin() || isForklift();
+    }
+
     public boolean canManageOrders() {
         return isManagerOrAdmin();
     }

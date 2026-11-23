@@ -1,7 +1,9 @@
 package hu.due.rewear.config;
 
+import hu.due.rewear.dao.ChatDao;
 import hu.due.rewear.dao.CustomerDao;
 import hu.due.rewear.dao.DictionaryDao;
+import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.InvoiceDao;
@@ -15,8 +17,10 @@ import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.service.AuthService;
 import hu.due.rewear.service.BackupService;
+import hu.due.rewear.service.ChatService;
 import hu.due.rewear.service.CsvExportService;
 import hu.due.rewear.service.DeliveryNotePdfExporter;
+import hu.due.rewear.service.EmailService;
 import hu.due.rewear.service.FinancialReportPdfExporter;
 import hu.due.rewear.service.InventoryService;
 import hu.due.rewear.service.InvoicePdfExporter;
@@ -30,6 +34,7 @@ import hu.due.rewear.service.ReceiptVaultService;
 import hu.due.rewear.service.ScannerService;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.TicketLabelPainter;
+import hu.due.rewear.service.TransportService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -62,6 +67,8 @@ public final class AppContext {
     private final InvoiceDao invoiceDao;
     private final SettingsDao settingsDao;
     private final FinanceConfigDao financeConfigDao;
+    private final EmailDao emailDao;
+    private final ChatDao chatDao;
 
     private final AuthService authService;
     private final QrCodeService qrCodeService;
@@ -77,6 +84,9 @@ public final class AppContext {
     private final FinancialReportPdfExporter financialReportPdfExporter;
     private final PartnerStatementService partnerStatementService;
     private final ReceiptVaultService receiptVaultService;
+    private final EmailService emailService;
+    private final ChatService chatService;
+    private final TransportService transportService;
     private final BackupService backupService;
 
     public AppContext() {
@@ -105,6 +115,8 @@ public final class AppContext {
         this.invoiceDao = new InvoiceDao(databaseManager);
         this.settingsDao = new SettingsDao(databaseManager);
         this.financeConfigDao = new FinanceConfigDao(databaseManager);
+        this.emailDao = new EmailDao(databaseManager);
+        this.chatDao = new ChatDao(databaseManager);
 
         this.authService = new AuthService(userDao, session);
         this.qrCodeService = new QrCodeService();
@@ -123,6 +135,9 @@ public final class AppContext {
                 ? databaseManager.getDatabasePath().getParent().resolve("receipts")
                 : AppPaths.defaultReceiptsDir();
         this.receiptVaultService = new ReceiptVaultService(receiptsDir, invoiceDao);
+        this.emailService = new EmailService(databaseManager, emailDao, settingsDao, userDao);
+        this.chatService = new ChatService(databaseManager, chatDao);
+        this.transportService = new TransportService(databaseManager, packageDao, locationDao, inventoryService);
         this.backupService = new BackupService(databaseManager);
 
         invoiceService.syncOverdueStatuses();
@@ -269,6 +284,26 @@ public final class AppContext {
 
     public ReceiptVaultService getReceiptVaultService() {
         return receiptVaultService;
+    }
+
+    public EmailDao getEmailDao() {
+        return emailDao;
+    }
+
+    public ChatDao getChatDao() {
+        return chatDao;
+    }
+
+    public EmailService getEmailService() {
+        return emailService;
+    }
+
+    public ChatService getChatService() {
+        return chatService;
+    }
+
+    public TransportService getTransportService() {
+        return transportService;
     }
 
     public BackupService getBackupService() {

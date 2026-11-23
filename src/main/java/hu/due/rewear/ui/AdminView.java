@@ -91,6 +91,9 @@ public final class AdminView extends JPanel implements NavigableView {
     private final DefaultTableModel packagesModel = BrutalistStyle.nonEditableTableModel();
     private final JTable packagesTable = new JTable(packagesModel);
 
+    // Tab 5: Email Settings (SUPER_ADMIN only)
+    private AdminEmailSettingsPanel emailSettingsPanel;
+
     private List<User> users = List.of();
     private List<StockMovement> allMovements = List.of();
 
@@ -193,6 +196,10 @@ public final class AdminView extends JPanel implements NavigableView {
         tabs.addTab("", auditPanel);
         tabs.addTab("", maintPanel);
         tabs.addTab("", systemPanel);
+        if (ctx.getSession().isSuperAdmin()) {
+            emailSettingsPanel = new AdminEmailSettingsPanel(ctx, this::refreshData);
+            tabs.addTab("", emailSettingsPanel);
+        }
         add(tabs, BorderLayout.CENTER);
     }
 
@@ -226,6 +233,23 @@ public final class AdminView extends JPanel implements NavigableView {
         JTextField userF = new JTextField(18);
         JTextField lastNameF = new JTextField(18);
         JTextField firstNameF = new JTextField(18);
+        JTextField emailF = new JTextField(22);
+        emailF.setEditable(ctx.getSession().isSuperAdmin());
+        Runnable updateEmailPreview = () -> {
+            String gen = ctx.getEmailService().generateDefaultEmail(
+                    firstNameF.getText(), lastNameF.getText(), userF.getText());
+            emailF.setText(gen);
+        };
+        javax.swing.event.DocumentListener nameListener = new javax.swing.event.DocumentListener() {
+            @Override public void insertUpdate(javax.swing.event.DocumentEvent e) { updateEmailPreview.run(); }
+            @Override public void removeUpdate(javax.swing.event.DocumentEvent e) { updateEmailPreview.run(); }
+            @Override public void changedUpdate(javax.swing.event.DocumentEvent e) { updateEmailPreview.run(); }
+        };
+        lastNameF.getDocument().addDocumentListener(nameListener);
+        firstNameF.getDocument().addDocumentListener(nameListener);
+        userF.getDocument().addDocumentListener(nameListener);
+        updateEmailPreview.run();
+
         JPasswordField pwF = new JPasswordField(18);
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
 
@@ -237,6 +261,7 @@ public final class AdminView extends JPanel implements NavigableView {
         addField(form, gbc, r++, i18n.t("login.username") + " *", userF);
         addField(form, gbc, r++, i18n.t("profile.last_name") + " *", lastNameF);
         addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
+        addField(form, gbc, r++, i18n.t("customer.email"), emailF);
         addField(form, gbc, r++, i18n.t("login.password") + " *", pwF);
         addField(form, gbc, r, i18n.t("admin.user.role") + " *", roleCombo);
 
@@ -248,7 +273,11 @@ public final class AdminView extends JPanel implements NavigableView {
         if (role == null) return;
         String combinedName = (lastNameF.getText().trim() + " " + firstNameF.getText().trim()).trim();
         try {
-            ctx.getAuthService().createUser(userF.getText(), new String(pwF.getPassword()), combinedName, role.id(), true);
+            long createdId = ctx.getAuthService().createUser(userF.getText(), new String(pwF.getPassword()), combinedName, role.id(), true);
+            String finalEmail = emailF.getText().trim().isEmpty()
+                    ? ctx.getEmailService().generateDefaultEmail(firstNameF.getText(), lastNameF.getText(), userF.getText())
+                    : emailF.getText().trim();
+            ctx.getUserDao().updateEmail(createdId, finalEmail);
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -266,6 +295,11 @@ public final class AdminView extends JPanel implements NavigableView {
 
         JTextField lastNameF = new JTextField(u.safeLastName(), 18);
         JTextField firstNameF = new JTextField(u.safeFirstName(), 18);
+        String initialEmail = (u.email() != null && !u.email().isBlank())
+                ? u.email()
+                : ctx.getEmailService().generateDefaultEmail(u.safeFirstName(), u.safeLastName(), u.username());
+        JTextField emailF = new JTextField(initialEmail, 22);
+        emailF.setEditable(ctx.getSession().isSuperAdmin());
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
         for (Role role : roles) {
             if (role.id() == u.roleId()) {
@@ -286,6 +320,7 @@ public final class AdminView extends JPanel implements NavigableView {
         int r = 0;
         addField(form, gbc, r++, i18n.t("profile.last_name") + " *", lastNameF);
         addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
+        addField(form, gbc, r++, i18n.t("customer.email"), emailF);
         addField(form, gbc, r++, i18n.t("admin.user.role") + " *", roleCombo);
         gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
 
@@ -303,6 +338,9 @@ public final class AdminView extends JPanel implements NavigableView {
         if (role == null) return;
         try {
             ctx.getUserDao().updateProfile(u.id(), lastNameF.getText(), firstNameF.getText(), role.id(), activeBox.isSelected());
+            if (ctx.getSession().isSuperAdmin()) {
+                ctx.getUserDao().updateEmail(u.id(), emailF.getText().trim());
+            }
             refreshData();
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -419,6 +457,9 @@ public final class AdminView extends JPanel implements NavigableView {
         ctx.getI18n().setLanguage(ctx.getPreferences().getLanguage());
         updateMaintenanceInfo();
         updateSystemDiagnostics();
+        if (emailSettingsPanel != null) {
+            emailSettingsPanel.refreshData();
+        }
     }
 
     private void updateMaintenanceInfo() {
@@ -471,6 +512,7 @@ public final class AdminView extends JPanel implements NavigableView {
             usersModel.addRow(new Object[]{
                     u.username(),
                     u.fullName(),
+                    u.email() != null ? u.email() : "",
                     i18n.t("role." + u.roleCode().name()).toUpperCase(),
                     u.active() ? yes : no,
                     u.createdAt() != null ? DT_FMT.format(u.createdAt()) : ""
@@ -494,6 +536,9 @@ public final class AdminView extends JPanel implements NavigableView {
 
         updateMaintenanceInfo();
         updateSystemDiagnostics();
+        if (emailSettingsPanel != null) {
+            emailSettingsPanel.refreshData();
+        }
     }
 
     private void updateSystemDiagnostics() {
@@ -546,6 +591,10 @@ public final class AdminView extends JPanel implements NavigableView {
         tabs.setTitleAt(1, i18n.t("admin.tab.audit").toUpperCase());
         tabs.setTitleAt(2, i18n.t("admin.tab.maintenance").toUpperCase());
         tabs.setTitleAt(3, i18n.t("admin.tab.system").toUpperCase());
+        if (emailSettingsPanel != null && tabs.getTabCount() > 4) {
+            tabs.setTitleAt(4, i18n.t("admin.tab.mail").toUpperCase());
+            emailSettingsPanel.applyTranslations();
+        }
 
         runtimeCardTitle.setText(i18n.t("admin.system.runtime").toUpperCase());
         packagesTitle.setText(i18n.t("admin.system.packages").toUpperCase());
@@ -575,6 +624,7 @@ public final class AdminView extends JPanel implements NavigableView {
         usersModel.setColumnIdentifiers(new Object[]{
                 i18n.t("login.username").toUpperCase(),
                 i18n.t("admin.user.full_name").toUpperCase(),
+                i18n.t("customer.email").toUpperCase(),
                 i18n.t("admin.user.role").toUpperCase(),
                 i18n.t("common.status").toUpperCase(),
                 i18n.t("common.created_at").toUpperCase()
@@ -606,5 +656,8 @@ public final class AdminView extends JPanel implements NavigableView {
         BrutalistStyle.styleTable(usersTable);
         BrutalistStyle.styleTable(auditTable);
         BrutalistStyle.styleTable(packagesTable);
+        if (emailSettingsPanel != null) {
+            emailSettingsPanel.applyTheme();
+        }
     }
 }

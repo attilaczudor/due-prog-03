@@ -146,6 +146,17 @@ public final class UserDao {
         }
     }
 
+    public void updateEmail(long userId, String email) {
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement("UPDATE users SET email = ? WHERE id = ?")) {
+            ps.setString(1, email != null ? email.trim() : null);
+            ps.setLong(2, userId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to update user email: " + userId, e);
+        }
+    }
+
     public void updateAccountSettings(long userId, String fullName, String email, String phone, byte[] avatarPng) {
         String clean = fullName.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
         String[] parts = clean.split("\\s+", 2);

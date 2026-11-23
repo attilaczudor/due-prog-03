@@ -4,6 +4,7 @@ import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
+import hu.due.rewear.model.LocationType;
 import hu.due.rewear.model.PackageFilter;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.WarehouseLocation;
@@ -13,6 +14,7 @@ import hu.due.rewear.util.FormatUtil;
 import javax.swing.BorderFactory;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JComboBox;
 import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
@@ -154,6 +156,16 @@ public final class LocationsView extends JPanel implements NavigableView {
         JTextField zoneField = new JTextField(existing != null ? existing.zone() : "A", 10);
         JTextField aisleField = new JTextField(existing != null ? existing.aisle() : "01", 10);
         JTextField shelfField = new JTextField(existing != null ? existing.shelf() : "01", 10);
+        JComboBox<LocationType> typeCombo = new JComboBox<>(LocationType.values());
+        typeCombo.setSelectedItem(existing != null ? existing.locationType() : LocationType.STORAGE);
+        typeCombo.setRenderer((list, val, idx, sel, foc) -> {
+            JLabel lbl = new JLabel(val != null ? i18n.t("location.type." + val.name()) : "");
+            lbl.setOpaque(true);
+            lbl.setBackground(sel ? list.getSelectionBackground() : list.getBackground());
+            lbl.setForeground(sel ? list.getSelectionForeground() : list.getForeground());
+            lbl.setBorder(BorderFactory.createEmptyBorder(3, 6, 3, 6));
+            return lbl;
+        });
         JTextField capField = new JTextField(existing != null ? FormatUtil.stripZeros(existing.maxCapacityKg()) : "600", 10);
         JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
 
@@ -164,6 +176,7 @@ public final class LocationsView extends JPanel implements NavigableView {
 
         int r = 0;
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.code") + " *", codeField);
+        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.type") + " *", typeCombo);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.zone") + " *", zoneField);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.aisle") + " *", aisleField);
         BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("locations.shelf") + " *", shelfField);
@@ -181,18 +194,19 @@ public final class LocationsView extends JPanel implements NavigableView {
         }
 
         try {
-            String code = codeField.getText().trim().toUpperCase();
-            String zone = zoneField.getText().trim().toUpperCase();
+            String code = codeField.getText().trim().toUpperCase(java.util.Locale.ROOT);
+            String zone = zoneField.getText().trim().toUpperCase(java.util.Locale.ROOT);
             String aisle = aisleField.getText().trim();
             String shelf = shelfField.getText().trim();
+            LocationType locType = (LocationType) typeCombo.getSelectedItem();
             BigDecimal cap = new BigDecimal(capField.getText().trim().replace(',', '.'));
             if (code.isEmpty() || zone.isEmpty() || aisle.isEmpty() || shelf.isEmpty() || cap.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new IllegalArgumentException(i18n.t("validation.location_fields_required"));
             }
             if (existing == null) {
-                ctx.getLocationDao().insert(code, zone, aisle, shelf, cap);
+                ctx.getLocationDao().insert(code, zone, aisle, shelf, locType, cap);
             } else {
-                ctx.getLocationDao().update(existing.id(), code, zone, aisle, shelf, cap, activeBox.isSelected());
+                ctx.getLocationDao().update(existing.id(), code, zone, aisle, shelf, locType, cap, activeBox.isSelected());
             }
             refreshData();
         } catch (Exception ex) {
@@ -253,6 +267,7 @@ public final class LocationsView extends JPanel implements NavigableView {
                     : 0;
             locModel.addRow(new Object[]{
                     l.code(),
+                    i18n.t("location.type." + l.locationType().name()),
                     l.zone(),
                     l.aisle(),
                     l.shelf(),
@@ -262,9 +277,9 @@ public final class LocationsView extends JPanel implements NavigableView {
                     l.active() ? i18n.t("common.yes") : i18n.t("common.no")
             });
         }
-        if (locTable.getColumnCount() >= 7) {
-            locTable.getColumnModel().getColumn(6).setCellRenderer(new OccupancyBarRenderer());
-            locTable.getColumnModel().getColumn(6).setPreferredWidth(180);
+        if (locTable.getColumnCount() >= 8) {
+            locTable.getColumnModel().getColumn(7).setCellRenderer(new OccupancyBarRenderer());
+            locTable.getColumnModel().getColumn(7).setPreferredWidth(180);
         }
         if (!locations.isEmpty() && locTable.getSelectedRow() < 0) {
             locTable.setRowSelectionInterval(0, 0);
@@ -283,6 +298,7 @@ public final class LocationsView extends JPanel implements NavigableView {
 
         locModel.setColumnIdentifiers(new Object[]{
                 i18n.t("common.code"),
+                i18n.t("locations.type"),
                 i18n.t("locations.zone"),
                 i18n.t("locations.aisle"),
                 i18n.t("locations.shelf"),

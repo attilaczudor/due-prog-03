@@ -6,10 +6,12 @@ import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.model.GarmentType;
 import hu.due.rewear.model.InventoryPackage;
+import hu.due.rewear.model.LocationType;
 import hu.due.rewear.model.MovementType;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.PackageType;
 import hu.due.rewear.model.QualityGrade;
+import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.TargetGroup;
 import hu.due.rewear.model.WarehouseLocation;
 import org.slf4j.Logger;
@@ -46,6 +48,133 @@ public final class InventoryService {
         this.packageDao = packageDao;
         this.movementDao = movementDao;
         this.codeService = codeService;
+    }
+
+    /**
+     * Generates unsaved preview {@link InventoryPackage} instances (with collision-checked QR codes)
+     * so the operator/manager can visually inspect and print-preview all labels BEFORE committing to SQLite.
+     * Operators are strictly restricted to {@link LocationType#OPERATOR_STATION} workstations.
+     */
+    public List<InventoryPackage> buildPreviewPackages(
+            TargetGroup targetGroup,
+            GarmentType garmentType,
+            QualityGrade qualityGrade,
+            PackageType packageType,
+            WarehouseLocation location,
+            BigDecimal weightKg,
+            int quantity,
+            String notes,
+            String preferredFirstHex,
+            long userId,
+            RoleCode actorRole
+    ) {
+        Objects.requireNonNull(targetGroup, "targetGroup");
+        Objects.requireNonNull(garmentType, "garmentType");
+        Objects.requireNonNull(qualityGrade, "qualityGrade");
+        Objects.requireNonNull(packageType, "packageType");
+        Objects.requireNonNull(location, "location");
+        if (actorRole == RoleCode.OPERATOR && location.locationType() != LocationType.OPERATOR_STATION) {
+            throw new IllegalArgumentException("Operators can only place new packages at an OPERATOR_STATION.");
+        }
+        if (weightKg == null || weightKg.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new IllegalArgumentException("Weight must be positive.");
+        }
+        if (quantity < 1 || quantity > 50) {
+            throw new IllegalArgumentException("Batch quantity must be between 1 and 50.");
+        }
+
+        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
+        List<InventoryPackage> previews = new ArrayList<>(quantity);
+        Set<String> batchCodes = new HashSet<>();
+
+        for (int i = 0; i < quantity; i++) {
+            String qrCode;
+            if (i == 0 && preferredFirstHex != null && preferredFirstHex.matches("^[0-9A-Fa-f]{2}$")) {
+                String candidate = codeService.buildCode(
+                        now, targetGroup.code(), garmentType.code(), qualityGrade.code(),
+                        packageType.code(), weightKg, preferredFirstHex.toUpperCase(Locale.ROOT));
+                if (!batchCodes.contains(candidate) && !packageDao.existsByQrCode(candidate)) {
+                    qrCode = candidate;
+                } else {
+                    qrCode = codeService.generateUniqueCode(now, targetGroup.code(), garmentType.code(),
+                            qualityGrade.code(), packageType.code(), weightKg,
+                            c -> batchCodes.contains(c) || packageDao.existsByQrCode(c));
+                }
+            } else {
+                qrCode = codeService.generateUniqueCode(now, targetGroup.code(), garmentType.code(),
+                        qualityGrade.code(), packageType.code(), weightKg,
+                        c -> batchCodes.contains(c) || packageDao.existsByQrCode(c));
+            }
+            batchCodes.add(qrCode);
+            String hex = qrCode.substring(qrCode.length() - 2);
+            previews.add(new InventoryPackage(
+                    -1L - i,
+                    qrCode,
+                    targetGroup.id(), targetGroup.code(), targetGroup.nameEn(), targetGroup.nameHu(),
+                    garmentType.id(), garmentType.code(), garmentType.nameEn(), garmentType.nameHu(),
+                    garmentType.priceEurPerKg(), garmentType.priceHufPerKg(),
+                    qualityGrade.id(), qualityGrade.code(), qualityGrade.nameEn(), qualityGrade.nameHu(),
+                    qualityGrade.defaultPricePerKg(), qualityGrade.defaultPriceHufPerKg(),
+                    packageType.id(), packageType.code(), packageType.nameEn(), packageType.nameHu(),
+                    location.id(), location.code(),
+                    weightKg, hex, PackageStatus.IN_STOCK, cleanNotes, userId, "", "", now, now
+            ));
+        }
+        return previews;
+    }
+
+    /**
+     * Atomically commits previously previewed packages to SQLite and writes {@link MovementType#INTAKE}
+     * audit entries. Enforces {@link LocationType#OPERATOR_STATION} for {@link RoleCode#OPERATOR}.
+     */
+    public List<InventoryPackage> commitPreviewedPackages(List<InventoryPackage> previews,
+                                                          WarehouseLocation location,
+                                                          long userId,
+                                                          RoleCode actorRole) {
+        if (previews == null || previews.isEmpty()) {
+            throw new IllegalArgumentException("At least one preview package is required.");
+        }
+        Objects.requireNonNull(location, "location");
+        if (actorRole == RoleCode.OPERATOR && location.locationType() != LocationType.OPERATOR_STATION) {
+            throw new IllegalArgumentException("Operators can only place new packages at an OPERATOR_STATION.");
+        }
+        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        List<Long> createdIds = db.executeInTransaction(conn -> {
+            List<Long> ids = new ArrayList<>(previews.size());
+            Set<String> batchCodes = new HashSet<>();
+            for (InventoryPackage p : previews) {
+                String qr = p.qrCode();
+                if (batchCodes.contains(qr) || packageDao.existsByQrCode(conn, qr)) {
+                    qr = codeService.generateUniqueCode(now, p.targetGroupCode(), p.garmentTypeCode(),
+                            p.qualityGradeCode(), p.packageTypeCode(), p.weightKg(),
+                            c -> {
+                                try {
+                                    return batchCodes.contains(c) || packageDao.existsByQrCode(conn, c);
+                                } catch (SQLException e) {
+                                    throw new DaoException("Failed checking QR uniqueness", e);
+                                }
+                            });
+                }
+                batchCodes.add(qr);
+                String hex = qr.substring(qr.length() - 2);
+                long id = packageDao.insert(conn, qr,
+                        p.targetGroupId(), p.garmentTypeId(), p.qualityGradeId(), p.packageTypeId(),
+                        location.id(), p.weightKg(), hex, PackageStatus.IN_STOCK, p.notes(), userId, now);
+                movementDao.insert(conn, id, MovementType.INTAKE, null, location.id(), userId,
+                        p.notes() != null ? p.notes() : "Initial package intake", now);
+                ids.add(id);
+            }
+            return ids;
+        });
+
+        List<InventoryPackage> saved = new ArrayList<>(createdIds.size());
+        for (Long id : createdIds) {
+            packageDao.findById(id).ifPresent(saved::add);
+        }
+        LOG.info("Committed {} previewed inventory package(s) by userId={} at location {}",
+                saved.size(), userId, location.code());
+        return saved;
     }
 
     /**

@@ -50,6 +50,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     public static final String VIEW_DASHBOARD = "dashboard";
     public static final String VIEW_INTAKE = "intake";
+    public static final String VIEW_TRANSPORT = "transport";
     public static final String VIEW_SCANNER = "scanner";
     public static final String VIEW_INVENTORY = "inventory";
     public static final String VIEW_LOCATIONS = "locations";
@@ -57,6 +58,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public static final String VIEW_CUSTOMERS = "customers";
     public static final String VIEW_ORDERS = "orders";
     public static final String VIEW_INVOICES = "invoices";
+    public static final String VIEW_EMAIL = "email";
+    public static final String VIEW_MESSAGES = "messages";
     public static final String VIEW_ADMIN = "admin";
 
     private static final int SIDEBAR_EXPANDED_WIDTH = 276;
@@ -223,7 +226,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         SessionContext session = ctx.getSession();
         addNavButton(navList, VIEW_DASHBOARD, "nav.dashboard");
-        addNavButton(navList, VIEW_INTAKE, "nav.intake");
+        if (session.canUseIntake()) {
+            addNavButton(navList, VIEW_INTAKE, "nav.intake");
+        }
+        if (session.canUseTransportQueue()) {
+            addNavButton(navList, VIEW_TRANSPORT, "nav.transport");
+        }
         addNavButton(navList, VIEW_SCANNER, "nav.scanner");
         addNavButton(navList, VIEW_INVENTORY, "nav.inventory");
 
@@ -239,6 +247,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             addNavButton(navList, VIEW_ORDERS, "nav.orders");
             addNavButton(navList, VIEW_INVOICES, "nav.invoices");
         }
+
+        // Communications (available to ALL logged-in users)
+        navList.add(Box.createVerticalStrut(7));
+        navList.add(createHairlineSeparator());
+        navList.add(Box.createVerticalStrut(7));
+        addNavButton(navList, VIEW_EMAIL, "nav.email");
+        addNavButton(navList, VIEW_MESSAGES, "nav.messages");
+
         if (session.canManageUsersAndMaintenance()) {
             navList.add(Box.createVerticalStrut(7));
             navList.add(createHairlineSeparator());
@@ -423,11 +439,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerViewFactory(VIEW_INTAKE, () -> new PackageIntakeView(ctx));
         registerViewFactory(VIEW_SCANNER, () -> new QrScannerView(ctx));
         registerViewFactory(VIEW_INVENTORY, () -> new InventoryView(ctx));
+        registerViewFactory(VIEW_TRANSPORT, () -> new TransportView(ctx));
         registerViewFactory(VIEW_LOCATIONS, () -> new LocationsView(ctx));
         registerViewFactory(VIEW_DICTIONARIES, () -> new DictionariesView(ctx));
         registerViewFactory(VIEW_CUSTOMERS, () -> new CustomersView(ctx));
         registerViewFactory(VIEW_ORDERS, () -> new OrdersView(ctx));
         registerViewFactory(VIEW_INVOICES, () -> new InvoicesView(ctx));
+        registerViewFactory(VIEW_EMAIL, () -> new EmailView(ctx));
+        registerViewFactory(VIEW_MESSAGES, () -> new MessagesView(ctx));
         registerViewFactory(VIEW_ADMIN, () -> new AdminView(ctx));
     }
 

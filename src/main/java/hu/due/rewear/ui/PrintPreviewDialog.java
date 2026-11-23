@@ -38,15 +38,19 @@ import java.awt.print.PrinterJob;
 import java.io.File;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Interactive Ticket / Label Print Preview dialog supporting Thermal (100x150, 80x100), A6, and A4 4-up formats,
- * zoom controls, page navigation, system printer selection, Java PrinterJob printing, PDF export, and QR PNG export.
+ * zoom controls, page navigation, system printer selection, Java PrinterJob printing, PDF export, QR PNG export,
+ * and an optional pre-save confirmation mode so newly created packages are inspected BEFORE committing to SQLite.
  */
 public final class PrintPreviewDialog extends JDialog {
 
     private final AppContext ctx;
-    private final List<InventoryPackage> packages;
+    private List<InventoryPackage> packages;
+    private final Supplier<List<InventoryPackage>> onConfirmSave;
+    private List<InventoryPackage> committedPackages;
 
     private final JComboBox<PresetOption> presetCombo = new JComboBox<>();
     private final JSlider zoomSlider = new JSlider(50, 200, 115);
@@ -79,9 +83,19 @@ public final class PrintPreviewDialog extends JDialog {
     }
 
     public PrintPreviewDialog(Window owner, AppContext ctx, List<InventoryPackage> packages, LabelPreset initialPreset) {
-        super(owner, ctx.getI18n().t("print.title"), ModalityType.APPLICATION_MODAL);
+        this(owner, ctx, packages, initialPreset, null);
+    }
+
+    public PrintPreviewDialog(Window owner, AppContext ctx, List<InventoryPackage> packages,
+                              LabelPreset initialPreset, Supplier<List<InventoryPackage>> onConfirmSave) {
+        super(owner,
+                onConfirmSave != null
+                        ? ctx.getI18n().t("print.presave.title")
+                        : ctx.getI18n().t("print.title"),
+                ModalityType.APPLICATION_MODAL);
         this.ctx = ctx;
         this.packages = List.copyOf(packages);
+        this.onConfirmSave = onConfirmSave;
         this.activePreset = initialPreset != null ? initialPreset : LabelPreset.THERMAL_100X150;
 
         setMinimumSize(new Dimension(680, 560));
@@ -99,8 +113,44 @@ public final class PrintPreviewDialog extends JDialog {
         if (packages == null || packages.isEmpty()) {
             return;
         }
-        PrintPreviewDialog dialog = new PrintPreviewDialog(owner, ctx, packages, preset);
+        PrintPreviewDialog dialog = new PrintPreviewDialog(owner, ctx, packages, preset, null);
         dialog.setVisible(true);
+    }
+
+    /**
+     * Opens the preview dialog in pre-save confirmation mode: nothing is written to SQLite until the user
+     * clicks Save / Save &amp; Print / Save &amp; PDF. Returns the committed packages, or {@code null} if cancelled.
+     */
+    public static List<InventoryPackage> showPreSavePreview(Window owner, AppContext ctx,
+                                                            List<InventoryPackage> previewPackages,
+                                                            LabelPreset preset,
+                                                            Supplier<List<InventoryPackage>> onConfirmSave) {
+        if (previewPackages == null || previewPackages.isEmpty()) {
+            return null;
+        }
+        PrintPreviewDialog dialog = new PrintPreviewDialog(owner, ctx, previewPackages, preset, onConfirmSave);
+        dialog.setVisible(true);
+        return dialog.committedPackages;
+    }
+
+    private boolean ensureCommittedIfNeeded() {
+        if (onConfirmSave == null || committedPackages != null) {
+            return true;
+        }
+        try {
+            List<InventoryPackage> saved = onConfirmSave.get();
+            if (saved == null || saved.isEmpty()) {
+                return false;
+            }
+            this.committedPackages = List.copyOf(saved);
+            this.packages = this.committedPackages;
+            rebuildPrintable();
+            return true;
+        } catch (Exception ex) {
+            JOptionPane.showMessageDialog(this, ex.getMessage(),
+                    ctx.getI18n().t("common.error"), JOptionPane.ERROR_MESSAGE);
+            return false;
+        }
     }
 
     private void buildUi() {
@@ -194,26 +244,76 @@ public final class PrintPreviewDialog extends JDialog {
         bottomBar.add(pager, BorderLayout.WEST);
 
         JPanel actions = new JPanel(new WrapLayout(FlowLayout.RIGHT, 8, 4));
-        JButton savePngBtn = new JButton(i18n.t("print.button.png"));
-        BrutalistStyle.styleSecondaryButton(savePngBtn);
-        savePngBtn.addActionListener(e -> exportQrPng());
+        if (onConfirmSave != null) {
+            JLabel banner = new JLabel(i18n.t("print.presave.banner",
+                    packages.size(), packages.get(0).locationCode()));
+            banner.setFont(hu.due.rewear.config.ThemeManager.monoFont(java.awt.Font.BOLD, 12f));
+            banner.setOpaque(true);
+            banner.setBackground(hu.due.rewear.config.ThemeManager.fg());
+            banner.setForeground(hu.due.rewear.config.ThemeManager.bg());
+            banner.setBorder(BorderFactory.createEmptyBorder(6, 10, 6, 10));
+            JPanel northWrap = new JPanel(new BorderLayout(0, 6));
+            northWrap.add(banner, BorderLayout.NORTH);
+            northWrap.add(toolbar, BorderLayout.CENTER);
+            root.add(northWrap, BorderLayout.NORTH);
 
-        JButton savePdfBtn = new JButton(i18n.t("print.button.pdf"));
-        BrutalistStyle.styleSecondaryButton(savePdfBtn);
-        savePdfBtn.addActionListener(e -> exportLabelPdf());
+            JButton saveOnlyBtn = new JButton(i18n.t("print.presave.save_only"));
+            BrutalistStyle.styleSecondaryButton(saveOnlyBtn);
+            saveOnlyBtn.addActionListener(e -> {
+                if (ensureCommittedIfNeeded()) {
+                    JOptionPane.showMessageDialog(this, i18n.t("intake.saved_success", committedPackages.size()),
+                            i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+                    dispose();
+                }
+            });
 
-        JButton printBtn = new JButton(i18n.t("print.button.print"));
-        BrutalistStyle.stylePrimaryButton(printBtn);
-        printBtn.addActionListener(e -> sendToPrinter());
+            JButton savePdfBtn = new JButton(i18n.t("print.presave.save_pdf"));
+            BrutalistStyle.styleSecondaryButton(savePdfBtn);
+            savePdfBtn.addActionListener(e -> {
+                if (ensureCommittedIfNeeded()) {
+                    exportLabelPdf();
+                }
+            });
 
-        JButton closeBtn = new JButton(i18n.t("common.close"));
-        BrutalistStyle.styleSecondaryButton(closeBtn);
-        closeBtn.addActionListener(e -> dispose());
+            JButton savePrintBtn = new JButton(i18n.t("print.presave.save_print"));
+            BrutalistStyle.stylePrimaryButton(savePrintBtn);
+            savePrintBtn.addActionListener(e -> {
+                if (ensureCommittedIfNeeded()) {
+                    sendToPrinter();
+                    dispose();
+                }
+            });
 
-        actions.add(savePngBtn);
-        actions.add(savePdfBtn);
-        actions.add(printBtn);
-        actions.add(closeBtn);
+            JButton cancelBtn = new JButton(i18n.t("common.cancel"));
+            BrutalistStyle.styleSecondaryButton(cancelBtn);
+            cancelBtn.addActionListener(e -> dispose());
+
+            actions.add(saveOnlyBtn);
+            actions.add(savePdfBtn);
+            actions.add(savePrintBtn);
+            actions.add(cancelBtn);
+        } else {
+            JButton savePngBtn = new JButton(i18n.t("print.button.png"));
+            BrutalistStyle.styleSecondaryButton(savePngBtn);
+            savePngBtn.addActionListener(e -> exportQrPng());
+
+            JButton savePdfBtn = new JButton(i18n.t("print.button.pdf"));
+            BrutalistStyle.styleSecondaryButton(savePdfBtn);
+            savePdfBtn.addActionListener(e -> exportLabelPdf());
+
+            JButton printBtn = new JButton(i18n.t("print.button.print"));
+            BrutalistStyle.stylePrimaryButton(printBtn);
+            printBtn.addActionListener(e -> sendToPrinter());
+
+            JButton closeBtn = new JButton(i18n.t("common.close"));
+            BrutalistStyle.styleSecondaryButton(closeBtn);
+            closeBtn.addActionListener(e -> dispose());
+
+            actions.add(savePngBtn);
+            actions.add(savePdfBtn);
+            actions.add(printBtn);
+            actions.add(closeBtn);
+        }
         bottomBar.add(actions, BorderLayout.CENTER);
 
         root.add(bottomBar, BorderLayout.SOUTH);

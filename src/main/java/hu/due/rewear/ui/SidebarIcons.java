@@ -33,6 +33,7 @@ public final class SidebarIcons {
         return switch (viewKey) {
             case MainFrame.VIEW_DASHBOARD -> makeIcon(size, SidebarIcons::paintDashboard);
             case MainFrame.VIEW_INTAKE -> makeIcon(size, SidebarIcons::paintIntake);
+            case MainFrame.VIEW_TRANSPORT -> makeIcon(size, SidebarIcons::paintTransport);
             case MainFrame.VIEW_SCANNER -> makeIcon(size, SidebarIcons::paintScanner);
             case MainFrame.VIEW_INVENTORY -> makeIcon(size, SidebarIcons::paintInventory);
             case MainFrame.VIEW_LOCATIONS -> makeIcon(size, SidebarIcons::paintLocations);
@@ -40,6 +41,8 @@ public final class SidebarIcons {
             case MainFrame.VIEW_CUSTOMERS -> makeIcon(size, SidebarIcons::paintCustomers);
             case MainFrame.VIEW_ORDERS -> makeIcon(size, SidebarIcons::paintOrders);
             case MainFrame.VIEW_INVOICES -> makeIcon(size, SidebarIcons::paintInvoices);
+            case MainFrame.VIEW_EMAIL -> makeIcon(size, SidebarIcons::paintEmail);
+            case MainFrame.VIEW_MESSAGES -> makeIcon(size, SidebarIcons::paintMessages);
             case MainFrame.VIEW_ADMIN -> makeIcon(size, SidebarIcons::paintAdmin);
             default -> makeIcon(size, SidebarIcons::paintDashboard);
         };
@@ -212,5 +215,41 @@ public final class SidebarIcons {
         g.draw(shield);
         g.draw(new Line2D.Double(9, 12, 11.2, 14.2));
         g.draw(new Line2D.Double(11.2, 14.2, 15.5, 9.5));
+    }
+
+    // Forklift / pallet transport arrows icon
+    private static void paintTransport(Graphics2D g) {
+        g.draw(new Rectangle2D.Double(3, 9, 10, 8));
+        g.draw(new Line2D.Double(13, 17, 21, 17));
+        g.draw(new Line2D.Double(17, 5, 17, 17));
+        g.draw(new Line2D.Double(17, 13, 21, 13));
+        g.draw(new Ellipse2D.Double(4.5, 17, 3.5, 3.5));
+        g.draw(new Ellipse2D.Double(11, 17, 3.5, 3.5));
+    }
+
+    // Envelope icon for corporate Email
+    private static void paintEmail(Graphics2D g) {
+        g.draw(new Rectangle2D.Double(3, 5, 18, 14));
+        Path2D flap = new Path2D.Double();
+        flap.moveTo(3, 6);
+        flap.lineTo(12, 13);
+        flap.lineTo(21, 6);
+        g.draw(flap);
+    }
+
+    // Chat bubble icon for internal Messages
+    private static void paintMessages(Graphics2D g) {
+        Path2D bubble = new Path2D.Double();
+        bubble.moveTo(3, 5);
+        bubble.lineTo(21, 5);
+        bubble.lineTo(21, 16);
+        bubble.lineTo(9, 16);
+        bubble.lineTo(5, 20);
+        bubble.lineTo(5, 16);
+        bubble.lineTo(3, 16);
+        bubble.closePath();
+        g.draw(bubble);
+        g.draw(new Line2D.Double(7, 9.5, 17, 9.5));
+        g.draw(new Line2D.Double(7, 12.5, 14, 12.5));
     }
 }

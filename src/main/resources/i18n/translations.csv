@@ -399,3 +399,75 @@ admin.system.packages,Bundled Libraries & Dependencies,Csomagolt könyvtárak é
 admin.system.component,Component,Komponens
 admin.system.version,Version,Verzió
 admin.system.purpose,Purpose,Szerepkör
+common.date,Date,Dátum
+common.info,Information,Információ
+role.FORKLIFT,Forklift Driver,Targoncás
+nav.transport,Forklift & Transport,Targonca és szállítás
+nav.email,Email,E-mail
+nav.messages,Messages,Üzenetek
+locations.type,Location Type,Hely típusa
+location.type.OPERATOR_STATION,Operator Station,Operátori állomás
+location.type.STORAGE,Storage Shelf,Raktárpolc
+location.type.DISPATCH_ZONE,Dispatch / Connection Zone,Kiadó / Összekészítő zóna
+print.presave.title,Pre-Save Product & Label Preview,Mentés előtti termék és címke előnézet
+print.presave.banner,"PRE-SAVE PREVIEW — {0} package(s) for {1} (not yet saved to database)","MENTÉS ELŐTTI ELŐNÉZET — {0} csomag ({1}) — még nincs mentve az adatbázisba"
+print.presave.save_only,Save Only,Csak mentés
+print.presave.save_pdf,Save & Export PDF,Mentés és PDF export
+print.presave.save_print,Save & Print,Mentés és nyomtatás
+transport.title,Forklift & In-House Transport Queue,Targonca és belső szállítási sor
+transport.tab.putaway,Putaway (Station → Shelf),Betárolás (Állomás → Polc)
+transport.tab.staging,Order Staging (Shelf → Dock),Összekészítés (Polc → Kiadó zóna)
+transport.target_shelf,Target Storage Shelf,Cél raktárpolc
+transport.target_dock,Target Dispatch Zone,Cél kiadó / összekészítő zóna
+transport.btn.move_storage,Move to Storage Shelf,Betárolás polcra
+transport.btn.move_dock,Move to Dispatch Zone,Átszállítás kiadó zónába
+transport.select_packages,Select one or more packages first.,Válassz ki legalább egy csomagot!
+transport.already_staged,Selected packages are already in the dispatch zone.,A kijelölt csomagok már a kiadó zónában vannak.
+transport.moved_success,Moved {0} package(s) to {1}.,{0} csomag sikeresen átszállítva ide: {1}.
+transport.putaway.summary,Waiting at operator stations: {0} package(s),Operátori állomásokon várakozó csomagok: {0} db
+transport.staging.summary,Pending pickup: {0} / Total allocated: {1} package(s),Felvételre vár: {0} / Összes rendelt csomag: {1} db
+transport.status.pickup,PICKUP NEEDED,ELSZÁLLÍTANDÓ
+transport.status.staged,AT DISPATCH,KIADÓ ZÓNÁBAN
+admin.tab.mail,Email Settings,E-mail beállítások
+admin.mail.domain_section,Company Email Domain & Mode,Céges e-mail domain és működési mód
+admin.mail.sim_mode,Offline Demo Mode (local mailbox simulation),Offline demó mód (helyi postafiók szimuláció)
+admin.mail.sync_users,Sync All User Emails,Összes felhasználói e-mail szinkronizálása
+admin.mail.smtp_section,Outgoing Mail Server (SMTP),Kimenő levelezőszerver (SMTP)
+admin.mail.imap_section,Incoming Mail Server (IMAP),Bejövő levelezőszerver (IMAP)
+admin.mail.test_btn,Test Connection,Kapcsolat tesztelése
+admin.mail.saved,Email gateway settings saved for @{0}.,E-mail beállítások elmentve (@{0}).
+admin.mail.synced,Updated {0} user email(s) to @{1}.,{0} felhasználói e-mail cím frissítve erre a domainre: @{1}.
+email.title,Company Email Client,Vállalati levelező
+email.folder.inbox,Inbox,Beérkező
+email.folder.sent,Sent,Elküldött
+email.folder.drafts,Drafts,Piszkozatok
+email.folder.trash,Trash,Kuka
+email.compose,Compose,Új e-mail
+email.reply,Reply,Válasz
+email.forward,Forward,Továbbítás
+email.toggle_read,Read / Unread,Olvasott / Olvasatlan
+email.sim_btn,Simulate Incoming,Bejövő szimulálása
+email.from,From,Feladó
+email.to,To,Címzett
+email.from_to,From / To,Feladó / Címzett
+email.subject,Subject,Tárgy
+email.attachment,Attachment,Csatolmány
+email.attach,Attach File,Fájl csatolása
+email.directory,Directory,Címjegyzék
+email.quick_pick,Insert teammate or partner email,Csapattag vagy partner e-mail beszúrása
+email.send,Send,Küldés
+email.save_draft,Save Draft,Piszkozat mentése
+email.sent_ok,Email sent successfully.,E-mail sikeresen elküldve.
+email.sim_received,Simulated external partner email received in Inbox.,Szimulált külső partner e-mail megérkezett a Beérkező mappába.
+chat.title,Team Messages,Belső üzenetek
+chat.rooms,Rooms,Szobák
+chat.room_short,Room,Szoba
+chat.direct_messages,Direct Messages,Közvetlen üzenetek
+chat.new_room,Create New Room,Új szoba létrehozása
+chat.new_dm,Start Direct Message,Új közvetlen üzenet
+chat.room_name,Room Name,Szoba neve
+chat.room_topic,Topic,Téma
+chat.members,Members,Tagok
+chat.add_member,Add Member,Tag hozzáadása
+chat.all_members_in,All active users are already members of this room.,Minden aktív felhasználó már tagja ennek a szobának.
+chat.members_count,{0} member(s),{0} tag

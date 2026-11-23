@@ -127,6 +127,24 @@ public final class InventoryPackageDao {
         }
     }
 
+    /** Lists all packages currently assigned to a specific physical {@code locationId}. */
+    public List<InventoryPackage> findByLocationId(long locationId) {
+        String sql = BASE_SELECT + " WHERE ip.location_id = ? ORDER BY ip.created_at DESC, ip.id DESC";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, locationId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<InventoryPackage> list = new ArrayList<>();
+                while (rs.next()) {
+                    list.add(mapRow(rs));
+                }
+                return list;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to find packages by locationId: " + locationId, e);
+        }
+    }
+
     public Optional<InventoryPackage> findByQrCode(String qrCode) {
         String sql = BASE_SELECT + " WHERE upper(ip.qr_code) = upper(?)";
         try (Connection conn = db.getConnection();

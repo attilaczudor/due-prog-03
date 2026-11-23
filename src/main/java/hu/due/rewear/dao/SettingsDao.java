@@ -3,6 +3,7 @@ package hu.due.rewear.dao;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyCode;
+import hu.due.rewear.model.EmailSettings;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -28,6 +29,18 @@ public final class SettingsDao {
     public static final String KEY_COMPANY_EMAIL = "company.email";
     public static final String KEY_COMPANY_PHONE = "company.phone";
     public static final String PREFIX_COMPANY_IBAN = "company.iban.";
+    public static final String KEY_MAIL_DOMAIN = "mail.domain";
+    public static final String KEY_MAIL_SMTP_HOST = "mail.smtp.host";
+    public static final String KEY_MAIL_SMTP_PORT = "mail.smtp.port";
+    public static final String KEY_MAIL_SMTP_SECURITY = "mail.smtp.security";
+    public static final String KEY_MAIL_SMTP_USER = "mail.smtp.user";
+    public static final String KEY_MAIL_SMTP_PASS = "mail.smtp.pass";
+    public static final String KEY_MAIL_IMAP_HOST = "mail.imap.host";
+    public static final String KEY_MAIL_IMAP_PORT = "mail.imap.port";
+    public static final String KEY_MAIL_IMAP_SECURITY = "mail.imap.security";
+    public static final String KEY_MAIL_IMAP_USER = "mail.imap.user";
+    public static final String KEY_MAIL_IMAP_PASS = "mail.imap.pass";
+    public static final String KEY_MAIL_SIMULATION = "mail.simulation_mode";
 
     private final DatabaseManager db;
 
@@ -150,6 +163,90 @@ public final class SettingsDao {
                 }
             }
         });
+    }
+
+    /** Loads the Super-Admin-managed company email domain & SMTP/IMAP gateway settings. */
+    public EmailSettings getEmailSettings() {
+        String sql = "SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'mail.%'";
+        EmailSettings def = EmailSettings.defaults();
+        String domain = def.companyDomain();
+        String smtpHost = def.smtpHost();
+        int smtpPort = def.smtpPort();
+        String smtpSec = def.smtpSecurity();
+        String smtpUser = def.smtpUsername();
+        String smtpPass = def.smtpPassword();
+        String imapHost = def.imapHost();
+        int imapPort = def.imapPort();
+        String imapSec = def.imapSecurity();
+        String imapUser = def.imapUsername();
+        String imapPass = def.imapPassword();
+        boolean simMode = def.simulationMode();
+
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            while (rs.next()) {
+                String k = rs.getString("setting_key");
+                String v = rs.getString("setting_value");
+                if (k == null || v == null) continue;
+                switch (k) {
+                    case KEY_MAIL_DOMAIN -> domain = v;
+                    case KEY_MAIL_SMTP_HOST -> smtpHost = v;
+                    case KEY_MAIL_SMTP_PORT -> smtpPort = parsePort(v, def.smtpPort());
+                    case KEY_MAIL_SMTP_SECURITY -> smtpSec = v;
+                    case KEY_MAIL_SMTP_USER -> smtpUser = v;
+                    case KEY_MAIL_SMTP_PASS -> smtpPass = v;
+                    case KEY_MAIL_IMAP_HOST -> imapHost = v;
+                    case KEY_MAIL_IMAP_PORT -> imapPort = parsePort(v, def.imapPort());
+                    case KEY_MAIL_IMAP_SECURITY -> imapSec = v;
+                    case KEY_MAIL_IMAP_USER -> imapUser = v;
+                    case KEY_MAIL_IMAP_PASS -> imapPass = v;
+                    case KEY_MAIL_SIMULATION -> simMode = !"0".equals(v.trim()) && !"false".equalsIgnoreCase(v.trim());
+                    default -> { }
+                }
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to load email settings", e);
+        }
+        return new EmailSettings(domain, smtpHost, smtpPort, smtpSec, smtpUser, smtpPass,
+                imapHost, imapPort, imapSec, imapUser, imapPass, simMode);
+    }
+
+    /** Atomically persists the Super-Admin-managed company email domain and SMTP/IMAP settings. */
+    public void saveEmailSettings(EmailSettings s) {
+        if (s == null) {
+            throw new IllegalArgumentException("Email settings are required.");
+        }
+        String upsertSql = """
+                INSERT INTO app_settings (setting_key, setting_value)
+                VALUES (?, ?)
+                ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+                """;
+        db.runInTransaction(conn -> {
+            try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
+                upsertSetting(ps, KEY_MAIL_DOMAIN, s.companyDomain());
+                upsertSetting(ps, KEY_MAIL_SMTP_HOST, s.smtpHost());
+                upsertSetting(ps, KEY_MAIL_SMTP_PORT, String.valueOf(s.smtpPort()));
+                upsertSetting(ps, KEY_MAIL_SMTP_SECURITY, s.smtpSecurity());
+                upsertSetting(ps, KEY_MAIL_SMTP_USER, s.smtpUsername());
+                upsertSetting(ps, KEY_MAIL_SMTP_PASS, s.smtpPassword());
+                upsertSetting(ps, KEY_MAIL_IMAP_HOST, s.imapHost());
+                upsertSetting(ps, KEY_MAIL_IMAP_PORT, String.valueOf(s.imapPort()));
+                upsertSetting(ps, KEY_MAIL_IMAP_SECURITY, s.imapSecurity());
+                upsertSetting(ps, KEY_MAIL_IMAP_USER, s.imapUsername());
+                upsertSetting(ps, KEY_MAIL_IMAP_PASS, s.imapPassword());
+                upsertSetting(ps, KEY_MAIL_SIMULATION, s.simulationMode() ? "1" : "0");
+            }
+        });
+    }
+
+    private static int parsePort(String raw, int fallback) {
+        try {
+            int p = Integer.parseInt(raw.trim());
+            return p > 0 && p <= 65535 ? p : fallback;
+        } catch (Exception ex) {
+            return fallback;
+        }
     }
 
     private static void upsertSetting(PreparedStatement ps, String key, String val) throws SQLException {
