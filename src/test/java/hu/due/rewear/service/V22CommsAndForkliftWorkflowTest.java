@@ -170,11 +170,27 @@ class V22CommsAndForkliftWorkflowTest {
     @Test
     void elementStyleChatRoomsDirectMessagesAndUnreadCounters() {
         AppContext ctx = newContext();
+        User superAdmin = ctx.getUserDao().findByUsername("superadmin").orElseThrow();
+        User admin = ctx.getUserDao().findByUsername("admin").orElseThrow();
+        User manager = ctx.getUserDao().findByUsername("manager").orElseThrow();
         User operator = ctx.getUserDao().findByUsername("operator").orElseThrow();
         User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
 
+        // Operator and Forklift Driver CANNOT create group rooms
+        assertThrows(IllegalArgumentException.class, () ->
+                ctx.getChatService().createRoom("unauthorized-op", "Nope", operator.id(), List.of(forklift.id())));
+        assertThrows(IllegalArgumentException.class, () ->
+                ctx.getChatService().createRoom("unauthorized-fk", "Nope", forklift.id(), List.of(operator.id())));
+
+        // Manager creates a room with only Operator & Forklift explicitly passed; SuperAdmin & Admin are auto-included
         long customRoomId = ctx.getChatService().createRoom("dock-coordination", "Dock 01 alerts",
-                operator.id(), List.of(forklift.id()));
+                manager.id(), List.of(operator.id(), forklift.id()));
+        List<Long> members = ctx.getChatService().listMemberIds(customRoomId);
+        assertTrue(members.contains(superAdmin.id()), "Super Admin must automatically be a member of every room");
+        assertTrue(members.contains(admin.id()), "Admin must automatically be a member of every room");
+        assertTrue(ctx.getChatService().listRoomsForUser(superAdmin.id()).stream().anyMatch(r -> r.id() == customRoomId));
+        assertTrue(ctx.getChatService().listRoomsForUser(admin.id()).stream().anyMatch(r -> r.id() == customRoomId));
+
         ctx.getChatService().sendMessage(customRoomId, operator.id(), "2 bales ready at ST-OP-01!");
 
         List<ChatRoom> forkliftRooms = ctx.getChatService().listRoomsForUser(forklift.id());

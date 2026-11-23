@@ -127,6 +127,21 @@ public final class ChatDao {
         }
     }
 
+    /** Ensures {@code adminUserId} is enrolled as a member of every group {@code ROOM} (never private DMs). */
+    public void ensureAdminEnrolledInAllGroupRooms(long adminUserId) {
+        String sql = """
+                INSERT OR IGNORE INTO chat_room_members (room_id, user_id, last_read_at)
+                SELECT id, ?, NULL FROM chat_rooms WHERE room_type = 'ROOM'
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, adminUserId);
+            ps.executeUpdate();
+        } catch (SQLException e) {
+            throw new DaoException("Failed to enroll admin in all group rooms", e);
+        }
+    }
+
     public List<Long> findMemberIds(long roomId) {
         String sql = "SELECT user_id FROM chat_room_members WHERE room_id = ? ORDER BY user_id";
         try (Connection conn = db.getConnection();

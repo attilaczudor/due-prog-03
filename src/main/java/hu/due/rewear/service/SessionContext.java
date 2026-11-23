@@ -78,6 +78,11 @@ public final class SessionContext {
         return isManagerOrAdmin();
     }
 
+    /** Only Super Admin, Admin, and Manager may create group chat rooms or manage room memberships. */
+    public boolean canManageChatRooms() {
+        return isManagerOrAdmin();
+    }
+
     public boolean canManageOrders() {
         return isManagerOrAdmin();
     }

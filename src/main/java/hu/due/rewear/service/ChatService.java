@@ -2,8 +2,10 @@ package hu.due.rewear.service;
 
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.dao.ChatDao;
+import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.model.ChatMessage;
 import hu.due.rewear.model.ChatRoom;
+import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 
 import java.time.LocalDateTime;
@@ -13,18 +15,27 @@ import java.util.Optional;
 
 /**
  * Element/Matrix-style internal company messaging service supporting group rooms and 1-on-1 direct messages.
+ * Room creation is restricted to {@link RoleCode#SUPER_ADMIN}, {@link RoleCode#ADMIN}, and {@link RoleCode#MANAGER};
+ * {@link RoleCode#SUPER_ADMIN} and {@link RoleCode#ADMIN} are automatically members of every group room.
  */
 public final class ChatService {
 
     private final DatabaseManager db;
     private final ChatDao chatDao;
+    private final UserDao userDao;
 
-    public ChatService(DatabaseManager db, ChatDao chatDao) {
+    public ChatService(DatabaseManager db, ChatDao chatDao, UserDao userDao) {
         this.db = db;
         this.chatDao = chatDao;
+        this.userDao = userDao;
     }
 
     public List<ChatRoom> listRoomsForUser(long userId) {
+        userDao.findById(userId).ifPresent(u -> {
+            if (u.roleCode() == RoleCode.SUPER_ADMIN || u.roleCode() == RoleCode.ADMIN) {
+                chatDao.ensureAdminEnrolledInAllGroupRooms(u.id());
+            }
+        });
         return chatDao.findRoomsForUser(userId);
     }
 
@@ -40,8 +51,19 @@ public final class ChatService {
         return chatDao.countTotalUnreadForUser(userId);
     }
 
-    /** Creates a new group room and adds the creator plus all chosen member user IDs atomically. */
+    /**
+     * Creates a new group room and adds the creator, all {@link RoleCode#SUPER_ADMIN}/{@link RoleCode#ADMIN}
+     * users automatically, plus all chosen member user IDs atomically.
+     */
     public long createRoom(String name, String topic, long creatorId, Collection<Long> memberIds) {
+        User creator = userDao.findById(creatorId)
+                .orElseThrow(() -> new IllegalArgumentException("Creator user not found."));
+        if (creator.roleCode() != RoleCode.SUPER_ADMIN
+                && creator.roleCode() != RoleCode.ADMIN
+                && creator.roleCode() != RoleCode.MANAGER) {
+            throw new IllegalArgumentException(
+                    "Only Super Admin, Admin, and Manager can create chat rooms.");
+        }
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Room name is required.");
         }
@@ -49,11 +71,19 @@ public final class ChatService {
         if (!cleanName.startsWith("#")) {
             cleanName = "#" + cleanName;
         }
+        List<Long> autoAdminIds = userDao.findAll().stream()
+                .filter(u -> u.roleCode() == RoleCode.SUPER_ADMIN || u.roleCode() == RoleCode.ADMIN)
+                .map(User::id)
+                .toList();
+
         final String finalName = cleanName;
         return db.executeInTransaction(conn -> {
             long roomId = chatDao.createRoom(conn, finalName, ChatRoom.TYPE_ROOM,
                     topic != null ? topic.trim() : "", creatorId, LocalDateTime.now());
             chatDao.addMember(conn, roomId, creatorId);
+            for (Long adminId : autoAdminIds) {
+                chatDao.addMember(conn, roomId, adminId);
+            }
             if (memberIds != null) {
                 for (Long uid : memberIds) {
                     if (uid != null) {

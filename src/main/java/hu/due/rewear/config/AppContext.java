@@ -136,7 +136,7 @@ public final class AppContext {
                 : AppPaths.defaultReceiptsDir();
         this.receiptVaultService = new ReceiptVaultService(receiptsDir, invoiceDao);
         this.emailService = new EmailService(databaseManager, emailDao, settingsDao, userDao);
-        this.chatService = new ChatService(databaseManager, chatDao);
+        this.chatService = new ChatService(databaseManager, chatDao, userDao);
         this.transportService = new TransportService(databaseManager, packageDao, locationDao, inventoryService);
         this.backupService = new BackupService(databaseManager);
 

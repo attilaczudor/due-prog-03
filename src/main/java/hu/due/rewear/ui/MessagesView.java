@@ -208,7 +208,8 @@ public final class MessagesView extends JPanel implements NavigableView {
         List<Long> memberIds = ctx.getChatService().listMemberIds(room.id());
         activeRoomTopic.setText((room.topic() != null && !room.topic().isBlank() ? room.topic() + "  |  " : "")
                 + ctx.getI18n().t("chat.members_count", memberIds.size()));
-        addMemberBtn.setEnabled(!room.isDirect());
+        addMemberBtn.setVisible(ctx.getSession().canManageChatRooms());
+        addMemberBtn.setEnabled(ctx.getSession().canManageChatRooms() && !room.isDirect());
 
         List<ChatMessage> msgs = ctx.getChatService().listMessages(room.id());
         StringBuilder sb = new StringBuilder();
@@ -255,7 +256,13 @@ public final class MessagesView extends JPanel implements NavigableView {
         List<Long> boxUserIds = new ArrayList<>();
         for (User u : allUsers) {
             if (u.id() == meId) continue;
-            JCheckBox cb = new JCheckBox(u.displayName() + " (" + i18n.t("role." + u.roleCode().name()) + ")", true);
+            boolean autoAdmin = u.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN
+                    || u.roleCode() == hu.due.rewear.model.RoleCode.ADMIN;
+            JCheckBox cb = new JCheckBox(u.displayName() + " (" + i18n.t("role." + u.roleCode().name())
+                    + (autoAdmin ? " — auto" : "") + ")", true);
+            if (autoAdmin) {
+                cb.setEnabled(false);
+            }
             boxes.add(cb);
             boxUserIds.add(u.id());
             membersBox.add(cb);
@@ -349,6 +356,10 @@ public final class MessagesView extends JPanel implements NavigableView {
     }
 
     private void refreshDataSelecting(long roomIdToSelect) {
+        boolean canManageRooms = ctx.getSession().canManageChatRooms();
+        newRoomBtn.setVisible(canManageRooms);
+        addMemberBtn.setVisible(canManageRooms);
+
         long meId = ctx.getSession().requireCurrentUser().id();
         List<ChatRoom> all = ctx.getChatService().listRoomsForUser(meId);
         updatingSelection = true;
