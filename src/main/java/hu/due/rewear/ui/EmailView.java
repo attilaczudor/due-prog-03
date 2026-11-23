@@ -346,13 +346,22 @@ public final class EmailView extends JPanel implements NavigableView {
                 contacts, externalAllowed, searchPlaceholder, initialCc);
 
         JTextField subjField = new JTextField(initialSubject, 34);
+        subjField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
+        subjField.setPreferredSize(new Dimension(subjField.getPreferredSize().width, 32));
+        subjField.setMinimumSize(new Dimension(0, 32));
         JTextArea bodyArea = new JTextArea(initialBody, 10, 34);
+        bodyArea.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
         bodyArea.setLineWrap(true);
         bodyArea.setWrapStyleWord(true);
         JTextField attachField = new JTextField("", 24);
+        attachField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
         attachField.setEditable(false);
+        attachField.setPreferredSize(new Dimension(attachField.getPreferredSize().width, 32));
+        attachField.setMinimumSize(new Dimension(0, 32));
         JButton browseBtn = new JButton(i18n.t("email.attach"));
         BrutalistStyle.styleSecondaryButton(browseBtn);
+        browseBtn.setPreferredSize(new Dimension(browseBtn.getPreferredSize().width, 32));
+        browseBtn.setMinimumSize(new Dimension(browseBtn.getPreferredSize().width, 32));
         browseBtn.addActionListener(e -> {
             JFileChooser fc = new JFileChooser();
             if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {

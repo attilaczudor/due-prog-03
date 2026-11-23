@@ -74,14 +74,17 @@ public final class RecipientMultiSelectField extends JPanel {
         setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
 
         chipsPanel.setOpaque(false);
+        chipsPanel.setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, ThemeManager.border()));
         chipsPanel.setVisible(false);
         add(chipsPanel, BorderLayout.NORTH);
 
         JPanel inputRow = new JPanel(new BorderLayout(0, 0));
         inputRow.setOpaque(false);
+        inputRow.setPreferredSize(new Dimension(0, 32));
+        inputRow.setMinimumSize(new Dimension(0, 32));
 
         searchField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
-        searchField.setBorder(BorderFactory.createEmptyBorder(5, 8, 5, 6));
+        searchField.setBorder(BorderFactory.createEmptyBorder(4, 8, 4, 6));
         searchField.setBackground(ThemeManager.bg());
         searchField.setForeground(ThemeManager.fg());
         searchField.setCaretColor(ThemeManager.fg());
@@ -90,7 +93,7 @@ public final class RecipientMultiSelectField extends JPanel {
         dropdownBtn.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
         dropdownBtn.setFocusPainted(false);
         dropdownBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        dropdownBtn.setPreferredSize(new Dimension(28, 28));
+        dropdownBtn.setPreferredSize(new Dimension(32, 32));
         dropdownBtn.setMargin(new Insets(0, 0, 0, 0));
         dropdownBtn.setBackground(ThemeManager.bg());
         dropdownBtn.setForeground(ThemeManager.fg());
