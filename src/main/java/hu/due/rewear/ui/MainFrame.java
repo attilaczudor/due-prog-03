@@ -250,7 +250,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             addNavButton(navList, VIEW_PUTAWAY, "nav.putaway");
             addNavButton(navList, VIEW_STAGING, "nav.staging");
         }
-        addNavButton(navList, VIEW_SCANNER, "nav.scanner");
+        if (session.canUseQrScannerStation()) {
+            addNavButton(navList, VIEW_SCANNER, "nav.scanner");
+        }
         addNavButton(navList, VIEW_INVENTORY, "nav.inventory");
 
         if (session.canManageLocationsAndDictionaries()) {

@@ -73,6 +73,11 @@ public final class SessionContext {
         return isManagerOrAdmin() || isForklift();
     }
 
+    /** Forklift Drivers use the dedicated scan-to-collect workflow inside Order Staging instead of the standalone QR Scanner Station. */
+    public boolean canUseQrScannerStation() {
+        return !isForklift();
+    }
+
     /** Only Management/Admins may send or receive external emails; Operators &amp; Forklift Drivers are internal-only. */
     public boolean canUseExternalEmail() {
         return isManagerOrAdmin();
