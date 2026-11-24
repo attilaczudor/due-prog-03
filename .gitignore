@@ -64,6 +64,7 @@ backups/
 # Local planning files (not tracked in public repo)
 PRD.md
 PHASES_AND_TASKS.md
+HANDOVER.md
 
 # OS generated files
 .DS_Store
