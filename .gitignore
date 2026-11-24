@@ -65,6 +65,9 @@ backups/
 PRD.md
 PHASES_AND_TASKS.md
 HANDOVER.md
+ASSIGNMENT_AND_DOCS_BRIEF.md
+graphify-out/
+.agents/
 
 # OS generated files
 .DS_Store
