@@ -8,6 +8,7 @@ import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.PartnerAgingStatement;
 import hu.due.rewear.ui.LogoAssets;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import java.awt.BasicStroke;
@@ -53,7 +54,7 @@ public final class PartnerStatementService {
                                                   List<Invoice> partnerInvoices,
                                                   Map<String, Integer> decByCur,
                                                   LocalDate asOfDate) {
-        LocalDate ref = asOfDate != null ? asOfDate : LocalDate.now();
+        LocalDate ref = asOfDate != null ? asOfDate : BusinessClock.today();
         Map<String, MutableAging> acc = new LinkedHashMap<>();
 
         if (partnerInvoices != null) {

@@ -1,6 +1,7 @@
 package hu.due.rewear.config;
 
 import hu.due.rewear.dao.DaoException;
+import hu.due.rewear.util.BusinessClock;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -15,7 +16,6 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
 import java.util.Set;
@@ -163,7 +163,7 @@ public final class SchemaInitializer {
             }
         }
         if (custCount > 0 && supCount == 0) {
-            String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now());
+            String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(BusinessClock.now());
             try (PreparedStatement ps = conn.prepareStatement("""
                     INSERT INTO customers (name, partner_type, contact_name, email, phone, address, tax_number, country_code, preferred_currency, active, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?)
@@ -239,7 +239,7 @@ public final class SchemaInitializer {
                 }
                 if (!hasForklift) {
                     String hash = BCrypt.hashpw("forklift123", BCrypt.gensalt(10));
-                    String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now());
+                    String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(BusinessClock.now());
                     try (PreparedStatement ps = conn.prepareStatement(
                             "INSERT INTO users (username, password_hash, full_name, last_name, first_name, email, role_id, active, created_at) "
                                     + "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)")) {
@@ -421,7 +421,7 @@ public final class SchemaInitializer {
         }
         if (!hasSuperAdmin) {
             String hash = BCrypt.hashpw("superadmin123", BCrypt.gensalt(10));
-            String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(LocalDateTime.now());
+            String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(BusinessClock.now());
             try (PreparedStatement ps = conn.prepareStatement(
                     "INSERT INTO users (username, password_hash, full_name, last_name, first_name, role_id, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)")) {
                 ps.setString(1, "superadmin");

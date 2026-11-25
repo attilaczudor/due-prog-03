@@ -8,15 +8,20 @@ import hu.due.rewear.model.EmailMessage;
 import hu.due.rewear.model.EmailSettings;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
+import hu.due.rewear.util.BusinessClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Coordinates corporate email addresses, Super-Admin SMTP/IMAP gateway settings,
@@ -31,14 +36,42 @@ public final class EmailService {
     private final SettingsDao settingsDao;
     private final UserDao userDao;
     private final SessionContext session;
+    private final MailAttachmentVault attachmentVault;
 
     public EmailService(DatabaseManager db, EmailDao emailDao, SettingsDao settingsDao, UserDao userDao,
-                        SessionContext session) {
+                        SessionContext session, MailAttachmentVault attachmentVault) {
         this.db = db;
         this.emailDao = emailDao;
         this.settingsDao = settingsDao;
         this.userDao = userDao;
         this.session = session;
+        this.attachmentVault = attachmentVault;
+    }
+
+    /**
+     * Resolves a message's attachment to a file that is safe to open, or empty when the file is gone,
+     * outside the vault, or not one of the allowed document types.
+     */
+    public Optional<Path> resolveAttachment(EmailMessage message) {
+        return message == null ? Optional.empty() : attachmentVault.resolve(message.attachmentPath());
+    }
+
+    /**
+     * Copies a caller-supplied attachment into the vault and returns the path to store on the mail row.
+     * A path that is already inside the vault is kept as it is. Returns {@code null} for no attachment.
+     */
+    private String storeAttachment(String attachmentPath) {
+        if (attachmentPath == null || attachmentPath.isBlank()) {
+            return null;
+        }
+        if (attachmentVault.contains(attachmentPath)) {
+            return attachmentPath;
+        }
+        try {
+            return attachmentVault.store(Path.of(attachmentPath));
+        } catch (IOException ex) {
+            throw new UncheckedIOException("Could not attach the file: " + ex.getMessage(), ex);
+        }
     }
 
     public EmailSettings getSettings() {
@@ -120,22 +153,30 @@ public final class EmailService {
         }
 
         String status = hasExternal ? "SIMULATED (EXTERNAL SMTP)" : "DELIVERED (INTERNAL)";
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
 
+        // Copy the attachment only now, after every check that can reject the message, so a refused
+        // send never leaves a file behind. The Sent copy and every Inbox copy share the stored file.
+        final String storedAttachment = storeAttachment(attachmentPath);
         final boolean externalFlag = hasExternal;
-        db.runInTransaction(conn -> {
-            // 1. Sender's SENT folder copy
-            emailDao.insert(conn, sender.id(), EmailMessage.FOLDER_SENT,
-                    fromAddr, toRaw.trim(), ccRaw != null ? ccRaw.trim() : "",
-                    cleanSubject, cleanBody, attachmentPath, true, externalFlag, status, now);
-
-            // 2. Deliver immediately to every matching internal teammate's INBOX
-            for (User recipient : internalTargets) {
-                emailDao.insert(conn, recipient.id(), EmailMessage.FOLDER_INBOX,
+        try {
+            db.runInTransaction(conn -> {
+                // 1. Sender's SENT folder copy
+                emailDao.insert(conn, sender.id(), EmailMessage.FOLDER_SENT,
                         fromAddr, toRaw.trim(), ccRaw != null ? ccRaw.trim() : "",
-                        cleanSubject, cleanBody, attachmentPath, false, false, "DELIVERED", now);
-            }
-        });
+                        cleanSubject, cleanBody, storedAttachment, true, externalFlag, status, now);
+
+                // 2. Deliver immediately to every matching internal teammate's INBOX
+                for (User recipient : internalTargets) {
+                    emailDao.insert(conn, recipient.id(), EmailMessage.FOLDER_INBOX,
+                            fromAddr, toRaw.trim(), ccRaw != null ? ccRaw.trim() : "",
+                            cleanSubject, cleanBody, storedAttachment, false, false, "DELIVERED", now);
+                }
+            });
+        } catch (RuntimeException ex) {
+            discardIfUnreferenced(storedAttachment);
+            throw ex;
+        }
         return hasExternal;
     }
 
@@ -144,10 +185,16 @@ public final class EmailService {
         String fromAddr = (owner.email() != null && !owner.email().isBlank())
                 ? owner.email().trim()
                 : cfg.generateUserEmail(owner.safeFirstName(), owner.safeLastName(), owner.username());
-        db.runInTransaction(conn -> emailDao.insert(conn, owner.id(), EmailMessage.FOLDER_DRAFTS,
-                fromAddr, toRaw != null ? toRaw.trim() : "", ccRaw != null ? ccRaw.trim() : "",
-                subject != null ? subject.trim() : "", body != null ? body : "",
-                attachmentPath, true, false, "DRAFT", LocalDateTime.now()));
+        final String storedAttachment = storeAttachment(attachmentPath);
+        try {
+            db.runInTransaction(conn -> emailDao.insert(conn, owner.id(), EmailMessage.FOLDER_DRAFTS,
+                    fromAddr, toRaw != null ? toRaw.trim() : "", ccRaw != null ? ccRaw.trim() : "",
+                    subject != null ? subject.trim() : "", body != null ? body : "",
+                    storedAttachment, true, false, "DRAFT", BusinessClock.now()));
+        } catch (RuntimeException ex) {
+            discardIfUnreferenced(storedAttachment);
+            throw ex;
+        }
     }
 
     /** Simulates an incoming external email (e.g. from a B2B customer/supplier via IMAP) into {@code recipient}'s Inbox. */
@@ -165,7 +212,7 @@ public final class EmailService {
                 : cfg.generateUserEmail(recipient.safeFirstName(), recipient.safeLastName(), recipient.username());
         String status = "SIMULATED (EXTERNAL IMAP)";
         db.runInTransaction(conn -> emailDao.insert(conn, recipient.id(), EmailMessage.FOLDER_INBOX,
-                fromAddress, toAddr, "", subject, body, null, false, true, status, LocalDateTime.now()));
+                fromAddress, toAddr, "", subject, body, null, false, true, status, BusinessClock.now()));
     }
 
     /** Lightweight TCP socket connectivity test for the configured SMTP or IMAP host & port. */
@@ -211,8 +258,22 @@ public final class EmailService {
     public void moveToTrashOrDelete(EmailMessage msg) {
         if (EmailMessage.FOLDER_TRASH.equalsIgnoreCase(msg.folder())) {
             emailDao.deleteById(msg.id());
+            discardIfUnreferenced(msg.attachmentPath());
         } else {
             emailDao.moveToFolder(msg.id(), EmailMessage.FOLDER_TRASH);
+        }
+    }
+
+    /**
+     * Removes a vault file once no mail row references it. The Sent copy and each Inbox copy share one
+     * file, so it must outlive every row but the last. Paths outside the vault are never touched.
+     */
+    private void discardIfUnreferenced(String storedPath) {
+        if (storedPath == null || storedPath.isBlank() || !attachmentVault.contains(storedPath)) {
+            return;
+        }
+        if (emailDao.countByAttachmentPath(storedPath) == 0) {
+            attachmentVault.delete(storedPath);
         }
     }
 

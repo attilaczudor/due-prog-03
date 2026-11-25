@@ -14,6 +14,7 @@ import hu.due.rewear.model.QualityGrade;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.TargetGroup;
 import hu.due.rewear.model.WarehouseLocation;
+import hu.due.rewear.util.BusinessClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -88,7 +89,7 @@ public final class InventoryService {
             throw new IllegalArgumentException("Batch quantity must be between 1 and 50.");
         }
 
-        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        LocalDateTime now = BusinessClock.now().withSecond(0).withNano(0);
         String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
         List<InventoryPackage> previews = new ArrayList<>(quantity);
         Set<String> batchCodes = new HashSet<>();
@@ -150,7 +151,7 @@ public final class InventoryService {
 
     List<Long> insertPreviewedPackages(java.sql.Connection conn, List<InventoryPackage> previews,
                                       WarehouseLocation location, long userId) throws SQLException {
-        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        LocalDateTime now = BusinessClock.now().withSecond(0).withNano(0);
         List<Long> ids = new ArrayList<>(previews.size());
         Set<String> batchCodes = new HashSet<>();
         for (InventoryPackage p : previews) {
@@ -224,7 +225,7 @@ public final class InventoryService {
             throw new IllegalArgumentException("Batch quantity must be between 1 and 50.");
         }
 
-        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        LocalDateTime now = BusinessClock.now().withSecond(0).withNano(0);
         String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
 
         List<Long> createdIds = db.executeInTransaction(conn -> {
@@ -327,7 +328,7 @@ public final class InventoryService {
         if (pkg.status() == PackageStatus.SHIPPED || pkg.status() == PackageStatus.DISCARDED) {
             throw new IllegalStateException("Cannot relocate package with status: " + pkg.status());
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         db.runInTransaction(conn -> {
             packageDao.updateLocation(conn, packageId, newLocationId, now);
             movementDao.insert(
@@ -357,7 +358,7 @@ public final class InventoryService {
         if (packageIds == null || packageIds.isEmpty()) {
             return 0;
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         String auditNote = note != null && !note.isBlank() ? note.trim() : "Bulk relocated via warehouse app";
         int moved = 0;
         for (Long packageId : packageIds) {
@@ -382,7 +383,7 @@ public final class InventoryService {
     public void verifyStocktake(long packageId, String note, long userId) {
         InventoryPackage pkg = packageDao.findById(packageId)
                 .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         db.runInTransaction(conn -> movementDao.insert(
                 conn,
                 packageId,
@@ -396,7 +397,7 @@ public final class InventoryService {
     }
 
     public InventoryPackage discardPackage(long packageId, String note, long userId) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         db.runInTransaction(conn -> {
             InventoryPackage pkg = packageDao.findById(conn, packageId)
                     .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
@@ -448,7 +449,7 @@ public final class InventoryService {
         }
 
         String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
 
         String finalQr = db.executeInTransaction(conn -> {
             InventoryPackage existing = packageDao.findById(conn, packageId)

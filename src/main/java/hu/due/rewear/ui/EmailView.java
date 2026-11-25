@@ -27,12 +27,12 @@ import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 
 /**
  * Brutalist Monochrome corporate email client supporting internal company delivery
@@ -187,11 +187,16 @@ public final class EmailView extends JPanel implements NavigableView {
             EmailMessage m = getSelectedEmail();
             if (m != null && m.hasAttachment()) {
                 try {
-                    Path p = Path.of(m.attachmentPath());
-                    if (Files.exists(p) && Desktop.isDesktopSupported()) {
-                        Desktop.getDesktop().open(p.toFile());
+                    // The service only returns files inside the attachment vault, or legacy files of an
+                    // allowed document type, so a message can never make the viewer launch a program.
+                    Optional<Path> file = ctx.getEmailService().resolveAttachment(m);
+                    if (file.isEmpty()) {
+                        JOptionPane.showMessageDialog(this, ctx.getI18n().t("email.attachment_missing"),
+                                ctx.getI18n().t("email.attachment"), JOptionPane.INFORMATION_MESSAGE);
+                    } else if (Desktop.isDesktopSupported()) {
+                        Desktop.getDesktop().open(file.get().toFile());
                     } else {
-                        JOptionPane.showMessageDialog(this, m.attachmentPath(),
+                        JOptionPane.showMessageDialog(this, file.get().toString(),
                                 ctx.getI18n().t("email.attachment"), JOptionPane.INFORMATION_MESSAGE);
                     }
                 } catch (Exception ex) {
@@ -249,7 +254,10 @@ public final class EmailView extends JPanel implements NavigableView {
         readerBodyArea.setText(m.body());
         readerBodyArea.setCaretPosition(0);
         if (m.hasAttachment()) {
-            openAttachmentBtn.setText("[PDF] " + Path.of(m.attachmentPath()).getFileName());
+            String attachmentName = Path.of(m.attachmentPath()).getFileName().toString();
+            int dot = attachmentName.lastIndexOf('.');
+            String kind = dot < 0 ? "FILE" : attachmentName.substring(dot + 1).toUpperCase(Locale.ROOT);
+            openAttachmentBtn.setText("[" + kind + "] " + attachmentName);
             openAttachmentBtn.setVisible(true);
         } else {
             openAttachmentBtn.setVisible(false);

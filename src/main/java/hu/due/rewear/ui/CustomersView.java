@@ -11,6 +11,7 @@ import hu.due.rewear.model.Order;
 import hu.due.rewear.model.PartnerAgingStatement;
 import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.service.DocumentPageSource;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
@@ -35,7 +36,6 @@ import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
 import java.awt.Window;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Locale;
@@ -252,7 +252,7 @@ public final class CustomersView extends JPanel implements NavigableView {
         List<Invoice> invs = ctx.getInvoiceDao().findByPartner(sel.id(), sel.name());
         Map<String, Integer> decByCur = ctx.getFinanceConfigDao().decimalPlacesMap();
         PartnerAgingStatement statement = ctx.getPartnerStatementService()
-                .computeStatement(sel, invs, decByCur, LocalDate.now());
+                .computeStatement(sel, invs, decByCur, BusinessClock.today());
         DocumentPageSource doc = ctx.getPartnerStatementService().createPageSource(statement, invs, decByCur);
         Window owner = SwingUtilities.getWindowAncestor(this);
         DocumentPreviewDialog.showDocuments(owner, ctx, List.of(doc), sel.email(),

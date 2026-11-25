@@ -4,6 +4,7 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.ChatMessage;
 import hu.due.rewear.model.ChatRoom;
 import hu.due.rewear.model.RoleCode;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -107,7 +108,7 @@ public final class ChatDao {
             ps.setString(2, roomType);
             ps.setString(3, topic != null ? topic : "");
             ps.setLong(4, createdBy);
-            ps.setString(5, DaoDateUtil.format(createdAt != null ? createdAt : LocalDateTime.now()));
+            ps.setString(5, DaoDateUtil.format(createdAt != null ? createdAt : BusinessClock.now()));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -200,7 +201,7 @@ public final class ChatDao {
             ps.setLong(1, roomId);
             ps.setLong(2, senderId);
             ps.setString(3, body);
-            ps.setString(4, DaoDateUtil.format(createdAt != null ? createdAt : LocalDateTime.now()));
+            ps.setString(4, DaoDateUtil.format(createdAt != null ? createdAt : BusinessClock.now()));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -215,7 +216,7 @@ public final class ChatDao {
         String sql = "UPDATE chat_room_members SET last_read_at = ? WHERE room_id = ? AND user_id = ?";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, DaoDateUtil.format(timestamp != null ? timestamp : LocalDateTime.now()));
+            ps.setString(1, DaoDateUtil.format(timestamp != null ? timestamp : BusinessClock.now()));
             ps.setLong(2, roomId);
             ps.setLong(3, userId);
             ps.executeUpdate();

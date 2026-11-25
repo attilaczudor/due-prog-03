@@ -9,6 +9,8 @@ import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.User;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.NotificationService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -54,6 +56,8 @@ import java.util.function.Supplier;
  * with settings gear + collapse/expand arrow controls, minimal top bar, and CardLayout workspace.
  */
 public final class MainFrame extends JFrame implements LanguageChangeListener, ThemeManager.ThemeChangeListener {
+
+    private static final Logger log = LoggerFactory.getLogger(MainFrame.class);
 
     public static final String VIEW_DASHBOARD = "dashboard";
     public static final String VIEW_TODO = "todo";
@@ -610,8 +614,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             int todoCount = 0;
             if (hasTodo) {
                 int sysCount = ctx.getTodoService().buildSystemTodosFor(me, ctx.getI18n()).size();
-                int openPersonal = (int) ctx.getTodoService().listPersonalTodos(me.id()).stream()
-                        .filter(t -> !t.completed()).count();
+                int openPersonal = ctx.getTodoService().countOpenPersonalTodos(me.id());
                 todoCount = sysCount + openPersonal;
             }
             int putawayCount = hasPutaway ? ctx.getPackageDao().countPutawayQueue() : 0;
@@ -654,7 +657,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                 setNavBadge(VIEW_INVOICES, snap.overdueInvoices());
             }
         }, err -> {
-            // Silently ignore transient background badge errors
+            // Badges refresh on a timer, so a failure must not interrupt the user with a dialog.
+            // It is still logged, otherwise a stuck badge has no diagnosable cause anywhere.
+            log.debug("Background sidebar badge refresh failed", err);
         });
     }
 
@@ -848,7 +853,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
     }
 
-    private void performLogout() {
+    /**
+     * Signs the current user out and returns to the login screen. Package-private so that
+     * actions which invalidate the session, such as a database restore, can force a fresh login.
+     */
+    void performLogout() {
         autoRefreshTimer.stop();
         ctx.getI18n().removeListener(this);
         ThemeManager.removeListener(this);

@@ -2,6 +2,7 @@ package hu.due.rewear.dao;
 
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.EmailMessage;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -12,6 +13,8 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.Locale;
 
 /**
@@ -100,7 +103,7 @@ public final class EmailDao {
             ps.setInt(9, isRead ? 1 : 0);
             ps.setInt(10, isExternal ? 1 : 0);
             ps.setString(11, deliveryStatus != null ? deliveryStatus : "DELIVERED");
-            ps.setString(12, DaoDateUtil.format(createdAt != null ? createdAt : LocalDateTime.now()));
+            ps.setString(12, DaoDateUtil.format(createdAt != null ? createdAt : BusinessClock.now()));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -108,6 +111,40 @@ public final class EmailDao {
                 }
                 throw new SQLException("No generated key returned for emails insert");
             }
+        }
+    }
+
+    /**
+     * Returns every distinct attachment path stored on any mail row, in any folder (drafts and
+     * trash included). A file is only safe to delete when it is absent from this set.
+     */
+    public Set<String> findAttachmentPaths() {
+        String sql = "SELECT DISTINCT attachment_path FROM emails "
+                + "WHERE attachment_path IS NOT NULL AND attachment_path <> ''";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            Set<String> paths = new HashSet<>();
+            while (rs.next()) {
+                paths.add(rs.getString(1));
+            }
+            return paths;
+        } catch (SQLException e) {
+            throw new DaoException("Failed to list mail attachment paths", e);
+        }
+    }
+
+    /** Counts mail rows, in any folder, whose attachment is exactly {@code attachmentPath}. */
+    public int countByAttachmentPath(String attachmentPath) {
+        String sql = "SELECT COUNT(*) FROM emails WHERE attachment_path = ?";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, attachmentPath);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to count mail rows for an attachment", e);
         }
     }
 

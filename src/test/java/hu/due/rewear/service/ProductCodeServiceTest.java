@@ -1,6 +1,7 @@
 package hu.due.rewear.service;
 
 import hu.due.rewear.model.ParsedProductCode;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
@@ -69,6 +70,6 @@ class ProductCodeServiceTest {
         assertFalse(service.isValid("NOT-A-VALID-CODE"));
 
         assertThrows(IllegalArgumentException.class, () ->
-                service.buildCode(LocalDateTime.now(), "L-1", "TSH", "A", "A", BigDecimal.TEN, "AF"));
+                service.buildCode(BusinessClock.now(), "L-1", "TSH", "A", "A", BigDecimal.TEN, "AF"));
     }
 }

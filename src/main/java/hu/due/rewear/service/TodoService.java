@@ -8,15 +8,14 @@ import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.Invoice;
-import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
-import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PersonalTodo;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.SystemTodoItem;
 import hu.due.rewear.model.User;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.ui.MainFrame;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import java.math.BigDecimal;
@@ -134,7 +133,7 @@ public final class TodoService {
             });
         }
         // P3: Daily intake shortcut
-        long todayCount = packageDao.countCreatedOnDate(LocalDate.now());
+        long todayCount = packageDao.countCreatedOnDate(BusinessClock.today());
         items.add(new SystemTodoItem(
                 3, "P3", i18n.t("todo.cat.intake"),
                 i18n.t("todo.sys.today_intake", todayCount),
@@ -145,9 +144,7 @@ public final class TodoService {
 
     private void appendManagementTodos(List<SystemTodoItem> items, I18nManager i18n) {
         // P1: Overdue Invoices
-        List<Invoice> overdue = invoiceDao.findAll().stream()
-                .filter(inv -> inv.status() == InvoiceStatus.OVERDUE)
-                .toList();
+        List<Invoice> overdue = invoiceDao.findOverdue();
         for (Invoice inv : overdue) {
             String amt = hu.due.rewear.model.CurrencyDef.formatAmount(
                     inv.grossAmount(), inv.effectiveCurrencyCode(), inv.currencyDecimals());
@@ -161,10 +158,7 @@ public final class TodoService {
 
         // P2: Active orders (DRAFT/PACKING) — distinguish Ready-to-Ship (all at DOCK) vs Awaiting Staging
         List<TransportService.StagingTask> staging = transportService.findOrderStagingTasks();
-        for (Order ord : orderDao.findAll()) {
-            if (ord.status() != OrderStatus.DRAFT && ord.status() != OrderStatus.PACKING) {
-                continue;
-            }
+        for (Order ord : orderDao.findOpenOrders()) {
             List<TransportService.StagingTask> ordTasks = staging.stream()
                     .filter(t -> t.orderId() == ord.id()).toList();
             if (ord.isCustomerArrived()) {
@@ -222,6 +216,15 @@ public final class TodoService {
 
     public List<PersonalTodo> listPersonalTodos(long userId) {
         return todoDao.findByUser(userId);
+    }
+
+    /**
+     * Counts a user's open personal to-dos without loading them.
+     * <p>
+     * Used by the sidebar badge refresh, which runs on a timer and only needs the number.
+     */
+    public int countOpenPersonalTodos(long userId) {
+        return todoDao.countOpenByUser(userId);
     }
 
     public long addPersonalTodo(long userId, String title, String priority, LocalDate dueDate) {

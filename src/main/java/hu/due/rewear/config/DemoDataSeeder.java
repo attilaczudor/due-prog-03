@@ -32,6 +32,7 @@ import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import hu.due.rewear.service.ProductCodeService;
+import hu.due.rewear.util.BusinessClock;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,7 +108,7 @@ public final class DemoDataSeeder {
         User manager = users.stream().filter(u -> "manager".equalsIgnoreCase(u.username())).findFirst().orElse(superAdmin);
         User operator = users.stream().filter(u -> "operator".equalsIgnoreCase(u.username())).findFirst().orElse(superAdmin);
         User forklift = users.stream().filter(u -> "forklift".equalsIgnoreCase(u.username())).findFirst().orElse(superAdmin);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
 
         if (emailDao.countAll() == 0) {
             db.runInTransaction(conn -> {
@@ -207,8 +208,8 @@ public final class DemoDataSeeder {
             }
         }
         BigDecimal vat27 = new BigDecimal("27.00");
-        LocalDate today = LocalDate.now();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDate today = BusinessClock.today();
+        LocalDateTime now = BusinessClock.now();
 
         db.runInTransaction(conn -> {
             // Outgoing invoices linked to shipped/active demo orders
@@ -297,7 +298,7 @@ public final class DemoDataSeeder {
     }
 
     private void seedAll(Connection conn) throws SQLException {
-        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        LocalDateTime now = BusinessClock.now().withSecond(0).withNano(0);
 
         // 1. Roles
         long superAdminRoleId = roleDao.insert(conn, RoleCode.SUPER_ADMIN, "Super Administrator");

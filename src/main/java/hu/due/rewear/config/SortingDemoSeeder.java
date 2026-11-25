@@ -4,13 +4,13 @@ import hu.due.rewear.dao.RoleDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
+import hu.due.rewear.util.BusinessClock;
 import org.mindrot.jbcrypt.BCrypt;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 
@@ -78,7 +78,7 @@ final class SortingDemoSeeder {
         long sorterRole = roles.findByCode(RoleCode.SORTER).orElseThrow().id();
         long helperRole = roles.findByCode(RoleCode.SORTING_HELPER).orElseThrow().id();
         long driverRole = driver.get().roleId();
-        var now = LocalDateTime.now();
+        var now = BusinessClock.now();
         String sortHash = BCrypt.hashpw("sorter123", BCrypt.gensalt(10));
         String helperHash = BCrypt.hashpw("helper123", BCrypt.gensalt(10));
         String driverHash = BCrypt.hashpw("forklift2123", BCrypt.gensalt(10));

@@ -6,6 +6,7 @@ import hu.due.rewear.config.AppPreferences;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.service.MailExportJanitor;
 import hu.due.rewear.ui.LoginFrame;
 import hu.due.rewear.ui.LogoAssets;
 import hu.due.rewear.ui.MainFrame;
@@ -17,6 +18,8 @@ import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import java.nio.file.Files;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
 import java.util.concurrent.ExecutionException;
 
@@ -26,6 +29,9 @@ import java.util.concurrent.ExecutionException;
 public final class App {
 
     private static final Logger LOG = LoggerFactory.getLogger(App.class);
+
+    /** Days an {@code exports/mail-*} attachment staging folder is kept before startup prunes it. */
+    private static final int MAIL_EXPORT_RETENTION_DAYS = 7;
 
     private App() {
     }
@@ -46,7 +52,9 @@ public final class App {
         new SwingWorker<AppContext, AppContext.StartupStep>() {
             @Override protected AppContext doInBackground() throws Exception {
                 Files.createDirectories(AppPaths.exportsDir());
-                return new AppContext(new DatabaseManager(), preferences, i18n, this::publish);
+                AppContext context = new AppContext(new DatabaseManager(), preferences, i18n, this::publish);
+                pruneAbandonedMailExports(context);
+                return context;
             }
 
             @Override protected void process(List<AppContext.StartupStep> steps) {
@@ -65,6 +73,27 @@ public final class App {
                 }
             }
         }.execute();
+    }
+
+    /**
+     * Housekeeping for e-mail attachment storage. Runs after the context exists so the mail table is
+     * guaranteed to be there, and never blocks startup if it fails.
+     * <ul>
+     *   <li>{@code exports/mail-*} staging folders are removed once old and unreferenced. Messages sent
+     *       before the attachment vault existed still point into them, so those stay protected.</li>
+     *   <li>Vault files no mail row references are removed after a day, which covers a copy made just
+     *       before a crash or database error.</li>
+     * </ul>
+     */
+    private static void pruneAbandonedMailExports(AppContext context) {
+        try {
+            var referenced = context.getEmailDao().findAttachmentPaths();
+            MailExportJanitor.pruneUnreferenced(AppPaths.exportsDir(), referenced,
+                    Duration.ofDays(MAIL_EXPORT_RETENTION_DAYS), Instant.now());
+            context.getMailAttachmentVault().pruneUnreferenced(referenced, Duration.ofDays(1), Instant.now());
+        } catch (RuntimeException ex) {
+            LOG.debug("Skipped mail attachment housekeeping", ex);
+        }
     }
 
     private static void showStartupError(I18nManager i18n, Throwable ex) {

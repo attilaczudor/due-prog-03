@@ -16,6 +16,7 @@ import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -24,7 +25,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -58,7 +58,7 @@ class InvoiceAndReversibleOrderTest {
         var tax = ctx.getFinanceConfigDao().findTaxTypeByCode("HU-5").orElseThrow();
         var supplier = new InvoiceService.ManualPartner(null, "Manual supplier", "TEST-2345", "", "", "HU", false);
         Path receipt = Files.writeString(tempDir.resolve("receipt.pdf"), "%PDF-1.4\n", StandardCharsets.US_ASCII);
-        var today = LocalDate.now();
+        var today = BusinessClock.today();
         var expense = new InvoiceService.ManualEntry(InvoiceDirection.INCOMING, InvoiceCategory.OTHER_EXPENSE,
                 "EXP-RECEIPT-1", supplier, List.of(), new BigDecimal("100.00"), tax, "EUR",
                 today, today, InvoiceStatus.ISSUED, userId, receipt);
@@ -192,8 +192,8 @@ class InvoiceAndReversibleOrderTest {
                 "fuvar",
                 new BigDecimal("100.00"),
                 new BigDecimal("27.00"),
-                LocalDate.now(),
-                LocalDate.now().plusDays(14),
+                BusinessClock.today(),
+                BusinessClock.today().plusDays(14),
                 InvoiceStatus.ISSUED,
                 userId
         );

@@ -15,6 +15,7 @@ import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.util.BusinessClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -74,7 +75,7 @@ public final class OrderService {
     }
 
     public Order createOrder(long customerId, String currencyCode, String notes, long userId) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         String cur = (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR";
         String cleanNotes = notes != null && !notes.isBlank() ? notes.trim() : null;
         long orderId = db.executeInTransaction(conn -> {
@@ -128,7 +129,7 @@ public final class OrderService {
                 }
             }
             long id = orderDao.insert(conn, orderDao.generateNextOrderNumber(conn), customerId, OrderStatus.DRAFT, code,
-                    BigDecimal.ZERO, BigDecimal.ZERO, null, userId, LocalDateTime.now(), null);
+                    BigDecimal.ZERO, BigDecimal.ZERO, null, userId, BusinessClock.now(), null);
             orderDao.updateDeliveryDate(conn, id, date);
             if (source != null) demand.setSource(conn, id, source, externalId);
             for (var entry : products.entrySet()) {
@@ -199,7 +200,7 @@ public final class OrderService {
                 }
                 planned.addAll(available);
             }
-            LocalDateTime now = LocalDateTime.now();
+            LocalDateTime now = BusinessClock.now();
             for (long packageId : planned) {
                 reservePackage(conn, order, packageDao.findById(conn, packageId).orElseThrow(), null, userId, now);
             }
@@ -247,7 +248,7 @@ public final class OrderService {
     }
 
     public Order addPackageToOrder(long orderId, long packageId, BigDecimal customPricePerKg, long userId) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         InventoryPackage pkg = db.executeInTransaction(conn -> {
             Order order = orderDao.findById(conn, orderId)
                     .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
@@ -349,7 +350,7 @@ public final class OrderService {
 
     /** Marks that the customer has arrived on site for pickup and alerts Managers &amp; the assigned Forklift Driver. */
     public Order markCustomerArrived(long orderId) {
-        boolean recorded = orderDao.recordCustomerArrival(orderId, LocalDateTime.now());
+        boolean recorded = orderDao.recordCustomerArrival(orderId, BusinessClock.now());
         Order updated = orderDao.findById(orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
         if (!recorded && (updated.status() == OrderStatus.SHIPPED || updated.status() == OrderStatus.CANCELLED)) {
@@ -407,7 +408,7 @@ public final class OrderService {
             orderItemDao.markHandoverScanned(conn, match.id(), true);
             movementDao.insert(conn, match.packageId(), MovementType.SCAN_VERIFY,
                     pkg.locationId(), pkg.locationId(), managerUserId,
-                    "Customer handover scan verified for " + order.orderNumber(), LocalDateTime.now());
+                    "Customer handover scan verified for " + order.orderNumber(), BusinessClock.now());
             return orderItemDao.findByOrderId(conn, orderId).stream()
                     .filter(item -> item.id() == match.id()).findFirst().orElseThrow();
         });
@@ -525,7 +526,7 @@ public final class OrderService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Order item not found: " + orderItemId));
         InventoryPackage pkg = packageDao.findById(target.packageId()).orElseThrow();
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
 
         db.runInTransaction(conn -> {
             orderItemDao.deleteById(conn, orderItemId);
@@ -552,7 +553,7 @@ public final class OrderService {
     }
 
     private Order changeOrderStatus(long orderId, OrderStatus targetStatus, long userId, boolean verifiedHandover) {
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         return db.executeInTransaction(conn -> {
             Order order = orderDao.findById(conn, orderId)
                     .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));

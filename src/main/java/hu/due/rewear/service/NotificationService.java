@@ -8,6 +8,7 @@ import hu.due.rewear.i18n.I18nManager.ExternalSourceStatus;
 import hu.due.rewear.model.AppNotification;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
+import hu.due.rewear.util.BusinessClock;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -59,7 +60,7 @@ public final class NotificationService {
         if (recipients.isEmpty()) {
             return 0;
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         db.runInTransaction(conn -> {
             for (User u : recipients) {
                 notificationDao.insert(conn, u.id(), category, title, message, targetView, now);
@@ -70,13 +71,13 @@ public final class NotificationService {
     }
 
     public void notifyUser(long userId, String category, String title, String message, String targetView) {
-        db.runInTransaction(conn -> notificationDao.insert(conn, userId, category, title, message, targetView, LocalDateTime.now()));
+        db.runInTransaction(conn -> notificationDao.insert(conn, userId, category, title, message, targetView, BusinessClock.now()));
         fireChanged();
     }
 
     void record(java.sql.Connection conn, long userId, String category, String title, String message,
                 String targetView) throws java.sql.SQLException {
-        notificationDao.insert(conn, userId, category, title, message, targetView, LocalDateTime.now());
+        notificationDao.insert(conn, userId, category, title, message, targetView, BusinessClock.now());
     }
 
     void publishCommitted() {

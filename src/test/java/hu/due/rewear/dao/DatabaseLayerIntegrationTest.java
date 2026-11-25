@@ -14,6 +14,7 @@ import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.ProductCodeService;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -120,14 +121,14 @@ class DatabaseLayerIntegrationTest {
         assertThrows(DaoException.class, () -> db.runInTransaction(conn ->
                 packageDao.insert(conn, "2026-11-12-11-23-L-TSH-A-A-25-3F",
                         tgId, gtId, qgId, ptId, loc.id(), BigDecimal.TEN, "3F",
-                        PackageStatus.IN_STOCK, null, admin.id(), LocalDateTime.now())
+                        PackageStatus.IN_STOCK, null, admin.id(), BusinessClock.now())
         ));
 
         // Invalid FK (non-existent location ID 99999) fails because PRAGMA foreign_keys = ON
         assertThrows(DaoException.class, () -> db.runInTransaction(conn ->
                 packageDao.insert(conn, "2026-11-20-17-20-L-TSH-A-A-10-AA",
                         tgId, gtId, qgId, ptId, 99999L, BigDecimal.TEN, "AA",
-                        PackageStatus.IN_STOCK, null, admin.id(), LocalDateTime.now())
+                        PackageStatus.IN_STOCK, null, admin.id(), BusinessClock.now())
         ));
     }
 

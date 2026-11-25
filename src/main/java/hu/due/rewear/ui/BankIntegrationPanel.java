@@ -7,6 +7,7 @@ import hu.due.rewear.dao.BankLedgerDao.AccountBalance;
 import hu.due.rewear.dao.BankLedgerDao.Transaction;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
+import hu.due.rewear.util.BusinessClock;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -186,7 +187,7 @@ final class BankIntegrationPanel extends JPanel {
         }
         form.add(new JLabel(t("currency.label")));
         form.add(currencies);
-        var date = field(form, "bank.opening_date", (account == null ? LocalDate.now() : account.openingDate()).toString());
+        var date = field(form, "bank.opening_date", (account == null ? BusinessClock.today() : account.openingDate()).toString());
         var opening = field(form, "bank.opening_balance", account == null ? "0" : account.openingBalance().toPlainString());
         String title = t(account == null ? "bank.add_account" : "bank.edit_account");
         while (confirm(form, title)) {
@@ -205,7 +206,7 @@ final class BankIntegrationPanel extends JPanel {
 
     private void addMovement(Account account) {
         var form = new JPanel(new GridLayout(0, 2, 8, 8));
-        var date = field(form, "bank.booking_date", LocalDate.now().toString());
+        var date = field(form, "bank.booking_date", BusinessClock.today().toString());
         var amount = field(form, "bank.signed_amount", "");
         var counterparty = field(form, "bank.counterparty", "");
         var reference = field(form, "bank.transaction_reference", "");

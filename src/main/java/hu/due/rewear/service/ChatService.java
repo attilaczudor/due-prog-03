@@ -7,6 +7,7 @@ import hu.due.rewear.model.ChatMessage;
 import hu.due.rewear.model.ChatRoom;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
+import hu.due.rewear.util.BusinessClock;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -79,7 +80,7 @@ public final class ChatService {
         final String finalName = cleanName;
         return db.executeInTransaction(conn -> {
             long roomId = chatDao.createRoom(conn, finalName, ChatRoom.TYPE_ROOM,
-                    topic != null ? topic.trim() : "", creatorId, LocalDateTime.now());
+                    topic != null ? topic.trim() : "", creatorId, BusinessClock.now());
             chatDao.addMember(conn, roomId, creatorId);
             for (Long adminId : autoAdminIds) {
                 chatDao.addMember(conn, roomId, adminId);
@@ -107,7 +108,7 @@ public final class ChatService {
         String dmName = me.displayName() + " ↔ " + other.displayName();
         return db.executeInTransaction(conn -> {
             long roomId = chatDao.createRoom(conn, dmName, ChatRoom.TYPE_DIRECT,
-                    "Direct Message", me.id(), LocalDateTime.now());
+                    "Direct Message", me.id(), BusinessClock.now());
             chatDao.addMember(conn, roomId, me.id());
             chatDao.addMember(conn, roomId, other.id());
             return roomId;
@@ -122,13 +123,13 @@ public final class ChatService {
         if (body == null || body.isBlank()) {
             throw new IllegalArgumentException("Message text cannot be empty.");
         }
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
         long msgId = db.executeInTransaction(conn -> chatDao.insertMessage(conn, roomId, senderId, body.trim(), now));
         chatDao.markRoomRead(roomId, senderId, now);
         return msgId;
     }
 
     public void markRoomRead(long roomId, long userId) {
-        chatDao.markRoomRead(roomId, userId, LocalDateTime.now());
+        chatDao.markRoomRead(roomId, userId, BusinessClock.now());
     }
 }

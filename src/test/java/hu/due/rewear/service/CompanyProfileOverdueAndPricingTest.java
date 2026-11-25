@@ -15,6 +15,7 @@ import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageStatus;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -92,7 +93,7 @@ class CompanyProfileOverdueAndPricingTest {
                 "Alpine Buyer GmbH", "ATU68219034", "1010 Wien", "ap@alpine.at",
                 "Export Bales", new BigDecimal("100"), "kg", new BigDecimal("5.00"),
                 BigDecimal.ZERO, "EU-0", "EUR",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, adminId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.ISSUED, adminId);
 
         Path pdf = tempDir.resolve("custom-company-invoice.pdf");
         ctx.getInvoicePdfExporter().export(inv, ctx.getInvoiceService().findItems(inv.id()), pdf);

@@ -3,6 +3,7 @@ package hu.due.rewear.dao;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.RoleCode;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -30,8 +31,9 @@ public final class RoleModulePermissionDao {
         String findRoleSql = "SELECT id, code FROM roles";
         String insertSql = """
                 INSERT OR IGNORE INTO role_module_permissions (role_id, module_code, enabled, updated_at)
-                VALUES (?, ?, ?, datetime('now'))
+                VALUES (?, ?, ?, ?)
                 """;
+        String stamp = DaoDateUtil.format(BusinessClock.now());
         try (Connection conn = db.getConnection();
              PreparedStatement rolePs = conn.prepareStatement(findRoleSql);
              ResultSet rs = rolePs.executeQuery();
@@ -48,6 +50,7 @@ public final class RoleModulePermissionDao {
                     insPs.setLong(1, roleId);
                     insPs.setString(2, mod.name());
                     insPs.setInt(3, mod.defaultEnabledFor(roleCode) ? 1 : 0);
+                    insPs.setString(4, stamp);
                     insPs.addBatch();
                 }
             }
@@ -105,16 +108,17 @@ public final class RoleModulePermissionDao {
     public void setEnabled(RoleCode roleCode, AppModule module, boolean enabled) {
         String sql = """
                 INSERT INTO role_module_permissions (role_id, module_code, enabled, updated_at)
-                VALUES ((SELECT id FROM roles WHERE code = ?), ?, ?, datetime('now'))
+                VALUES ((SELECT id FROM roles WHERE code = ?), ?, ?, ?)
                 ON CONFLICT(role_id, module_code) DO UPDATE SET
                     enabled = excluded.enabled,
-                    updated_at = datetime('now')
+                    updated_at = excluded.updated_at
                 """;
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, roleCode.name());
             ps.setString(2, module.name());
             ps.setInt(3, enabled ? 1 : 0);
+            ps.setString(4, DaoDateUtil.format(BusinessClock.now()));
             ps.executeUpdate();
         } catch (SQLException e) {
             throw new DaoException("Failed to update module permission " + roleCode + "/" + module, e);

@@ -8,6 +8,7 @@ import hu.due.rewear.model.Role;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.User;
+import hu.due.rewear.util.BusinessClock;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -43,7 +44,6 @@ import java.awt.event.MouseEvent;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
@@ -486,7 +486,7 @@ public final class AdminView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         JFileChooser chooser = new JFileChooser();
         chooser.setFileFilter(new FileNameExtensionFilter("SQLite Database (*.db)", "db"));
-        chooser.setSelectedFile(new File("rewear-backup-" + FILE_TS.format(LocalDateTime.now()) + ".db"));
+        chooser.setSelectedFile(new File("rewear-backup-" + FILE_TS.format(BusinessClock.now()) + ".db"));
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         File file = chooser.getSelectedFile();
         Path target = file.getName().toLowerCase().endsWith(".db") ? file.toPath() : Path.of(file.getAbsolutePath() + ".db");
@@ -512,9 +512,15 @@ public final class AdminView extends JPanel implements NavigableView {
         try {
             ctx.getBackupService().restoreDatabase(chooser.getSelectedFile().toPath());
             new SchemaInitializer(ctx.getDatabaseManager()).initialize();
-            refreshData();
             JOptionPane.showMessageDialog(this, i18n.t("admin.db.restored"),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+            // The session still holds the user as they were before the restore. The backup may lack
+            // that account or give it another role, so require a fresh login against the restored data.
+            if (SwingUtilities.getWindowAncestor(this) instanceof MainFrame frame) {
+                frame.performLogout();
+            } else {
+                refreshData();
+            }
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }

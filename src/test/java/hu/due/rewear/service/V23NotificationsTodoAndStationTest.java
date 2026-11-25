@@ -13,12 +13,12 @@ import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.SystemTodoItem;
 import hu.due.rewear.model.User;
 import hu.due.rewear.model.WarehouseLocation;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.math.BigDecimal;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -105,7 +105,7 @@ class V23NotificationsTodoAndStationTest {
         User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
         User operator = ctx.getUserDao().findByUsername("operator").orElseThrow();
 
-        long id1 = ctx.getTodoService().addPersonalTodo(forklift.id(), "Check forklift battery", PersonalTodo.PRIO_HIGH, LocalDate.now().plusDays(1));
+        long id1 = ctx.getTodoService().addPersonalTodo(forklift.id(), "Check forklift battery", PersonalTodo.PRIO_HIGH, BusinessClock.today().plusDays(1));
         long id2 = ctx.getTodoService().addPersonalTodo(forklift.id(), "Sweep DOCK-01", PersonalTodo.PRIO_LOW, null);
 
         List<PersonalTodo> fkList = ctx.getTodoService().listPersonalTodos(forklift.id());

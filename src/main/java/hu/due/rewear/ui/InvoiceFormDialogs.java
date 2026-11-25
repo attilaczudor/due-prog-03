@@ -15,6 +15,7 @@ import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.TaxType;
 import hu.due.rewear.service.InvoiceService;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
@@ -47,7 +48,6 @@ import java.awt.Insets;
 import java.awt.Rectangle;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -618,7 +618,7 @@ final class InvoiceFormDialogs {
                     var entry = new InvoiceService.ManualEntry(outgoing ? InvoiceDirection.OUTGOING : InvoiceDirection.INCOMING,
                             category, invoiceNumber.getText(), partner, lines, net, tax,
                             java.util.Objects.toString(currencies.getSelectedItem(), "EUR"),
-                            LocalDate.now(), LocalDate.now().plusDays(14), status, user, receipt);
+                            BusinessClock.today(), BusinessClock.today().plusDays(14), status, user, receipt);
                     return Optional.of(ctx.getInvoiceService().saveManualEntry(entry, ctx.getReceiptVaultService()));
                 } catch (InvoiceService.OrderChangedException ex) {
                     JOptionPane.showMessageDialog(owner, i18n.t("invoice.entry.order_changed"), title, JOptionPane.WARNING_MESSAGE);

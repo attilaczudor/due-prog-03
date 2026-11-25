@@ -6,6 +6,7 @@ import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
+import hu.due.rewear.util.BusinessClock;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -194,15 +195,36 @@ public final class InvoiceDao {
         }
     }
 
+    /**
+     * Indexed lookup of invoices currently in {@code OVERDUE} status, ordered like {@link #findAll()}.
+     * <p>
+     * Used by background to-do and badge computations so they never have to load the full invoice
+     * ledger just to filter it down in Java.
+     */
+    public List<Invoice> findOverdue() {
+        String sql = BASE_SELECT + " WHERE i.status = 'OVERDUE' ORDER BY i.issue_date DESC, i.id DESC";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            List<Invoice> list = new ArrayList<>();
+            while (rs.next()) {
+                list.add(mapInvoice(rs));
+            }
+            return list;
+        } catch (SQLException e) {
+            throw new DaoException("Failed to list overdue invoices", e);
+        }
+    }
+
     public String generateNextInvoiceNumber(Connection conn, InvoiceDirection direction) throws SQLException {
-        int year = LocalDate.now().getYear();
+        int year = BusinessClock.today().getYear();
         String dirTag = direction == InvoiceDirection.OUTGOING ? "OUT" : "IN";
         return nextSequentialNumber(conn, "INV-" + dirTag + "-" + year + "-");
     }
 
     /** Generates the next sequential yearly credit note number ({@code CN-YYYY-NNNN}). */
     public String generateNextCreditNoteNumber(Connection conn) throws SQLException {
-        return nextSequentialNumber(conn, "CN-" + LocalDate.now().getYear() + "-");
+        return nextSequentialNumber(conn, "CN-" + BusinessClock.today().getYear() + "-");
     }
 
     private static String nextSequentialNumber(Connection conn, String prefix) throws SQLException {
@@ -413,7 +435,7 @@ public final class InvoiceDao {
      * before {@code asOfDate} to {@code OVERDUE}, returning the number of updated rows.
      */
     public int markPastDueAsOverdue(LocalDate asOfDate) {
-        LocalDate ref = asOfDate != null ? asOfDate : LocalDate.now();
+        LocalDate ref = asOfDate != null ? asOfDate : BusinessClock.today();
         String sql = "UPDATE invoices SET status = 'OVERDUE' WHERE status = 'ISSUED' AND due_date < ?";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {

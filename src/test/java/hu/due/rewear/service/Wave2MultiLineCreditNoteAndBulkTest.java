@@ -14,6 +14,7 @@ import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.StockValuation;
 import hu.due.rewear.model.WarehouseLocation;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -21,7 +22,6 @@ import org.junit.jupiter.api.io.TempDir;
 import java.math.BigDecimal;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -56,7 +56,7 @@ class Wave2MultiLineCreditNoteAndBulkTest {
                 InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, null, null,
                 "Alpine Second-Hand GmbH", "ATU68219034", "1010 Wien", "office@alpine.at",
                 lines, BigDecimal.ZERO, "EU-0", "EUR",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, adminId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.ISSUED, adminId);
 
         List<InvoiceItem> persisted = ctx.getInvoiceService().findItems(inv.id());
         assertEquals(3, persisted.size());
@@ -74,7 +74,7 @@ class Wave2MultiLineCreditNoteAndBulkTest {
                 "Test Buyer Kft.", "11111111-2-07", "2400 Dunaújváros", "buyer@test.hu",
                 "Mixed Bales", new BigDecimal("10"), "kg", new BigDecimal("2000"),
                 new BigDecimal("27"), "HU-27", "HUF",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, adminId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.ISSUED, adminId);
 
         Invoice cnUnpaid = ctx.getInvoiceService().issueCreditNote(unpaid.id(), adminId);
         assertTrue(cnUnpaid.invoiceNumber().startsWith("CN-"));
@@ -92,7 +92,7 @@ class Wave2MultiLineCreditNoteAndBulkTest {
                 "US Vintage LLC", "US-998877", "New York, NY", "ap@usvintage.com",
                 "Cream Denim", new BigDecimal("50"), "kg", new BigDecimal("10.00"),
                 BigDecimal.ZERO, "EXPORT-0", "USD",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.PAID, adminId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.PAID, adminId);
 
         Invoice cnPaid = ctx.getInvoiceService().issueCreditNote(paidUsd.id(), adminId);
         assertEquals(InvoiceStatus.PAID, ctx.getInvoiceDao().findById(paidUsd.id()).orElseThrow().status());

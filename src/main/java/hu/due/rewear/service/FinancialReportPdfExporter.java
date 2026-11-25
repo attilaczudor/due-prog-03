@@ -7,6 +7,7 @@ import hu.due.rewear.model.FinancialSummary;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.StockValuation;
 import hu.due.rewear.ui.LogoAssets;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import java.awt.BasicStroke;
@@ -16,7 +17,6 @@ import java.awt.Graphics2D;
 import java.awt.RenderingHints;
 import java.io.IOException;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -52,7 +52,7 @@ public final class FinancialReportPdfExporter {
                                                Map<String, Integer> decByCur) {
         List<Invoice> safeInvoices = invoices == null ? List.of() : List.copyOf(invoices);
         int totalPages = computePageCount(safeInvoices.size());
-        LocalDateTime generatedAt = LocalDateTime.now();
+        LocalDateTime generatedAt = BusinessClock.now();
         String safeScope = (scopeLabel == null || scopeLabel.isBlank())
                 ? i18n.t("common.all").toUpperCase(Locale.ROOT)
                 : scopeLabel;
@@ -60,7 +60,7 @@ public final class FinancialReportPdfExporter {
         return new DocumentPageSource() {
             @Override
             public String getDocumentId() {
-                return "financial-pnl-" + LocalDate.now();
+                return "financial-pnl-" + BusinessClock.today();
             }
 
             @Override
@@ -70,7 +70,7 @@ public final class FinancialReportPdfExporter {
 
             @Override
             public String getDefaultFileName() {
-                return "rewear-pnl-report-" + LocalDate.now() + ".pdf";
+                return "rewear-pnl-report-" + BusinessClock.today() + ".pdf";
             }
 
             @Override

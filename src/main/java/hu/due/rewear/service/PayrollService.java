@@ -3,6 +3,7 @@ package hu.due.rewear.service;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.RoleCode;
+import hu.due.rewear.util.BusinessClock;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -11,13 +12,11 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
 
 /** Draft gross payroll inputs and observed production for a selected warehouse work day. */
 public final class PayrollService {
-    private static final ZoneId WAREHOUSE_ZONE = ZoneId.of("Europe/Budapest");
 
     public record Worker(long id, String name, RoleCode role, boolean active, Long monthlyGross, String effectiveFrom) { }
     public record Department(long id, String name, String sortingTeam) { }
@@ -52,7 +51,7 @@ public final class PayrollService {
     }
 
     public LocalDate today() {
-        return LocalDate.now(WAREHOUSE_ZONE);
+        return BusinessClock.today();
     }
 
     public void initializeDepartments() {

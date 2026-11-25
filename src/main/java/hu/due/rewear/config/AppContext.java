@@ -26,6 +26,7 @@ import hu.due.rewear.service.ChatService;
 import hu.due.rewear.service.CsvExportService;
 import hu.due.rewear.service.DeliveryNotePdfExporter;
 import hu.due.rewear.service.EmailService;
+import hu.due.rewear.service.MailAttachmentVault;
 import hu.due.rewear.service.FinancialReportPdfExporter;
 import hu.due.rewear.service.InventoryService;
 import hu.due.rewear.service.InvoicePdfExporter;
@@ -107,6 +108,7 @@ public final class AppContext {
     private final PartnerStatementService partnerStatementService;
     private final ReceiptVaultService receiptVaultService;
     private final EmailService emailService;
+    private final MailAttachmentVault mailAttachmentVault;
     private final ChatService chatService;
     private final TransportService transportService;
     private final NotificationService notificationService;
@@ -136,11 +138,13 @@ public final class AppContext {
         Path dataDir = databaseManager.getDatabasePath().getParent();
         Path receiptsDir = dataDir.resolve("receipts");
         Path invoicesDir = dataDir.resolve("invoices");
+        Path mailAttachmentsDir = dataDir.resolve("mail-attachments");
         try {
             Files.createDirectories(receiptsDir);
             Files.createDirectories(invoicesDir);
+            Files.createDirectories(mailAttachmentsDir);
         } catch (IOException ex) {
-            throw new UncheckedIOException("Could not prepare invoice and receipt storage in " + dataDir, ex);
+            throw new UncheckedIOException("Could not prepare invoice, receipt and mail attachment storage in " + dataDir, ex);
         }
 
         progress.accept(StartupStep.DATABASE);
@@ -188,7 +192,9 @@ public final class AppContext {
         this.financialReportPdfExporter = new FinancialReportPdfExporter(i18n, settingsDao::getCompanyProfile);
         this.partnerStatementService = new PartnerStatementService(i18n, settingsDao::getCompanyProfile);
         this.receiptVaultService = new ReceiptVaultService(receiptsDir, invoiceDao);
-        this.emailService = new EmailService(databaseManager, emailDao, settingsDao, userDao, session);
+        this.mailAttachmentVault = new MailAttachmentVault(mailAttachmentsDir);
+        this.emailService = new EmailService(databaseManager, emailDao, settingsDao, userDao, session,
+                mailAttachmentVault);
         this.chatService = new ChatService(databaseManager, chatDao, userDao);
         this.transportService = new TransportService(databaseManager, packageDao, locationDao, inventoryService);
         this.notificationService = new NotificationService(databaseManager, notificationDao, userDao);
@@ -362,6 +368,10 @@ public final class AppContext {
 
     public ChatDao getChatDao() {
         return chatDao;
+    }
+
+    public MailAttachmentVault getMailAttachmentVault() {
+        return mailAttachmentVault;
     }
 
     public EmailService getEmailService() {

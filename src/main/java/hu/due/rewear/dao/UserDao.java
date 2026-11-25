@@ -3,6 +3,7 @@ package hu.due.rewear.dao;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -87,7 +88,7 @@ public final class UserDao {
     }
 
     public long insert(String username, String passwordHash, String fullName, long roleId, boolean active) {
-        return db.executeInTransaction(conn -> insert(conn, username, passwordHash, fullName, roleId, active, LocalDateTime.now()));
+        return db.executeInTransaction(conn -> insert(conn, username, passwordHash, fullName, roleId, active, BusinessClock.now()));
     }
 
     public long insert(Connection conn, String username, String passwordHash, String fullName,

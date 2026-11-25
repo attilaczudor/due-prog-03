@@ -22,6 +22,7 @@ import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.TaxType;
+import hu.due.rewear.util.BusinessClock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -166,9 +167,9 @@ public final class InvoiceService {
                 .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
         BigDecimal grossAmount = CurrencyDef.roundForScale(netTotal.add(vatAmount), decimals);
 
-        LocalDate today = LocalDate.now();
+        LocalDate today = BusinessClock.today();
         LocalDate dueDate = today.plusDays(14);
-        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime now = BusinessClock.now();
 
         return saveWithDocuments(conn -> {
             Invoice existing = invoiceDao.findByOrderId(conn, order.id()).orElse(null);
@@ -389,7 +390,7 @@ public final class InvoiceService {
                 net.multiply(effectiveVat).divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
         BigDecimal gross = CurrencyDef.roundForScale(net.add(vat), decimals);
 
-        LocalDate effIssue = issueDate != null ? issueDate : LocalDate.now();
+        LocalDate effIssue = issueDate != null ? issueDate : BusinessClock.today();
         LocalDate effDue = dueDate != null ? dueDate : effIssue.plusDays(14);
         InvoiceStatus effStatus = status != null ? status : InvoiceStatus.ISSUED;
         LocalDate paidDate = effStatus == InvoiceStatus.PAID ? effIssue : null;
@@ -404,7 +405,7 @@ public final class InvoiceService {
             long id = invoiceDao.insert(conn, invNo, direction, category, null, partnerId,
                     partnerName.trim(), partner.taxNumber(), partner.address(), partner.email(),
                     effStatus, effIssue, effDue, paidDate, finalNet, effectiveVat, effectiveTaxCode, vat, gross,
-                    cur, CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, LocalDateTime.now());
+                    cur, CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, BusinessClock.now());
             for (ComputedLine cl : computed) {
                 invoiceDao.insertItem(conn, id, cl.desc(), cl.qty(), cl.unit(), cl.unitPrice(), cl.lineNet());
             }
@@ -467,7 +468,7 @@ public final class InvoiceService {
                 throw new IllegalArgumentException("A partner already uses this tax number. Select that partner first.");
             }
             return customerDao.insert(conn, partner.name(), needed, null, partner.email(), null, partner.address(),
-                    partner.taxNumber(), partner.country(), currency, LocalDateTime.now());
+                    partner.taxNumber(), partner.country(), currency, BusinessClock.now());
         }
         Customer existing = customerDao.findById(conn, partner.id())
                 .filter(Customer::active).orElseThrow(() -> new IllegalArgumentException("Select an active partner."));
@@ -507,7 +508,7 @@ public final class InvoiceService {
                     ? (orig.direction() == InvoiceDirection.OUTGOING ? InvoiceDirection.INCOMING : InvoiceDirection.OUTGOING)
                     : orig.direction();
             InvoiceStatus cnStatus = wasPaid ? InvoiceStatus.PAID : InvoiceStatus.CANCELLED;
-            LocalDate today = LocalDate.now();
+            LocalDate today = BusinessClock.today();
             LocalDate paidDate = wasPaid ? today : null;
             if (!wasPaid) {
                 invoiceDao.updateStatus(conn, originalInvoiceId, InvoiceStatus.CANCELLED, null);
@@ -519,7 +520,7 @@ public final class InvoiceService {
                     cnStatus, today, today, paidDate,
                     orig.netAmount(), orig.vatRate(), orig.effectiveTaxTypeCode(),
                     orig.vatAmount(), orig.grossAmount(), orig.effectiveCurrencyCode(),
-                    orig.exchangeRate(), userId, LocalDateTime.now());
+                    orig.exchangeRate(), userId, BusinessClock.now());
             if (origItems.isEmpty()) {
                 invoiceDao.insertItem(conn, id, refPrefix + orig.category().name(),
                         BigDecimal.ONE, "db", orig.netAmount(), orig.netAmount());
@@ -539,7 +540,7 @@ public final class InvoiceService {
         Invoice existing = invoiceDao.findById(invoiceId)
                 .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invoiceId));
         LocalDate paidDate = targetStatus == InvoiceStatus.PAID
-                ? (existing.paidDate() != null ? existing.paidDate() : LocalDate.now())
+                ? (existing.paidDate() != null ? existing.paidDate() : BusinessClock.today())
                 : null;
         invoiceDao.updateStatus(invoiceId, targetStatus, paidDate);
         LOG.info("Invoice {} status changed {} -> {}", existing.invoiceNumber(), existing.status(), targetStatus);
@@ -548,7 +549,7 @@ public final class InvoiceService {
 
     /** Automatically flags all past-due {@code ISSUED} invoices as {@code OVERDUE} relative to today. */
     public int syncOverdueStatuses() {
-        return syncOverdueStatuses(LocalDate.now());
+        return syncOverdueStatuses(BusinessClock.today());
     }
 
     /** Deterministic overload flagging {@code ISSUED} invoices with {@code due_date < asOfDate} as {@code OVERDUE}. */

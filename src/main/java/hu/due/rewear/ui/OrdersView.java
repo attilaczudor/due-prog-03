@@ -13,6 +13,7 @@ import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageFilter;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.service.DocumentPageSource;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
@@ -345,7 +346,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         gbc.gridx = 0; gbc.gridy = 1; form.add(new JLabel(i18n.t("currency.label") + ":"), gbc);
         gbc.gridx = 1; form.add(currencyCombo, gbc);
 
-        var delivery = new JTextField(java.time.LocalDate.now().toString(), 11);
+        var delivery = new JTextField(BusinessClock.today().toString(), 11);
         BrutalistStyle.addFormRow(form, gbc, 2, i18n.t("orders.delivery_date.format"), delivery);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("orders.new_order"),

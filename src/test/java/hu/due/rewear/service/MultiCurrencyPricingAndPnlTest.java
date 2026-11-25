@@ -17,6 +17,7 @@ import hu.due.rewear.model.Order;
 import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.TaxType;
+import hu.due.rewear.util.BusinessClock;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -25,7 +26,6 @@ import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -129,25 +129,25 @@ class MultiCurrencyPricingAndPnlTest {
                 InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "SEP-OUT-EUR", null,
                 "Alpine GmbH", "ATU68219034", "Wien", "office@alpine.at",
                 "Export Lot", BigDecimal.ONE, "lot", new BigDecimal("500.00"), tax0, "EUR",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.PAID, userId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.PAID, userId);
 
         Invoice eurExpense = ctx.getInvoiceService().createManualInvoice(
                 InvoiceDirection.INCOMING, InvoiceCategory.RAW_STOCK_PURCHASE, "SEP-IN-EUR", null,
                 "EuroTex GmbH", "DE294810221", "München", "billing@eurotex.de",
                 "Import Lot", BigDecimal.ONE, "lot", new BigDecimal("200.00"), tax0, "EUR",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.PAID, userId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.PAID, userId);
 
         Invoice hufIncome = ctx.getInvoiceService().createManualInvoice(
                 InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "SEP-OUT-HUF", null,
                 "Duna Vintage Kft.", "24891234-2-07", "Dunaújváros", "marta@dunavintage.hu",
                 "Belföldi tétel", BigDecimal.ONE, "tétel", new BigDecimal("100000"), tax27, "HUF",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.ISSUED, userId);
 
         Invoice usdIncome = ctx.getInvoiceService().createManualInvoice(
                 InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES, "SEP-OUT-USD", null,
                 "US Vintage LLC", "US-991822", "New York", "buy@usvintage.com",
                 "Export Pallet", BigDecimal.ONE, "pallet", new BigDecimal("750.00"), tax0, "USD",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, userId);
+                BusinessClock.today(), BusinessClock.today().plusDays(14), InvoiceStatus.ISSUED, userId);
 
         // Also test creating a US partner with USD currency
         long usPartnerId = ctx.getCustomerDao().insert("US Vintage LLC", PartnerType.CUSTOMER, "John Doe",

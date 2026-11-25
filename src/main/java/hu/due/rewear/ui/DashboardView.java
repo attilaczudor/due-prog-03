@@ -8,6 +8,7 @@ import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.StockValuation;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 import org.knowm.xchart.CategoryChart;
 import org.knowm.xchart.CategoryChartBuilder;
@@ -35,7 +36,6 @@ import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.math.BigDecimal;
-import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -266,7 +266,7 @@ public final class DashboardView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         ctx.getInvoiceService().syncOverdueStatuses();
         StockValuation val = ctx.getPackageDao().sumInStockValuation();
-        int todayIntake = ctx.getPackageDao().countCreatedOnDate(LocalDate.now());
+        int todayIntake = ctx.getPackageDao().countCreatedOnDate(BusinessClock.today());
         int openOrders = ctx.getOrderDao().countOpenOrders();
         int overdueCount = ctx.getInvoiceDao().countOverdue();
 

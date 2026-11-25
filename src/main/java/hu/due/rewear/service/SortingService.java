@@ -6,15 +6,14 @@ import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.*;
+import hu.due.rewear.util.BusinessClock;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.time.Clock;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -71,7 +70,6 @@ public final class SortingService {
     private final InventoryPackageDao packages;
     private final NotificationService notifications;
     private final I18nManager i18n;
-    private final Clock clock = Clock.system(ZoneId.of("Europe/Budapest"));
 
     public SortingService(DatabaseManager db, SessionContext session, DictionaryDao dictionaries,
                           WarehouseLocationDao locations, InventoryService inventory, InventoryPackageDao packages,
@@ -102,7 +100,7 @@ public final class SortingService {
         });
     }
 
-    public LocalDate today() { return LocalDate.now(clock); }
+    public LocalDate today() { return BusinessClock.today(); }
 
     public long receive(String reference, BigDecimal weightKg) {
         User actor = actor();
@@ -447,7 +445,8 @@ public final class SortingService {
         throw new IllegalArgumentException("Enter a bonus percentage between 0 and 100.");
     }
 
-    private String now() { return clock.instant().toString(); }
+    /** Sorting records UTC instants; only the source of "now" is shared with the rest of the app. */
+    private String now() { return BusinessClock.clock().instant().toString(); }
 
     private static Request mapRequest(ResultSet r) throws SQLException {
         return new Request(r.getLong("id"), r.getString("sorter"), r.getString("helper"), r.getString("driver"),

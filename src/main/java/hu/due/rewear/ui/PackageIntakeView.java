@@ -10,6 +10,7 @@ import hu.due.rewear.model.QualityGrade;
 import hu.due.rewear.model.TargetGroup;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.LabelPreset;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 
 import javax.swing.BorderFactory;
@@ -42,7 +43,6 @@ import java.awt.Insets;
 import java.awt.Window;
 import java.awt.image.BufferedImage;
 import java.math.BigDecimal;
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -427,7 +427,7 @@ public final class PackageIntakeView extends JPanel implements NavigableView {
 
         try {
             String code = ctx.getProductCodeService().buildCode(
-                    LocalDateTime.now(), tg.code(), gt.code(), qg.code(), pt.code(), weight, currentHexSuffix
+                    BusinessClock.now(), tg.code(), gt.code(), qg.code(), pt.code(), weight, currentHexSuffix
             );
             generatedCodeValue.setText(code);
             BufferedImage qr = ctx.getQrCodeService().generateQrImage(code, 230);

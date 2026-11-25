@@ -2,6 +2,7 @@ package hu.due.rewear.dao;
 
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.PersonalTodo;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -9,7 +10,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -60,6 +60,25 @@ public final class TodoDao {
         }
     }
 
+    /**
+     * Counts a user's open (not completed) personal to-dos in SQL.
+     * <p>
+     * The sidebar badge refresh runs on a timer, so it counts rows here instead of materialising
+     * every {@link PersonalTodo} just to call {@code size()} on the filtered result.
+     */
+    public int countOpenByUser(long userId) {
+        String sql = "SELECT COUNT(*) FROM user_todos WHERE user_id = ? AND completed = 0";
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getInt(1) : 0;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to count open personal todos for user " + userId, e);
+        }
+    }
+
     public long insert(long userId, String title, String priority, LocalDate dueDate) {
         if (title == null || title.isBlank()) {
             throw new IllegalArgumentException("To-do title is required.");
@@ -75,7 +94,7 @@ public final class TodoDao {
                 ps.setString(2, title.trim());
                 ps.setString(3, prio);
                 ps.setString(4, dueDate != null ? dueDate.toString() : null);
-                ps.setString(5, DaoDateUtil.format(LocalDateTime.now()));
+                ps.setString(5, DaoDateUtil.format(BusinessClock.now()));
                 ps.executeUpdate();
                 try (ResultSet keys = ps.getGeneratedKeys()) {
                     if (keys.next()) {

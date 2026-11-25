@@ -27,7 +27,7 @@ Desktop Java 17 GUI warehouse, QR labeling, scanning, forklift logistics, intern
   - Dedicated **To-Do Center (`Teendők`)** combining prioritized, auto-generated **System To-Dos** (tailored per role with 1-click navigation) and private **Personal To-Dos**.
   - Dedicated **Notifications (`Értesítések`)** feed with automated operational triggers (Operator intake → Forklift Putaway; Order allocation/arrival → Forklift Staging; Dock ready → Manager Handover) and live red sidebar badges.
   - **Element-Style Team Messaging (`Üzenetek`)** with group rooms (`#általános`, `#raktár-logisztika`, custom rooms managed by Manager/Admin/SuperAdmin) and 1-on-1 Direct Messages.
-  - **Corporate Email Client (`E-mail`)** with a collapsible folder rail, searchable **To / CC** fields and attachments. Mail between teammates is delivered locally. Document previews attach their selected PDFs in the built-in composer, where **Open file location** opens the attachment folder. SMTP/IMAP settings support connectivity checks and simulated external delivery. Operators and forklift drivers use internal mail.
+  - **Corporate Email Client (`E-mail`)** with a collapsible folder rail, searchable **To / CC** fields and attachments. Mail between teammates is delivered locally. Document previews attach their selected PDFs in the built-in composer, where **Open file location** opens the attachment folder. On send or save, each attachment is copied into the portable `data/mail-attachments/YYYY/MM/` vault, so a message keeps its file after the original export is moved or cleaned up. Attachments can be PDF, PNG, JPEG, DOCX, XLSX, PPTX, CSV or TXT files up to 25 MB, are checked against their file signature, and are the only kinds the viewer will open. SMTP/IMAP settings support connectivity checks and simulated external delivery. Operators and forklift drivers use internal mail.
 - **B2B Partners (Buyers & Providers), Orders & Native Multi-Currency Invoicing:**
   - Manage buyers (`CUSTOMER`), providers (`SUPPLIER`), or both (`BOTH`) with ISO country codes, preferred currency, and 1-click **Partner Account Statements & 30/60/90-day Aging PDFs**.
   - Separate non-converting currency ledgers (`EUR`, `HUF`, `USD`, or custom currencies), country-aware VAT rules (`HU 27%`, `EU B2B 0%`, `Export 0%`), editable Seller Company Profile with per-currency IBANs, multi-line Outgoing/Incoming invoices, 1-click auditable **Credit Notes** (`CN-YYYY-NNNN`), automatic **`ISSUED → OVERDUE`** sync + localized `mailto:` reminders, portable **Expense Receipt Vault** (`./data/receipts/`), and printable A4 **P&L + Stock Valuation PDF Reports**.
@@ -44,7 +44,7 @@ Desktop Java 17 GUI warehouse, QR labeling, scanning, forklift logistics, intern
   - Double-click an account in **Admin → Users** to open its editor and optionally reset its password. Only Super Admin can edit account email addresses.
   - The menu list scrolls when the window is short. The avatar and sidebar controls stay pinned below it in both sidebar modes.
 - **Brutalist Monochrome Light & Dark Theme & Zero-Refresh Ergonomics:** FlatLaf uses square corners, hairline borders, vector icons, and monospace typography. Admin & Maintenance, Code Dictionaries, and Payments use collapsible secondary menus styled like the Email folder rail. Table header arrows sort columns in either direction. Views load on demand and refresh automatically, with heavy work off the Swing event thread. Global shortcuts include `Cmd/Ctrl+1..9/0`, `F5`/`Cmd/Ctrl+R`, and `Esc`.
-- **CSV-Driven Bilingual UI (`EN` / `HU` + Extensible):** All **810** UI keys live in `src/main/resources/i18n/translations.csv`. Add any new language column (`de`, `sk`, etc.) and reload live from **Admin → Translations** without recompiling.
+- **CSV-Driven Bilingual UI (`EN` / `HU` + Extensible):** All **811** UI keys live in `src/main/resources/i18n/translations.csv`. Add any new language column (`de`, `sk`, etc.) and reload live from **Admin → Translations** without recompiling.
 - **Zero-Config 3NF Embedded Database & Diagnostics:** The SQLite schema declares **41 tables** and **23 indexes**, with foreign keys enabled. The app shows startup progress, prepares storage, runs migrations, seeds demo data, and provides BCrypt authentication, audit CSV export, SQLite backup and restore, and live diagnostics.
 
 ---
@@ -67,7 +67,7 @@ Desktop Java 17 GUI warehouse, QR labeling, scanning, forklift logistics, intern
 ## Requirements
 
 - **Java 17+** (JDK) — or run one of the bundled cross-platform launchers (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) which automatically detect Java 17+ or download a local Temurin 17 JRE if needed.
-- **Apache Maven 3.9+** (or open directly as a Maven project in **Apache NetBeans** / IntelliJ IDEA).
+- **Apache Maven** is *not* required — the bundled wrapper (`./mvnw`, `mvnw.cmd`) downloads Maven 3.9.9 on first use. An existing Maven 3.9+ installation works too, as does opening the project directly in **Apache NetBeans** / IntelliJ IDEA.
 
 ---
 
@@ -75,10 +75,10 @@ Desktop Java 17 GUI warehouse, QR labeling, scanning, forklift logistics, intern
 
 ```bash
 # Run the JUnit 5 unit and integration tests
-mvn test
+./mvnw test
 
 # Build and verify the self-contained runnable JAR
-mvn clean verify
+./mvnw clean verify
 
 # Launch the application (auto-creates ./data/rewear-wms.db on first start)
 java -jar target/due-prog-03.jar

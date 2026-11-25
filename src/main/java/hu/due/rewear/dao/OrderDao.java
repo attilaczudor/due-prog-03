@@ -4,6 +4,7 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderStatus;
+import hu.due.rewear.util.BusinessClock;
 
 import java.math.BigDecimal;
 import java.sql.Connection;
@@ -122,7 +123,7 @@ public final class OrderDao {
     }
 
     public String generateNextOrderNumber(Connection conn) throws SQLException {
-        int year = LocalDate.now().getYear();
+        int year = BusinessClock.today().getYear();
         String prefix = "ORD-" + year + "-";
         String sql = "SELECT order_number FROM orders WHERE order_number LIKE ? ORDER BY order_number DESC LIMIT 1";
         int nextSeq = 1;

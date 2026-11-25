@@ -5,6 +5,7 @@ import hu.due.rewear.model.CountryDirectory;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.PartnerType;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -127,7 +128,7 @@ public final class CustomerDao {
     public long insert(String name, PartnerType partnerType, String contactName, String email, String phone,
                        String address, String taxNumber, String countryCode, String preferredCurrency) {
         return db.executeInTransaction(conn -> insert(conn, name, partnerType, contactName, email, phone,
-                address, taxNumber, countryCode, preferredCurrency, LocalDateTime.now()));
+                address, taxNumber, countryCode, preferredCurrency, BusinessClock.now()));
     }
 
     public long insert(Connection conn, String name, String contactName, String email, String phone,

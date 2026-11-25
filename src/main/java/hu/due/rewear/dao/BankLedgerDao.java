@@ -1,6 +1,7 @@
 package hu.due.rewear.dao;
 
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.util.BusinessClock;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -124,7 +125,7 @@ public final class BankLedgerDao {
                  var rows = query.executeQuery()) {
                 while (rows.next()) currencies.add(rows.getString(1));
             }
-            LocalDate today = LocalDate.now();
+            LocalDate today = BusinessClock.today();
             for (String currency : currencies) {
                 boolean forint = currency.equals("HUF");
                 long id = writeAccount(conn, new Account(0, "Demo Bank", "ReWear " + currency, "DEMO-" + currency,

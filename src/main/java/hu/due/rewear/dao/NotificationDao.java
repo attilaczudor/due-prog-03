@@ -2,6 +2,7 @@ package hu.due.rewear.dao;
 
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.AppNotification;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -116,7 +117,7 @@ public final class NotificationDao {
                 ps.executeUpdate();
             }
             if (!state.isEmpty()) {
-                insert(conn, userId, "SYSTEM", title, message, targetView, LocalDateTime.now());
+                insert(conn, userId, "SYSTEM", title, message, targetView, BusinessClock.now());
             }
         });
     }
@@ -133,7 +134,7 @@ public final class NotificationDao {
             ps.setString(3, title);
             ps.setString(4, message);
             ps.setString(5, targetView);
-            ps.setString(6, DaoDateUtil.format(createdAt != null ? createdAt : LocalDateTime.now()));
+            ps.setString(6, DaoDateUtil.format(createdAt != null ? createdAt : BusinessClock.now()));
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {

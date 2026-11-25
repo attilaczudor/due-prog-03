@@ -7,6 +7,7 @@ import hu.due.rewear.model.User;
 import hu.due.rewear.service.LabelPreset;
 import hu.due.rewear.service.SortingService;
 import hu.due.rewear.service.SortingService.*;
+import hu.due.rewear.util.BusinessClock;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -19,7 +20,6 @@ import java.awt.Insets;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -27,7 +27,7 @@ import java.util.function.Function;
 
 final class SortingView extends JPanel implements NavigableView {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
-            .withZone(ZoneId.of("Europe/Budapest"));
+            .withZone(BusinessClock.ZONE);
 
     private final AppContext ctx;
     private final SortingService service;

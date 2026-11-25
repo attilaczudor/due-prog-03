@@ -1,17 +1,16 @@
 package hu.due.rewear.config;
 
 import hu.due.rewear.dao.DaoException;
+import hu.due.rewear.util.BusinessClock;
 
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.time.Instant;
-import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 final class SortingRosterMigration {
-    private static final ZoneId WAREHOUSE_ZONE = ZoneId.of("Europe/Budapest");
     private final DatabaseManager db;
 
     SortingRosterMigration(DatabaseManager db) {
@@ -58,7 +57,7 @@ final class SortingRosterMigration {
              var update = conn.prepareStatement("UPDATE sorting_bags SET packed_by=?, pack_day=? WHERE id=?")) {
             while (rows.next()) {
                 update.setLong(1, rows.getLong("helper_id"));
-                update.setString(2, Instant.parse(rows.getString("packed_at")).atZone(WAREHOUSE_ZONE).toLocalDate().toString());
+                update.setString(2, Instant.parse(rows.getString("packed_at")).atZone(BusinessClock.ZONE).toLocalDate().toString());
                 update.setLong(3, rows.getLong("id"));
                 update.addBatch();
             }

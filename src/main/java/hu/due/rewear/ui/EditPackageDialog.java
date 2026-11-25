@@ -12,6 +12,7 @@ import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.TargetGroup;
 import hu.due.rewear.model.WarehouseLocation;
 import hu.due.rewear.service.LabelPreset;
+import hu.due.rewear.util.BusinessClock;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -310,7 +311,7 @@ public final class EditPackageDialog extends JDialog {
             return;
         }
         try {
-            LocalDateTime ts = original.createdAt() != null ? original.createdAt() : LocalDateTime.now();
+            LocalDateTime ts = original.createdAt() != null ? original.createdAt() : BusinessClock.now();
             String code = ctx.getProductCodeService().buildCode(
                     ts, tg.code(), gt.code(), qg.code(), pt.code(), weight, original.hexSuffix());
             liveCodeLabel.setText(code);
