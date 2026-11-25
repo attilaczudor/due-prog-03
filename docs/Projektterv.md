@@ -44,7 +44,7 @@ A **ReWear WMS** egy többplatformos, asztali **Java 17 GUI alkalmazás**, amely
 10. **Első indítás saját céggel vagy demó munkaterülettel:** Egy új telepítés üresen indul, és az első indításkor a tulajdonos választ: saját cég (egyetlen, általa megadott szuper-adminisztrátori fiók, nyilvános vagy gyakori jelszavak tiltásával, opcionális szokásos ruházati kódtörzsekkel és kezdő polcrenddel), demó munkaterület (mintaraktár a nyilvánosan ismert demó belépőkkel) vagy korábbi mentés visszaállítása. Az alkalmazás indításkor már használatban lévő adatbázist nem tölt fel mintaadattal, és a demó belépő gombok csak demó munkaterületen jelennek meg.
 11. **Teljes mentés és visszaállítás:** Az Adminban készített `.zip` az SQLite-pillanatképet és a számla-, bizonylat- és levélcsatolmány-mappákat is tartalmazza SHA-256 ellenőrző jegyzékkel. A visszaállítás először mindent átmeneti mappában ellenőriz, a régi mappákat félreteszi (nem törli), az adatbázist utoljára cseréli, hiba esetén visszavonja a mozgatásokat. A levélcsatolmányok saját, dátum szerinti mappában élnek, típus- és fájlfejléc-ellenőrzéssel.
 12. **Számla-életciklus, előzmények és szedési lista:** A számla állapotváltásait egyetlen szabályrendszer korlátozza (kiállított számla nem lesz újra piszkozat, a sztornó csak jóváíró számlával lehetséges, a jóváíró számla végleges), minden váltás naplózott a felhasználóval és az idővel, az előzmények a számla részletei között láthatók, a műveletekhez az `INVOICES` modul jogosultsága szükséges a szolgáltatásban is. Az Összekészítés nézet **Szedési lista** gombja bejárási sorrendű (zóna, sor, polc), haladásjelzős, nyomtatható listát ad egy vagy több rendelésre.
-13. **Egységes üzleti idő és ellenőrzött build:** Minden üzleti dátum a raktár budapesti idejét követi a gép időzónájától függetlenül, egy építési őrteszt tiltja a közvetlen rendszeróra-hívásokat. A projekt Maven wrapperrel (`./mvnw clean verify`) épül Maven-telepítés nélkül, és a hozzá előkészített GitHub Actions munkafolyamat minden változtatásra lefuttatná Ubuntun és macOS-en (a munkafolyamat fájlja még nincs feltöltve a tárhelyre).
+13. **Egységes üzleti idő és ellenőrzött build:** Minden üzleti dátum a raktár budapesti idejét követi a gép időzónájától függetlenül, egy építési őrteszt tiltja a közvetlen rendszeróra-hívásokat. A projekt Maven wrapperrel (`./mvnw clean verify`) épül Maven-telepítés nélkül.
 
 ---
 
@@ -86,7 +86,7 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 | PDF generálás | OpenPDF 2.0.3 | Hőcímke/A4 4-es PDF címkék, többdevizás A4 PDF számlák/jóváírások, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok |
 | Adatvizualizáció | XChart 3.8.8 | Dinamikus monokróm kör- és oszlopdiagramok a készlet súlyeloszlásáról |
 | Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (847 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
-| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **131 automatizált egység- és integrációs teszt** 36 tesztosztályban, Maven wrapper (`./mvnw`), előkészített GitHub Actions CI (Ubuntu és macOS, még nincs feltöltve) |
+| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **131 automatizált egység- és integrációs teszt** 36 tesztosztályban, Maven wrapper (`./mvnw`) |
 
 ---
 
@@ -104,7 +104,7 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 | **Bérszámfejtési előkészítés** | Hatályos díjak, részlegváltás egy munkanapon belül, jóváhagyott bónusz és napi bruttó tervezet | Kész |
 | **Ellenőrzés és megbízhatóság (2026. 11. 25.)** | Teljes kód- és hibaellenőrzés, reprodukálható build (Maven wrapper), biztonságosabb visszaállítás (integritás-ellenőrzés, atomi csere), levélcsatolmány-tár, egységes budapesti üzleti idő őrtesztettel | Kész |
 | **Üzemszerű használat előkészítése (2026. 11. 25.)** | Teljes `.zip` mentés és visszaállítás, explicit első indítás (saját cég vagy demó), a beégetett alapértelmezett fiókok és mintaadat-utántöltés megszüntetése | Kész |
-| **Pénzügyi és raktári finomítás (2026. 11. 25.)** | Számla-életciklus és előzmények, jóváíró számla szerkezeti kapcsolata, pénzügyi műveletek jogosultsága, bejárási sorrendű szedési lista, CI | Kész |
+| **Pénzügyi és raktári finomítás (2026. 11. 25.)** | Számla-életciklus és előzmények, jóváíró számla szerkezeti kapcsolata, pénzügyi műveletek jogosultsága, bejárási sorrendű szedési lista | Kész |
 
 ---
 

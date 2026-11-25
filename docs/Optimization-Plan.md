@@ -344,20 +344,14 @@ directory, created a database with 0 users, 0 invoices and all 7 roles.
 
 ---
 
-## Pass 6 — continuous integration and pick lists (25 November 2026)
+## Pass 6 — pick lists, and a CI workflow that was dropped (25 November 2026)
 
-### CI
+### CI (decided against)
 
-- [x] **Not on GitHub yet:** the push of `.github/workflows/ci.yml` was rejected because the token has no `workflow`
-  scope, so the file lives on the local branch `ci-workflow` (commit `678cd67`) and `main` was pushed without it.
-  Once the token has the scope, merge that branch and push.
-- [x] `.github/workflows/ci.yml` runs `./mvnw -B -ntp clean verify` on every push to `main` and on every
-  pull request, on Ubuntu and macOS with JDK 17 (Temurin), headless. Test reports are kept when a run
-  fails, and the jar from the Linux run is kept for seven days.
-- Verified locally: the same command with `-Djava.awt.headless=true` passes (113 run, 1 skipped, the dialog
-  test that needs a display) and the YAML parses. **Not verified:** the workflow itself has not run on
-  GitHub yet, and the Linux and macOS runners may expose differences (fonts, file systems) that this Mac
-  does not. Actions are pinned to major versions, not commit hashes.
+A GitHub Actions workflow (`./mvnw -B -ntp clean verify` on Ubuntu and macOS) was written, and the same command
+was verified locally headless. The push was then rejected because the token had no `workflow` scope, and the
+decision was **not to use CI**, so the workflow was discarded and is not in the repository. The build is run
+locally with `./mvnw clean verify`.
 
 ### Pick lists
 
