@@ -10,7 +10,7 @@
 - [x] Add the Admin-only payroll draft with date-effective HUF rates, shared shifts, daily output by worker and department, and manual bonus approval.
 - [x] Add invoice and receipt archives, order-first invoicing, expense capture, private smart folders, searchable filters, in-app document email, and consistent table sorting.
 - [x] Move invoice settings into Admin, add offline NAV and bank demos, and update the Hungarian project, database, and program reports.
-- [x] Make the build reproducible (`./mvnw clean verify` with a Maven wrapper) and run it in GitHub Actions on Linux and macOS (workflow written, not yet run on GitHub).
+- [x] Make the build reproducible (`./mvnw clean verify` with a Maven wrapper) and prepare a GitHub Actions workflow for Linux and macOS (written and kept on the local branch `ci-workflow`; it could not be pushed because the token lacks the `workflow` scope).
 - [x] Harden backup and restore: integrity-checked, atomic database restore, and a full `.zip` backup (database plus invoices, receipts and mail attachments, SHA-256 manifest) restored through a staging folder with rollback.
 - [x] Store mail attachments in their own vault with type and signature checks, and keep one business clock (Europe/Budapest) with a guard test.
 - [x] Separate the demo workspace from real onboarding: a new installation starts empty and asks (own company, demo, or restore); default-password accounts and sample data are no longer recreated.
@@ -20,7 +20,7 @@
 
 ## Next session
 
-- [ ] Push the work and watch the first GitHub Actions run; fix anything the Linux or macOS runner shows (fonts, file systems, headless behaviour).
+- [ ] Give the push token the `workflow` scope (for example `gh auth refresh -s workflow`), merge branch `ci-workflow` and push, then watch the first GitHub Actions run; fix anything the Linux or macOS runner shows (fonts, file systems, headless behaviour).
 - [ ] Click through what was only compiled or painted, not seen: the first-time setup dialog, the invoice dialog (history table, disabled buttons, status drop-down), the Pick list button and printed layout, the mail attachment open flow, and the Admin backup and restore buttons.
 - [ ] Agree on payroll policy using a worked split-shift day. Confirm how monthly gross interacts with daily rates, how time and absences count, and how sorter, helper, and team results qualify for bonuses. Record those decisions in the [payroll plan](Payroll-Implementation-Plan.md) before extending the draft calculation.
 - [ ] Rehearse the [handover walkthrough](HANDOVER.md#demo-walkthrough) in a fresh portable installation, choosing the demo workspace at first launch. Include a shortage, a rejected or duplicate scan, a shared helper, and a split payroll day. Test on the intended scanner and printer when available.

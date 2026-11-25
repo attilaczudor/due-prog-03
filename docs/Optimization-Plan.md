@@ -348,6 +348,9 @@ directory, created a database with 0 users, 0 invoices and all 7 roles.
 
 ### CI
 
+- [x] **Not on GitHub yet:** the push of `.github/workflows/ci.yml` was rejected because the token has no `workflow`
+  scope, so the file lives on the local branch `ci-workflow` (commit `678cd67`) and `main` was pushed without it.
+  Once the token has the scope, merge that branch and push.
 - [x] `.github/workflows/ci.yml` runs `./mvnw -B -ntp clean verify` on every push to `main` and on every
   pull request, on Ubuntu and macOS with JDK 17 (Temurin), headless. Test reports are kept when a run
   fails, and the jar from the Linux run is kept for seven days.

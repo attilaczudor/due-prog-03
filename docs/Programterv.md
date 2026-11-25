@@ -381,7 +381,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **36 tesztosztály, összesen 131 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, ugyanez a parancs fut a GitHub Actions CI-ben is (Ubuntu és macOS, kijelző nélkül; ott az egyetlen kijelzőt igénylő teszt kimarad).
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **36 tesztosztály, összesen 131 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, ugyanezt a parancsot futtatná a GitHub Actions CI is (Ubuntu és macOS, kijelző nélkül; ott az egyetlen kijelzőt igénylő teszt kimarad). A munkafolyamat el van készítve, de még nincs feltöltve a tárhelyre.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
