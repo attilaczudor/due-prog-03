@@ -26,7 +26,8 @@
 
 ## Next session
 
-- [ ] Click through what was only compiled or painted, not seen: the first-time setup dialog, the invoice dialog (history table, disabled buttons, status drop-down), the Pick list button and printed layout, the mail attachment open flow, and the Admin backup and restore buttons.
+- [x] Walk every screen each role can open, through the real main window, and look at the rendered result. Covered by `ScreenWalkthroughTest`; remaining dialogs (invoice details, pick list preview, package intake preview) are still only compile-verified.
+- [ ] Click through the remaining dialogs that the walkthrough does not open: the first-time setup dialog, the invoice dialog (history table, disabled buttons, status drop-down), the Pick list button and printed layout, the mail attachment open flow, and the Admin backup and restore buttons.
 - [ ] Agree on payroll policy using a worked split-shift day. Confirm how monthly gross interacts with daily rates, how time and absences count, and how sorter, helper, and team results qualify for bonuses. Record those decisions in the [payroll plan](Payroll-Implementation-Plan.md) before extending the draft calculation.
 - [ ] Rehearse the [handover walkthrough](HANDOVER.md#demo-walkthrough) in a fresh portable installation, choosing the demo workspace at first launch. Include a shortage, a rejected or duplicate scan, a shared helper, and a split payroll day. Test on the intended scanner and printer when available.
 - [ ] When requested, assemble the university submission from the three Hungarian Markdown reports (now current), the runnable bundle, and a ten-minute defense deck. The diagrams still need rendering to PNG. Keep sample data fictional and rehearse from a clean demo database.

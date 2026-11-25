@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **147 across 41** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -587,6 +587,44 @@ views were also rendered to PNG and looked at.
 - The primary "Plan shift" button does not paint its background in an offscreen render; its text and colours
   were checked directly and are correct, and the real application paints primary buttons normally.
 - Transit drivers are still not users; collections are recorded by management with the area as free text.
+
+---
+
+## Pass 12 — walking the application (25 November 2026)
+
+Screen capture is blocked on this machine (macOS screen recording permission is not granted, so a capture
+returns a black image), so instead of clicking blind the screens are opened through the real `MainFrame` and
+rendered.
+
+### Built
+
+- [x] **`ScreenWalkthroughTest`.** For six accounts covering every kind of role, it opens every module that
+  account can reach — through the real window, so lazy view creation, navigation and the refresh that runs
+  before a screen appears are all exercised — then paints the result and fails if a screen throws or comes up
+  blank. 72 screens in total. `-Dshot.dir=...` also writes a PNG of each one.
+
+### Found by it
+
+- **A listener leak in `MainFrame`.** Cleanup (the 10-second refresh timer and the theme, language,
+  notification and module listeners) lived only in `performLogout()`. A window disposed any other way kept
+  listening and kept querying the database behind a window nobody could see. The walkthrough hit this directly:
+  a theme change reached a disposed frame whose database was gone. Cleanup moved into `dispose()`, which every
+  path goes through.
+- **Unreadable amounts on the raw materials screen.** `4.8 t (4800 kg)` did not fit its column and was cut to
+  `4.8 t (4800...`. Amounts now show tonnes alone, and every cell in the sorting tables carries its full value
+  as a tooltip, since the material names are long.
+- **A truncated role label.** "Delivery Forklift Driver" did not fit the sidebar. The English names are now
+  "Supply Driver" and "Delivery Driver"; the Hungarian names were already short.
+- **An empty queue in the demo.** No demo order was assigned to the delivery driver, so their Order Staging
+  screen and the new Pick list button had nothing to work with. The packing order is now handed to them at the
+  dock. Two tests had assumed that order was unassigned; one of them was relying on a shortcut that only
+  applies to unassigned orders, which is now stated in the test.
+
+### Not covered
+
+The walkthrough opens screens, not dialogs. The invoice details dialog (history table, disabled buttons), the
+pick list preview, the package intake pre-save preview and the backup and restore dialogs are still only
+compile-verified. Driving a modal dialog needs a different harness.
 
 ---
 

@@ -325,8 +325,8 @@ final class SortingView extends JPanel implements NavigableView {
                 row.grade(), kg(row.weightGrams()), row.packaging(), row.packer(), row.station(), time(row.reportedAt()),
                 time(row.packedAt()), time(row.registeredAt()), row.qr()});
         lots.set(state.lots(), row -> new Object[]{row.reference(), dash(row.material()), dash(row.sourceArea()),
-                row.stored() ? row.locationCode() : t("sorting.lot.awaiting_storage"), amount(row.availableGrams()),
-                amount(row.receivedGrams()), time(row.receivedAt())});
+                row.stored() ? row.locationCode() : t("sorting.lot.awaiting_storage"),
+                amount(row.availableGrams()), amount(row.receivedGrams()), time(row.receivedAt())});
         teams.set(state.teams(), row -> new Object[]{row.name(), row.sorterIds().size(), row.helperIds().size(), kg(row.targetGrams()),
                 row.bonusBasisPoints() == null ? "—" : percent(row.bonusBasisPoints())});
         daily.set(state.daily(), row -> new Object[]{row.sorter(), row.helper(), kg(row.processedGrams()),
@@ -386,9 +386,9 @@ final class SortingView extends JPanel implements NavigableView {
         return grams == null ? "" : SortingService.kg(grams).toPlainString();
     }
 
-    /** A stock amount the way people think of raw loads: tonnes first, with the exact kilograms beside it. */
+    /** Raw loads are talked about in tonnes; the exact kilograms are in the cell's tooltip. */
     private static String amount(long grams) {
-        return SortingService.tonnes(grams).toPlainString() + " t (" + SortingService.kg(grams).toPlainString() + " kg)";
+        return SortingService.tonnes(grams).toPlainString() + " t";
     }
 
     private static String dash(String value) {
@@ -430,7 +430,18 @@ final class SortingView extends JPanel implements NavigableView {
 
     private static final class DataTable<T> {
         private final DefaultTableModel model = BrutalistStyle.nonEditableTableModel();
-        private final JTable table = new JTable(model);
+        // Columns are narrow and the text is long, so every cell carries its full value as a tooltip.
+        private final JTable table = new JTable(model) {
+            @Override
+            public java.awt.Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int row, int column) {
+                java.awt.Component component = super.prepareRenderer(renderer, row, column);
+                Object value = getValueAt(row, column);
+                if (component instanceof javax.swing.JComponent cell) {
+                    cell.setToolTipText(value == null || value.toString().isBlank() ? null : value.toString());
+                }
+                return component;
+            }
+        };
         private List<T> rows = List.of();
 
         void set(List<T> values, Function<T, Object[]> cells) {

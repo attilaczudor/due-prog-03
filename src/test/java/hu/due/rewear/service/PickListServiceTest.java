@@ -192,8 +192,11 @@ class PickListServiceTest {
 
         PickList driversList = ctx.getPickListService().forDriver(deliveryDriver.id());
 
-        assertEquals(List.of(mine.orderNumber()), driversList.lines().stream().map(PickLine::orderNumber).distinct().toList());
-        assertFalse(driversList.lines().stream().anyMatch(l -> l.orderNumber().equals(notMine.orderNumber())));
+        // The driver sees the orders assigned to them (the demo already gives them one) and nobody else's.
+        var mineNumbers = driversList.lines().stream().map(PickLine::orderNumber).distinct().toList();
+        assertTrue(mineNumbers.contains(mine.orderNumber()), "Their own order should be on the list: " + mineNumbers);
+        assertFalse(driversList.lines().stream().anyMatch(l -> l.orderNumber().equals(notMine.orderNumber())),
+                "An order assigned to nobody must not appear on a driver's list");
         assertTrue(ctx.getPickListService().forDriver(null).lines().stream()
                 .anyMatch(l -> l.orderNumber().equals(notMine.orderNumber())), "Management sees every open order");
     }

@@ -136,6 +136,9 @@ class InvoiceAndReversibleOrderTest {
                 .findFirst().orElseThrow();
         List<OrderItem> items = ctx.getOrderItemDao().findByOrderId(packingOrder.id());
         assertTrue(!items.isEmpty());
+        // The demo hands this order to a delivery driver, and an assigned order may only ship once every
+        // package has been scanned at handover. This test covers the plain path, so take the driver off it.
+        ctx.getOrderService().assignForkliftAndDock(packingOrder.id(), null, null);
 
         // 1. Ship the order -> packages become SHIPPED
         Order shipped = ctx.getOrderService().changeOrderStatus(packingOrder.id(), OrderStatus.SHIPPED, userId);

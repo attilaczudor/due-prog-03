@@ -6,7 +6,7 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**176 fő Java forrásfájl**, **40 JUnit 5 tesztosztály**, **145 teszt**):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**176 fő Java forrásfájl**, **41 JUnit 5 tesztosztály**, **147 teszt**):
 
 ```mermaid
 flowchart TD
@@ -385,7 +385,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **40 tesztosztály, összesen 145 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **41 tesztosztály, összesen 147 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -429,3 +429,4 @@ A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevi
 | `RoleHierarchyTest` | 3 | A 11 szerepkör megléte és kétnyelvű megnevezése, modulhozzáférés szerepkörönként (két targoncás szerepkör, pénzügy és bérszámfejtés elkülönítése), a régi egységes targoncás szerepkör egyszeri szétválasztása |
 | `RotaServiceTest` | 5 | Beosztás mentése és felülírása, hónap- és hétrács határai, saját napok kontra teljes cég, írási jogosultság, demó beosztás |
 | `RotaViewTest` | 1 | A beosztásnaptár kirajzolása tervezőnek és dolgozónak, mindkét nyelven (kijelző nélküli környezetben kimarad) |
+| `ScreenWalkthroughTest` | 2 | Minden szerepkör minden elérhető képernyőjének megnyitása a valódi főablakon át, kirajzolás-ellenőrzéssel, valamint az első indítási ablak két nyelven (kijelző nélküli környezetben kimarad) |

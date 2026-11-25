@@ -417,7 +417,7 @@ admin.system.version,Version,Verzió
 admin.system.purpose,Purpose,Szerepkör
 common.date,Date,Dátum
 common.info,Information,Információ
-role.SUPPLY_DRIVER,Supply Forklift Driver,Alapanyag-targoncás
+role.SUPPLY_DRIVER,Supply Driver,Alapanyag-targoncás
 nav.transport,Forklift & Transport,Targonca és szállítás
 nav.putaway,Putaway,Betárolás
 nav.staging,Order Staging,Összekészítés
@@ -858,7 +858,7 @@ sorting.lot.select_first,Select a raw material line first.,Előbb válasszon ki 
 sorting.available_amount,Available,Készleten
 sorting.received_amount,Received,Beérkezett
 sorting.alert.lot_received,Raw lot {0} is waiting to be stored,A(z) {0} nyersanyag-tétel betárolásra vár
-role.DELIVERY_DRIVER,Delivery Forklift Driver,Kiszállítási targoncás
+role.DELIVERY_DRIVER,Delivery Driver,Kiszállítási targoncás
 role.PRODUCTION_LEAD,Production Manager,Termelési vezető
 role.SHIFT_LEAD,Shift Leader,Műszakvezető
 role.HR_PAYROLL,HR and Payroll,Bérszámfejtés és HR

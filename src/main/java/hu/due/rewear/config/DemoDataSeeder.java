@@ -472,6 +472,16 @@ public final class DemoDataSeeder {
                     locations.get(seedBales[idx].loc()), managerId, "Reserved for ORD-2026-0002", now.minusDays(1));
         }
 
+        // The packing order is handed to the delivery driver at the dock, so the staging queue and the
+        // pick list have something real in them in a demo.
+        try (var ps = conn.prepareStatement(
+                "UPDATE orders SET assigned_forklift_id = ?, dispatch_location_id = ? WHERE id = ?")) {
+            ps.setLong(1, deliveryId);
+            ps.setLong(2, locations.get("DOCK-01"));
+            ps.setLong(3, order2Id);
+            ps.executeUpdate();
+        }
+
         // Order 3: DRAFT in EUR (Slovak export customer, ready to scan bales into during live demo!)
         orderDao.insert(conn, "ORD-2026-0003", cust3, OrderStatus.DRAFT, CurrencyCode.EUR,
                 BigDecimal.ZERO, BigDecimal.ZERO, "Export draft — scan bales to pack", adminId, now.minusHours(3), null);

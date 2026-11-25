@@ -860,14 +860,24 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
      * actions which invalidate the session, such as a database restore, can force a fresh login.
      */
     void performLogout() {
+        ctx.getAuthService().logout();
+        dispose();
+        onLogout.run();
+    }
+
+    /**
+     * Releases everything this window listens to. Done here rather than in {@link #performLogout()} so that
+     * a frame closed any other way also stops refreshing and stops reacting to theme and language changes:
+     * otherwise it would keep querying the database behind a window nobody can see.
+     */
+    @Override
+    public void dispose() {
         autoRefreshTimer.stop();
         ctx.getI18n().removeListener(this);
         ThemeManager.removeListener(this);
         ctx.getNotificationService().removeChangeListener(notifListener);
         ctx.getRoleModuleService().removeChangeListener(moduleListener);
-        ctx.getAuthService().logout();
-        dispose();
-        onLogout.run();
+        super.dispose();
     }
 
     private void applyTranslations() {
