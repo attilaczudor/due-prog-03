@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -499,6 +499,51 @@ from the surefire reports (36 classes, 131 tests, matching the build).
 - The Google Docs and Slides, the 300-DPI diagram PNGs and the screenshots are still to be made when requested.
 - The private `PRD.md` and the assignment brief still describe the v2.5 baseline (697 keys, 26 tables, 59 tests).
 - A headless run of the full build (the CI setting) passed with 131 run and 1 skipped.
+
+---
+
+## Pass 10 — raw material supply (25 November 2026)
+
+### The real process this models
+
+Transit drivers collect used clothing daily from drop-off points across the country, each driver covering their
+own area, and bring it to the facility. A forklift driver stores each collection somewhere in the warehouse.
+Sorters then call for material from what is stored. A sorter cannot know in advance how much they will get:
+that is decided when the driver delivers.
+
+### Built
+
+- [x] **Raw material lines.** A lot now carries the material, the collection area it came from, and the storage
+  location it was put away at. `sorting_raw_lots` gained `material`, `source_area` and `location_id`.
+- [x] **Receive, then store.** Receiving a collection notifies the supply drivers (not the fulfilment driver,
+  who serves customer orders) and leaves the line unstored. It becomes usable only once a forklift driver
+  stores it on an active storage shelf.
+- [x] **Call for a line, not a weight.** `requestSupply(lotId)` replaces `requestSupply(kg)`. The request stores
+  `requested_lot_id` and no weight; `sorting_requests.requested_grams` became nullable, which needed a table
+  rebuild (`SortingRawMaterialMigration`) because SQLite cannot drop `NOT NULL` in place. Older weight-based
+  requests keep working, and for those the driver still chooses the lot at delivery.
+- [x] **Delivery decides the amount.** The driver records what was actually brought; it cannot exceed what the
+  line holds, and the called line cannot be swapped for another.
+- [x] **Raw materials is the first tab of Sorting**, showing material, area, location (or "awaiting storage"),
+  available and received amounts in tonnes with the exact kilograms beside them. Sorters see only lines they can
+  actually call for. Twelve new translation keys.
+- [x] **Demo data:** six daily collections from six collection areas, four stored and two still awaiting storage.
+  An existing demo workspace is upgraded to them in sequence (version 1 → 2 → 3).
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **136 / 136** across 37 classes (+5 `RawMaterialSupplyTest`). Mutation
+checks: allowing an unstored line to be called for, showing unstored lines to sorters, and letting the driver
+swap the called line each broke a test. One real bug was caught by an existing test while building this: the
+first version of `receive` notified every forklift driver, including the fulfilment driver who has nothing to do
+with raw supply.
+
+### Not done
+
+- The transit drivers themselves are not users or a role; a collection is recorded by warehouse management, with
+  the area as free text. If drivers should log in and record their own collections, that is a separate change.
+- A delivery still comes from exactly one line.
+- The screens were checked by compiling and by service tests, not by clicking through them.
 
 ---
 

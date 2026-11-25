@@ -55,7 +55,6 @@ final class SortingView extends JPanel implements NavigableView {
         var requestActions = controls();
         var bagActions = controls();
         if (role == RoleCode.SORTER) {
-            addAction(requestActions, "sorting.request.new", true, this::requestSupply);
             addAction(requestActions, "sorting.request.report", false, this::reportBag);
             addAction(requestActions, "sorting.request.finish", false, this::finish);
             addAction(requestActions, "common.cancel", false, () -> {
@@ -71,17 +70,20 @@ final class SortingView extends JPanel implements NavigableView {
             addAction(bagActions, "scanner.action.reprint", false, this::reprint);
         }
 
+        // Raw materials come first: they are where the whole sorting flow starts.
+        if (manages || role == RoleCode.FORKLIFT || role == RoleCode.SORTER) {
+            var rawActions = controls();
+            if (role == RoleCode.SORTER) addAction(rawActions, "sorting.lot.call", true, this::requestSupply);
+            if (manages) addAction(rawActions, "sorting.lot.receive", true, this::receive);
+            if (manages || role == RoleCode.FORKLIFT) addAction(rawActions, "sorting.lot.store", role == RoleCode.FORKLIFT, this::storeLot);
+            addSection("sorting.materials", MainFrame.VIEW_INVENTORY, lots, rawActions);
+        }
         if (role == RoleCode.OPERATOR || role == RoleCode.SORTING_HELPER) {
             addSection("sorting.bags", MainFrame.VIEW_INTAKE, bags, bagActions);
             addSection("sorting.requests", MainFrame.VIEW_TODO, requests, requestActions);
         } else {
             addSection("sorting.requests", MainFrame.VIEW_TODO, requests, requestActions);
             addSection("sorting.bags", MainFrame.VIEW_INTAKE, bags, bagActions);
-        }
-        if (manages || role == RoleCode.FORKLIFT) {
-            var rawActions = controls();
-            if (manages) addAction(rawActions, "sorting.lot.receive", true, this::receive);
-            addSection("sorting.raw", MainFrame.VIEW_INVENTORY, lots, rawActions);
         }
         if (manages) {
             var teamActions = controls();
@@ -130,14 +132,51 @@ final class SortingView extends JPanel implements NavigableView {
         sections.addSection(label, SidebarIcons.forView(icon, 16), panel);
     }
 
+    /** Calls for the selected raw material line. No weight is entered: the driver's delivery decides it. */
     private void requestSupply() {
-        var weight = new JTextField("400", 12);
-        if (form("sorting.request.new", "sorting.requested_kg", weight)) service.requestSupply(decimal(weight));
+        Lot lot = lots.selected();
+        if (lot == null) {
+            JOptionPane.showMessageDialog(this, t("sorting.lot.select_first"), t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        String where = lot.stored() ? lot.locationCode() : t("sorting.lot.awaiting_storage");
+        String message = lot.material() + " · " + lot.sourceArea() + "\n" + lot.reference() + " · " + where + " · "
+                + amount(lot.availableGrams()) + "\n\n" + t("sorting.lot.call_confirm");
+        if (JOptionPane.showConfirmDialog(this, message, t("sorting.lot.call"), JOptionPane.OK_CANCEL_OPTION,
+                JOptionPane.QUESTION_MESSAGE) == JOptionPane.OK_OPTION) {
+            service.requestSupply(lot.id());
+        }
+    }
+
+    private void storeLot() {
+        Lot lot = lots.selected();
+        if (lot == null) {
+            JOptionPane.showMessageDialog(this, t("sorting.lot.select_first"), t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        var location = choices(ctx.getLocationDao().findByType(LocationType.STORAGE, true).stream()
+                .map(row -> new Choice<>(row.id(), row.code())).toList());
+        if (lot.locationId() != null) select(location, lot.locationId());
+        var info = new JLabel(lot.reference() + " · " + lot.material() + " · " + amount(lot.availableGrams()));
+        if (form("sorting.lot.store", "", info, "sorting.lot.location", location)) {
+            service.storeLot(lot.id(), selected(location));
+        }
     }
 
     private void deliver() {
         Request request = requests.selected();
         if (request == null || !request.awaitingDelivery()) return;
+        if (request.requestedLotId() != null) {
+            // The sorter called for a line without a weight, so the driver just records what was actually brought.
+            Lot called = lots.rows.stream().filter(row -> row.id() == request.requestedLotId()).findFirst().orElse(null);
+            var actual = new JTextField(12);
+            var info = new JLabel(called == null ? request.lot()
+                    : called.material() + " · " + called.reference() + " · " + amount(called.availableGrams()));
+            if (form("sorting.request.deliver", "sorting.lot", info, "sorting.delivered_kg", actual)) {
+                service.deliver(request.id(), decimal(actual));
+            }
+            return;
+        }
         var lot = choices(lots.rows.stream().filter(row -> row.availableGrams()>0)
                 .map(row -> new Choice<>(row.id(), row.reference() + " · " + kg(row.availableGrams()) + " kg")).toList());
         var actual = new JTextField(kg(request.requestedGrams()), 12);
@@ -201,9 +240,12 @@ final class SortingView extends JPanel implements NavigableView {
 
     private void receive() {
         var reference = new JTextField(18);
+        var material = new JTextField(24);
+        var area = new JTextField(24);
         var weight = new JTextField(12);
-        if (form("sorting.lot.receive", "sorting.lot", reference, "sorting.received_kg", weight)) {
-            service.receive(reference.getText(), decimal(weight));
+        if (form("sorting.lot.receive", "sorting.lot", reference, "sorting.lot.material", material,
+                "sorting.lot.area", area, "sorting.received_kg", weight)) {
+            service.receive(reference.getText(), material.getText(), area.getText(), decimal(weight));
         }
     }
 
@@ -274,15 +316,16 @@ final class SortingView extends JPanel implements NavigableView {
     @Override public void refreshData() {
         Workspace state = service.workspace(day);
         requests.set(state.requests(), row -> new Object[]{row.id(), requestStatus(row), row.sorter(), row.team(), row.driver(),
-                kg(row.requestedGrams()), kg(row.deliveredGrams()), kg(row.processedGrams()), kg(row.outputGrams()),
+                dash(kg(row.requestedGrams())), kg(row.deliveredGrams()), kg(row.processedGrams()), kg(row.outputGrams()),
                 kg(row.processedGrams() == null ? null : row.deliveredGrams() - row.processedGrams()),
-                kg(row.processedGrams() == null ? null : row.processedGrams() - row.outputGrams()), row.lot(),
+                kg(row.processedGrams() == null ? null : row.processedGrams() - row.outputGrams()), row.lot(), row.material() == null ? "" : row.material(),
                 time(row.requestedAt()), time(row.deliveredAt()), time(row.finishedAt()), time(row.cancelledAt())});
         bags.set(state.bags(), row -> new Object[]{row.id(), bagStatus(row), row.requestId(), row.sorter(), row.target(), row.garment(),
                 row.grade(), kg(row.weightGrams()), row.packaging(), row.packer(), row.station(), time(row.reportedAt()),
                 time(row.packedAt()), time(row.registeredAt()), row.qr()});
-        lots.set(state.lots(), row -> new Object[]{row.reference(), kg(row.receivedGrams()),
-                kg(row.availableGrams()), time(row.receivedAt())});
+        lots.set(state.lots(), row -> new Object[]{row.reference(), dash(row.material()), dash(row.sourceArea()),
+                row.stored() ? row.locationCode() : t("sorting.lot.awaiting_storage"), amount(row.availableGrams()),
+                amount(row.receivedGrams()), time(row.receivedAt())});
         teams.set(state.teams(), row -> new Object[]{row.name(), row.sorterIds().size(), row.helperIds().size(), kg(row.targetGrams()),
                 row.bonusBasisPoints() == null ? "—" : percent(row.bonusBasisPoints())});
         daily.set(state.daily(), row -> new Object[]{row.sorter(), row.helper(), kg(row.processedGrams()),
@@ -295,12 +338,13 @@ final class SortingView extends JPanel implements NavigableView {
         actions.forEach(action -> action.button().setText(t(action.key())));
         columns(requests, "sorting.batch", "common.status", "role.SORTER", "sorting.team", "role.FORKLIFT",
                 "sorting.requested_kg", "sorting.delivered_kg", "sorting.processed_kg", "sorting.output_kg",
-                "sorting.returned_kg", "sorting.other_kg", "sorting.lot",
+                "sorting.returned_kg", "sorting.other_kg", "sorting.lot", "sorting.lot.material",
                 "sorting.requested_at", "sorting.delivered_at", "sorting.finished_at", "sorting.cancelled_at");
         columns(bags, "sorting.bag", "common.status", "sorting.batch", "role.SORTER", "sorting.target_group", "sorting.product",
                 "sorting.grade", "sorting.output_kg", "sorting.packaging", "sorting.packed_by", "sorting.station", "sorting.reported_at",
                 "sorting.packed_at", "sorting.registered_at", "sorting.qr");
-        columns(lots, "sorting.lot", "sorting.received_kg", "sorting.available_kg", "sorting.received_at");
+        columns(lots, "sorting.lot", "sorting.lot.material", "sorting.lot.area", "sorting.lot.location",
+                "sorting.available_amount", "sorting.received_amount", "sorting.received_at");
         columns(teams, "sorting.team", "sorting.team.sorters", "sorting.team.helpers", "sorting.target_kg", "sorting.bonus_rate");
         columns(daily, "role.SORTER", "role.SORTING_HELPER", "sorting.processed_kg", "sorting.target_kg",
                 "common.status", "sorting.bonus_rate");
@@ -339,6 +383,15 @@ final class SortingView extends JPanel implements NavigableView {
 
     private static String kg(Long grams) {
         return grams == null ? "" : SortingService.kg(grams).toPlainString();
+    }
+
+    /** A stock amount the way people think of raw loads: tonnes first, with the exact kilograms beside it. */
+    private static String amount(long grams) {
+        return SortingService.tonnes(grams).toPlainString() + " t (" + SortingService.kg(grams).toPlainString() + " kg)";
+    }
+
+    private static String dash(String value) {
+        return value == null || value.isBlank() ? "—" : value;
     }
 
     private static String time(String instant) {

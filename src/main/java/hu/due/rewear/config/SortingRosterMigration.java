@@ -65,7 +65,7 @@ final class SortingRosterMigration {
         }
     }
 
-    private static void rebuild(Connection conn, String schema, String table) throws SQLException {
+    static void rebuild(Connection conn, String schema, String table) throws SQLException {
         String prefix = "CREATE TABLE IF NOT EXISTS " + table + " (";
         String canonical = Arrays.stream(schema.split(";")).map(String::strip)
                 .map(statement -> statement.indexOf(prefix) < 0 ? "" : statement.substring(statement.indexOf(prefix)))
@@ -74,7 +74,10 @@ final class SortingRosterMigration {
         String replacement = table + "_new";
         try (var statement = conn.createStatement()) {
             statement.execute("CREATE TABLE " + replacement + " (" + canonical.substring(prefix.length()));
-            String columns = String.join(",", columns(conn, replacement));
+            // Only columns both versions have are copied, so a rebuild may add a column as well as remove one.
+            List<String> shared = new ArrayList<>(columns(conn, replacement));
+            shared.retainAll(columns(conn, table));
+            String columns = String.join(",", shared);
             statement.executeUpdate("INSERT INTO " + replacement + " (" + columns + ") SELECT " + columns + " FROM " + table);
             statement.execute("DROP TABLE " + table);
             statement.execute("ALTER TABLE " + replacement + " RENAME TO " + table);

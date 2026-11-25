@@ -50,11 +50,12 @@ class PayrollWorkflowTest {
         assertEquals(5, configured.sorterIds().size());
         assertEquals(2, configured.helperIds().size());
 
-        long lot = sorting.receive("WORK-DAY", bd("800"));
+        long lot = sorting.receive("WORK-DAY", "Vegyes", "Pest megye", bd("800"));
+        sorting.storeLot(lot, ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.STORAGE, true).get(0).id());
         ctx.getSession().login(sorter);
-        long request = sorting.requestSupply(bd("400"));
+        long request = sorting.requestSupply(lot);
         ctx.getSession().login(user(ctx, "forklift"));
-        sorting.deliver(request, lot, bd("400"));
+        sorting.deliver(request, bd("400"));
         var dict = ctx.getDictionaryDao();
         var target = dict.findTargetGroups(true).get(0);
         var garment = dict.findGarmentTypes(true).get(0);
@@ -71,9 +72,9 @@ class PayrollWorkflowTest {
 
         var secondSorter = user(ctx, "sorter06");
         ctx.getSession().login(secondSorter);
-        long secondRequest = sorting.requestSupply(bd("400"));
+        long secondRequest = sorting.requestSupply(lot);
         ctx.getSession().login(user(ctx, "forklift"));
-        sorting.deliver(secondRequest, lot, bd("400"));
+        sorting.deliver(secondRequest, bd("400"));
         ctx.getSession().login(secondSorter);
         long secondBag = sorting.reportBag(secondRequest, target.id(), garment.id(), grade.id(), bd("20"));
         sorting.finish(secondRequest, bd("400"));

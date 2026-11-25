@@ -18,7 +18,7 @@ Az alkalmazástáblák tíz logikai csoportot alkotnak.
 6. **Vállalati kommunikáció, értesítések és teendők (6 tábla):** `emails`, `chat_rooms`, `chat_room_members`, `chat_messages`, `notifications`, `user_todos`
 7. **Felhasználónként mentett számla- és e-mail-szűrések (2 tábla):** `smart_folders`, `smart_folder_rules`
 8. **Kézi és demó banki nyilvántartás (2 tábla):** `bank_accounts`, `bank_transactions`
-9. **Válogatás (7 tábla):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
+9. **Válogatás (7 tábla, nyersanyag-tételekkel):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
 10. **Bérszámfejtési előkészítés (4 tábla):** `payroll_departments`, `payroll_worker_base`, `payroll_department_rates`, `payroll_shifts`
 
 ---
@@ -290,6 +290,19 @@ erDiagram
 | `created_at` | `TEXT` | `NOT NULL` | A művelet időpontja |
 
 Az állapotváltás és a hozzá tartozó esemény ugyanabban a tranzakcióban mentődik, ezért nincs napló nélküli állapotváltás. Az indexe: `idx_invoice_events_invoice`.
+
+---
+
+### 3.31b Nyersanyag-tételek és igénylés (`sorting_raw_lots`, `sorting_requests`)
+
+- **`sorting_raw_lots`:** egy napi begyűjtés a `reference` (egyedi) mellett `material` (mit tartalmaz), `source_area`
+  (melyik gyűjtési területről érkezett), `location_id` (`FK -> warehouse_locations`, a betárolás helye; `NULL`
+  amíg targoncás be nem tárolta), `received_grams`, `available_grams`, `received_by`, `received_at` mezőkkel.
+  A tétel csak betárolás után igényelhető.
+- **`sorting_requests`:** a `requested_grams` immár elhagyható (`NULL`), mert a válogató nem súlyt, hanem
+  nyersanyag-tételt igényel; a `requested_lot_id` (`FK -> sorting_raw_lots`) tárolja, melyik tételt kérte.
+  Az átadott mennyiséget továbbra is a `lot_id` és a `delivered_grams` rögzíti, azt a targoncás méri meg.
+  A régebbi, súlyra szóló igénylések változatlanul maradnak, azoknál a targoncás választ tételt átadáskor.
 
 ---
 

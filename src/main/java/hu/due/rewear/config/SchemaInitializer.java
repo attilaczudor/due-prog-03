@@ -55,6 +55,9 @@ public final class SchemaInitializer {
                 stmt.execute("UPDATE roles SET name = 'Station Manager' WHERE code = 'OPERATOR' AND name = 'Sorting Operator'");
                 stmt.execute("INSERT OR IGNORE INTO roles (code, name) VALUES ('SORTER', 'Sorting Operator'), ('SORTING_HELPER', 'Sorting Helper')");
             }
+            addColumnIfMissing(conn, "sorting_raw_lots", "material", "TEXT NOT NULL DEFAULT ''");
+            addColumnIfMissing(conn, "sorting_raw_lots", "source_area", "TEXT NOT NULL DEFAULT ''");
+            addColumnIfMissing(conn, "sorting_raw_lots", "location_id", "INTEGER REFERENCES warehouse_locations(id)");
             addColumnIfMissing(conn, "orders", "delivery_date", "TEXT");
             addColumnIfMissing(conn, "sorting_bags", "packed_by", "INTEGER REFERENCES users(id)");
             addColumnIfMissing(conn, "sorting_bags", "pack_day", "TEXT");
@@ -63,6 +66,7 @@ public final class SchemaInitializer {
             }
         });
         new SortingRosterMigration(dbManager).upgrade(sql);
+        new SortingRawMaterialMigration(dbManager).upgrade(sql);
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
     }
 

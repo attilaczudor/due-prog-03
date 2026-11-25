@@ -18,6 +18,8 @@
 - [x] Add route-sorted pick lists with collected/total progress to Order Staging.
 - [x] Bring the three Hungarian reports and the README up to date with the code (42 tables, 24 indexes, 847 keys, 36 test classes, 131 tests); details and the audit trail are in the [optimization plan](Optimization-Plan.md).
 
+- [x] Track raw material as daily collection lines (material, collection area, storage location). A sorter now calls for a line instead of typing kilograms, since the delivered weight is only known when the driver brings it.
+
 ## Next session
 
 - [ ] Click through what was only compiled or painted, not seen: the first-time setup dialog, the invoice dialog (history table, disabled buttons, status drop-down), the Pick list button and printed layout, the mail attachment open flow, and the Admin backup and restore buttons.

@@ -846,3 +846,15 @@ invoice.event.PAID,Marked paid,Kifizetettnek jelölve
 invoice.event.PAYMENT_WITHDRAWN,Payment withdrawn,Kifizetés visszavonva
 invoice.event.CREDIT_NOTE_ISSUED,Credit note issued,Sztornó számla kiállítva
 invoice.event.CREDIT_NOTE_FOR,Credit note for,Sztornó számla a következőhöz
+sorting.materials,Raw materials,Nyersanyag-tételek
+sorting.lot.material,Material,Anyag
+sorting.lot.area,Collection area,Gyűjtési terület
+sorting.lot.location,Storage location,Tárolóhely
+sorting.lot.awaiting_storage,Awaiting storage,Betárolásra vár
+sorting.lot.store,Store lot,Tétel betárolása
+sorting.lot.call,Call for this material,Alapanyag igénylése
+sorting.lot.call_confirm,"Call for this material? You will not know how much you get until the driver delivers it.","Igényli ezt az alapanyagot? Azt, hogy mennyit kap, csak a targoncás átadásakor tudja meg."
+sorting.lot.select_first,Select a raw material line first.,Előbb válasszon ki egy nyersanyag-tételt.
+sorting.available_amount,Available,Készleten
+sorting.received_amount,Received,Beérkezett
+sorting.alert.lot_received,Raw lot {0} is waiting to be stored,A(z) {0} nyersanyag-tétel betárolásra vár

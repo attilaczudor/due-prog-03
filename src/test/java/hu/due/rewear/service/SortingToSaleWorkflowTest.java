@@ -52,24 +52,28 @@ class SortingToSaleWorkflowTest {
         assertEquals(4, team.sorterIds().size());
         sorting.saveTeam(team.id(), team.name(), List.of(helper.id()), supply.id(), team.stationId(),
                 team.sorterIds(), bd("1000"), bd("7.5"));
-        long lot = sorting.receive("TEST-R-001", bd("1300"));
-        long shortLot = sorting.receive("TEST-SHORT", bd("20"));
+        long lot = sorting.receive("TEST-R-001", "Vegyes", "Pest megye", bd("1300"));
+        long shortLot = sorting.receive("TEST-SHORT", "Gyerek", "Fejér megye", bd("20"));
+        long rawShelf = ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.STORAGE, true).get(0).id();
+        sorting.storeLot(lot, rawShelf);
+        sorting.storeLot(shortLot, rawShelf);
 
         ctx.getSession().login(sorter);
         assertEquals(0L, sorting.workspace(sorting.today()).daily().get(0).processedGrams());
-        long request = sorting.requestSupply(bd("400"));
+        long request = sorting.requestSupply(lot);
         assertTrue(ctx.getNotificationService().listForUser(supply.id(), 100).stream()
                 .anyMatch(n -> n.title().endsWith("#" + request) && AppModule.SORTING.viewKey().equals(n.targetView())));
         assertFalse(ctx.getNotificationService().listForUser(fulfilment.id(), 100).stream()
                 .anyMatch(n -> AppModule.SORTING.viewKey().equals(n.targetView())));
 
         ctx.getSession().login(fulfilment);
-        assertThrows(IllegalStateException.class, () -> sorting.deliver(request, lot, bd("400")));
+        assertThrows(IllegalStateException.class, () -> sorting.deliver(request, bd("400")));
         ctx.getSession().login(supply);
+        // The request names its own lot, so another lot cannot be substituted at delivery.
         assertThrows(IllegalStateException.class, () -> sorting.deliver(request, shortLot, bd("400")));
         assertTrue(sorting.workspace(sorting.today()).requests().get(0).awaitingDelivery());
-        sorting.deliver(request, lot, bd("400"));
-        assertThrows(IllegalStateException.class, () -> sorting.deliver(request, lot, bd("400")));
+        sorting.deliver(request, bd("400"));
+        assertThrows(IllegalStateException.class, () -> sorting.deliver(request, bd("400")));
 
         var dict = ctx.getDictionaryDao();
         var target = dict.findTargetGroups(true).stream().filter(t -> t.code().equals("B")).findFirst().orElseThrow();
@@ -83,9 +87,9 @@ class SortingToSaleWorkflowTest {
         sorting.finish(request, bd("400"));
 
         for (String amount : List.of("400", "200")) {
-            long next = sorting.requestSupply(bd(amount));
+            long next = sorting.requestSupply(lot);
             ctx.getSession().login(supply);
-            sorting.deliver(next, lot, bd(amount));
+            sorting.deliver(next, bd(amount));
             ctx.getSession().login(sorter);
             sorting.finish(next, bd(amount));
         }
@@ -95,9 +99,9 @@ class SortingToSaleWorkflowTest {
         assertTrue(total.reachedTarget());
         assertEquals(helper.displayName(), total.helper());
 
-        long extra = sorting.requestSupply(bd("100"));
+        long extra = sorting.requestSupply(lot);
         ctx.getSession().login(supply);
-        sorting.deliver(extra, lot, bd("100"));
+        sorting.deliver(extra, bd("100"));
         ctx.getSession().login(sorter);
         sorting.finish(extra, BigDecimal.ZERO);
         ctx.getSession().login(manager);

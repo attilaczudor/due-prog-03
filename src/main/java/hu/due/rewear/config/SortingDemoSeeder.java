@@ -16,7 +16,7 @@ import java.util.Locale;
 
 final class SortingDemoSeeder {
     private static final String SEED_KEY = "demo.sorting.seeded";
-    private static final String CURRENT_VERSION = "2";
+    private static final String CURRENT_VERSION = "3";
     private static final Person FULFILMENT_DRIVER = new Person("Kelemen", "Ádám");
     private static final List<Person> HELPERS = List.of(
             new Person("Szűcs", "Bálint"),
@@ -65,7 +65,9 @@ final class SortingDemoSeeder {
     void seedForDemoWorkspace() {
         String version = seedVersion();
         if (version != null) {
+            // Sequential steps, so a workspace seeded at any earlier version ends up current.
             if ("1".equals(version)) upgradeLegacyNames();
+            upgradeRawLots();
             return;
         }
         var stationManager = users.findByUsername("operator");
@@ -126,15 +128,63 @@ final class SortingDemoSeeder {
                     }
                 }
             }
-            try (var ps = conn.prepareStatement("""
-                    INSERT OR IGNORE INTO sorting_raw_lots(reference,received_grams,available_grams,received_by,received_at)
-                    VALUES ('DEMO-RAW-001',12000000,12000000,?,?)
-                    """)) {
-                ps.setLong(1, manager.get().id());
-                ps.setString(2, Instant.now().toString());
+            seedRawLots(conn, manager.get().id());
+        });
+    }
+
+    /**
+     * The daily collections the transit drivers bring in from their own drop-off areas. Idempotent: a lot
+     * reference that already exists is left alone, so this can also run when an older demo workspace is upgraded.
+     */
+    private static void seedRawLots(java.sql.Connection conn, long receivedBy) throws SQLException {
+        long[] storage = new long[3];
+        int found = 0;
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT id FROM warehouse_locations WHERE active=1 AND location_type='STORAGE' ORDER BY code")) {
+            while (rs.next() && found < storage.length) storage[found++] = rs.getLong(1);
+        }
+        Object[][] lots = {
+                {"RAW-2026-0001", "Vegyes használt ruha / Mixed used clothing", "Budapest és Pest megye", 12_000_000L},
+                {"RAW-2026-0002", "Vegyes használt ruha / Mixed used clothing", "Győr-Moson-Sopron", 8_400_000L},
+                {"RAW-2026-0003", "Téli kabát és pulóver / Winter coats and knitwear", "Borsod-Abaúj-Zemplén", 6_250_000L},
+                {"RAW-2026-0004", "Gyerekruha / Kids clothing", "Dunaújváros és környéke", 4_800_000L},
+                {"RAW-2026-0005", "Lakástextil / Home textiles", "Szeged és Csongrád", 3_100_000L},
+                {"RAW-2026-0006", "Cipő és táska / Shoes and bags", "Debrecen és Hajdú-Bihar", 2_400_000L}
+        };
+        try (var ps = conn.prepareStatement("""
+                INSERT OR IGNORE INTO sorting_raw_lots(reference,material,source_area,location_id,
+                received_grams,available_grams,received_by,received_at) VALUES (?,?,?,?,?,?,?,?)
+                """)) {
+            for (int i = 0; i < lots.length; i++) {
+                long weight = (Long) lots[i][3];
+                // The two most recent collections are still waiting for a forklift driver to store them.
+                boolean stored = found > 0 && i < lots.length - 2;
+                ps.setString(1, (String) lots[i][0]);
+                ps.setString(2, (String) lots[i][1]);
+                ps.setString(3, (String) lots[i][2]);
+                if (stored) ps.setLong(4, storage[i % found]); else ps.setNull(4, java.sql.Types.INTEGER);
+                ps.setLong(5, weight);
+                ps.setLong(6, weight);
+                ps.setLong(7, receivedBy);
+                ps.setString(8, Instant.now().minusSeconds(86_400L * (lots.length - i)).toString());
                 ps.executeUpdate();
             }
-        });
+        }
+        // The single unlabelled lot of older demo data gets the same treatment as the new ones.
+        try (var ps = conn.prepareStatement("""
+                UPDATE sorting_raw_lots SET material=?, source_area=?
+                WHERE reference='DEMO-RAW-001' AND material=''
+                """)) {
+            ps.setString(1, "Vegyes használt ruha / Mixed used clothing");
+            ps.setString(2, "Vegyes gyűjtés / Mixed collection");
+            ps.executeUpdate();
+        }
+        if (found > 0) {
+            try (var ps = conn.prepareStatement("UPDATE sorting_raw_lots SET location_id=? WHERE reference='DEMO-RAW-001' AND location_id IS NULL")) {
+                ps.setLong(1, storage[0]);
+                ps.executeUpdate();
+            }
+        }
     }
 
     private String seedVersion() {
@@ -147,12 +197,28 @@ final class SortingDemoSeeder {
         }
     }
 
+    /** Gives an existing demo workspace the collection lines, without touching anything else. */
+    private void upgradeRawLots() {
+        var manager = users.findByUsername("manager");
+        if (manager.isEmpty()) return;
+        db.runInTransaction(conn -> {
+            try (var marker = conn.prepareStatement("""
+                    UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '2'
+                    """)) {
+                marker.setString(1, CURRENT_VERSION);
+                marker.setString(2, SEED_KEY);
+                if (marker.executeUpdate() != 1) return;
+            }
+            seedRawLots(conn, manager.get().id());
+        });
+    }
+
     private void upgradeLegacyNames() {
         db.runInTransaction(conn -> {
             try (var marker = conn.prepareStatement("""
                     UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '1'
                     """)) {
-                marker.setString(1, CURRENT_VERSION);
+                marker.setString(1, "2");
                 marker.setString(2, SEED_KEY);
                 if (marker.executeUpdate() != 1) return;
             }

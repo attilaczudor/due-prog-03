@@ -27,12 +27,16 @@ public final class SortingService {
                    (SELECT GROUP_CONCAT(h.full_name, ', ') FROM sorting_request_helpers rh
                     JOIN users h ON h.id=rh.helper_id WHERE rh.request_id=r.id) AS helper,
                    d.full_name AS driver,
-                   t.name AS team, l.reference AS lot, s.code AS station,
+                   t.name AS team, l.reference AS lot, l.material AS material, s.code AS station,
                    COALESCE((SELECT SUM(b.weight_grams) FROM sorting_bags b WHERE b.request_id=r.id),0) AS output
             FROM sorting_requests r
             JOIN users u ON u.id=r.sorter_id JOIN users d ON d.id=r.driver_id
             JOIN sorting_teams t ON t.id=r.team_id JOIN warehouse_locations s ON s.id=r.station_id
-            LEFT JOIN sorting_raw_lots l ON l.id=r.lot_id
+            LEFT JOIN sorting_raw_lots l ON l.id=COALESCE(r.lot_id, r.requested_lot_id)
+            """;
+    private static final String LOT_SELECT = """
+            SELECT l.*, loc.code AS location_code FROM sorting_raw_lots l
+            LEFT JOIN warehouse_locations loc ON loc.id=l.location_id
             """;
     private static final String BAG_SELECT = """
             SELECT b.*, tg.code AS target, gt.code AS garment, q.code AS grade, p.code AS packaging,
@@ -47,10 +51,17 @@ public final class SortingService {
 
     public record Team(long id, String name, List<Long> helperIds, long driverId, long stationId, long targetGrams,
                        Integer bonusBasisPoints, List<Long> sorterIds) { }
-    public record Lot(long id, String reference, long receivedGrams, long availableGrams, String receivedAt) { }
+    /**
+     * One raw material line: a daily collection of unsorted clothing from a collection area. It is received at
+     * the facility first, and becomes available to sorters once a forklift driver has stored it at a location.
+     */
+    public record Lot(long id, String reference, String material, String sourceArea, Long locationId, String locationCode,
+                      long receivedGrams, long availableGrams, String receivedAt) {
+        public boolean stored() { return locationId != null; }
+    }
     public record Request(long id, String sorter, String helper, String driver, String team, String station, String lot,
-                          long requestedGrams, Long deliveredGrams, Long processedGrams, long outputGrams, String requestedAt,
-                          String deliveredAt, String finishedAt, String cancelledAt) {
+                          Long requestedGrams, Long deliveredGrams, Long processedGrams, long outputGrams, String requestedAt,
+                          String deliveredAt, String finishedAt, String cancelledAt, Long requestedLotId, String material) {
         public boolean awaitingDelivery() { return deliveredAt == null && cancelledAt == null; }
         public boolean processing() { return deliveredAt != null && finishedAt == null; }
     }
@@ -91,10 +102,12 @@ public final class SortingService {
             List<Request> requests = query(conn, REQUEST_SELECT + scope.where() + " ORDER BY r.id DESC",
                     SortingService::mapRequest, scope.params());
             List<Bag> bags = query(conn, BAG_SELECT + scope.where() + " ORDER BY b.id DESC", SortingService::mapBag, scope.params());
-            List<Lot> lots = management(actor) || actor.roleCode() == RoleCode.FORKLIFT
-                    ? query(conn, "SELECT * FROM sorting_raw_lots ORDER BY id DESC", r -> new Lot(r.getLong("id"),
-                    r.getString("reference"), r.getLong("received_grams"), r.getLong("available_grams"),
-                    r.getString("received_at"))) : List.of();
+            // Sorters see only what they can actually call for: lots that are stored and still have stock.
+            String lotFilter = actor.roleCode() == RoleCode.SORTER
+                    ? " WHERE l.location_id IS NOT NULL AND l.available_grams>0" : "";
+            List<Lot> lots = management(actor) || actor.roleCode() == RoleCode.FORKLIFT || actor.roleCode() == RoleCode.SORTER
+                    ? query(conn, LOT_SELECT + lotFilter + " ORDER BY l.available_grams=0, l.material COLLATE NOCASE, l.reference",
+                    SortingService::mapLot) : List.of();
             List<Team> teams = management(actor) ? teams(conn) : List.of();
             return new Workspace(requests, bags, lots, teams, daily(conn, actor, day));
         });
@@ -102,16 +115,49 @@ public final class SortingService {
 
     public LocalDate today() { return BusinessClock.today(); }
 
-    public long receive(String reference, BigDecimal weightKg) {
+    /**
+     * Records one daily collection arriving at the facility from a collection area. The lot is not yet
+     * available to sorters: a forklift driver is notified and stores it ({@link #storeLot}) first.
+     */
+    public long receive(String reference, String material, String sourceArea, BigDecimal weightKg) {
         User actor = actor();
         require(management(actor), "Only warehouse management may receive raw stock.");
         long weight = grams(weightKg, false);
         String label = reference == null ? "" : reference.strip();
+        String what = material == null ? "" : material.strip();
+        String area = sourceArea == null ? "" : sourceArea.strip();
         require(!label.isEmpty() && label.length() <= 100, "Enter a lot reference of up to 100 characters.");
-        return db.executeInTransaction(conn -> insertId(conn, """
-                INSERT INTO sorting_raw_lots(reference,received_grams,available_grams,received_by,received_at)
-                VALUES (?,?,?,?,?) RETURNING id
-                """, label, weight, weight, actor.id(), now()));
+        require(!what.isEmpty() && what.length() <= 120, "Enter the material of the lot (up to 120 characters).");
+        require(!area.isEmpty() && area.length() <= 120, "Enter the collection area of the lot (up to 120 characters).");
+        long id = db.executeInTransaction(conn -> {
+            long lot = insertId(conn, """
+                    INSERT INTO sorting_raw_lots(reference,material,source_area,received_grams,available_grams,received_by,received_at)
+                    VALUES (?,?,?,?,?,?,?) RETURNING id
+                    """, label, what, area, weight, weight, actor.id(), now());
+            // Only the supply drivers of sorting teams, never the fulfilment driver who serves customer orders.
+            for (long driver : query(conn, """
+                    SELECT DISTINCT t.driver_id FROM sorting_teams t JOIN users u ON u.id=t.driver_id
+                    WHERE u.active=1
+                    """, row -> row.getLong(1))) {
+                alert(conn, driver, i18n.t("sorting.alert.lot_received", label), what + " · " + area + " · " + kg(weight) + " kg");
+            }
+            return lot;
+        });
+        notifications.publishCommitted();
+        return id;
+    }
+
+    /** Puts a received lot away at a storage location, which is what makes it available to sorters. */
+    public void storeLot(long lotId, long locationId) {
+        User actor = actor();
+        require(management(actor) || actor.roleCode() == RoleCode.FORKLIFT,
+                "Only a forklift driver or warehouse management may store raw stock.");
+        db.runInTransaction(conn -> {
+            locations.findById(conn, locationId).filter(l -> l.active() && l.locationType() == LocationType.STORAGE)
+                    .orElseThrow(() -> new IllegalStateException("Select an active storage location."));
+            require(changed(conn, "UPDATE sorting_raw_lots SET location_id=? WHERE id=?", locationId, lotId) == 1,
+                    "The raw lot does not exist.");
+        });
     }
 
     public void saveTeam(long teamId, String name, List<Long> helpers, long driver, long station, List<Long> sorters,
@@ -156,10 +202,17 @@ public final class SortingService {
         });
     }
 
-    public long requestSupply(BigDecimal requestedKg) {
+    /**
+     * The sorter calls for a raw material line, not for an amount: how much the driver can bring is only known
+     * at delivery, so the request carries no weight. The line must be stored and still have stock.
+     */
+    public long requestSupply(long lotId) {
         User actor = actor(RoleCode.SORTER);
-        long weight = grams(requestedKg, false);
         long id = db.executeInTransaction(conn -> {
+            Lot lot = first(query(conn, LOT_SELECT + " WHERE l.id=?", SortingService::mapLot, lotId),
+                    "Select a raw material line.");
+            require(lot.stored(), "This raw material has not been stored yet.");
+            require(lot.availableGrams() > 0, "This raw material is used up.");
             Team team = first(query(conn, """
                     SELECT t.* FROM sorting_teams t JOIN sorting_team_members m ON m.team_id=t.id WHERE m.sorter_id=?
                     """, r -> mapTeam(r, List.of(), List.of()), actor.id()), "Ask a manager to assign you to a sorting team.");
@@ -172,14 +225,15 @@ public final class SortingService {
             verifyStation(conn, team.stationId());
             long requestId = insertId(conn, """
                     INSERT INTO sorting_requests(sorter_id,team_id,driver_id,station_id,target_grams,
-                    bonus_basis_points,requested_grams,requested_at) VALUES (?,?,?,?,?,?,?,?) RETURNING id
+                    bonus_basis_points,requested_lot_id,requested_at) VALUES (?,?,?,?,?,?,?,?) RETURNING id
                     """, actor.id(), team.id(), team.driverId(), team.stationId(),
-                    team.targetGrams(), team.bonusBasisPoints(), weight, now());
+                    team.targetGrams(), team.bonusBasisPoints(), lot.id(), now());
             for (long helper : helpers) {
                 changed(conn, "INSERT INTO sorting_request_helpers(request_id,helper_id) VALUES (?,?)", requestId, helper);
             }
             alert(conn, team.driverId(), i18n.t("sorting.alert.request", requestId),
-                    actor.displayName() + " · " + team.name() + " · " + kg(weight) + " kg");
+                    actor.displayName() + " · " + team.name() + " · " + lot.material() + " · " + lot.reference()
+                            + " @ " + lot.locationCode());
             return requestId;
         });
         notifications.publishCommitted();
@@ -194,13 +248,31 @@ public final class SortingService {
                 """, now(), requestId, actor.id()) == 1, "Only your undelivered requests can be cancelled."));
     }
 
+    /** Delivers the raw lot the sorter called for; the weight is whatever the driver actually brings. */
+    public void deliver(long requestId, BigDecimal deliveredKg) {
+        deliverFrom(requestId, null, deliveredKg);
+    }
+
+    /** For a request made before lots could be called for: the driver chooses the lot at delivery. */
     public void deliver(long requestId, long lotId, BigDecimal deliveredKg) {
+        deliverFrom(requestId, lotId, deliveredKg);
+    }
+
+    private void deliverFrom(long requestId, Long chosenLot, BigDecimal deliveredKg) {
         User actor = actor(RoleCode.FORKLIFT);
         long weight = grams(deliveredKg, false);
         db.runInTransaction(conn -> {
+            List<Long> called = query(conn, "SELECT requested_lot_id FROM sorting_requests WHERE id=? AND driver_id=?",
+                    r -> nullableLong(r, "requested_lot_id"), requestId, actor.id());
+            require(!called.isEmpty(), "The request is unavailable.");
+            Long calledLot = called.get(0);
+            require(calledLot == null || chosenLot == null || calledLot.equals(chosenLot),
+                    "This request is for a different raw lot.");
+            Long lotId = calledLot != null ? calledLot : chosenLot;
+            require(lotId != null, "Select the raw lot to deliver from.");
             require(changed(conn, """
                     UPDATE sorting_requests SET lot_id=?,delivered_grams=?,delivered_at=? WHERE id=? AND driver_id=?
-                        AND delivered_at IS NULL AND cancelled_at IS NULL AND requested_grams>=?
+                        AND delivered_at IS NULL AND cancelled_at IS NULL AND (requested_grams IS NULL OR requested_grams>=?)
                     """, lotId, weight, now(), requestId, actor.id(), weight) == 1,
                     "The request is unavailable or the delivery exceeds the requested weight.");
             require(changed(conn, "UPDATE sorting_raw_lots SET available_grams=available_grams-? WHERE id=? AND available_grams>=?",
@@ -318,6 +390,9 @@ public final class SortingService {
     }
 
     public static BigDecimal kg(long grams) { return BigDecimal.valueOf(grams, 3).stripTrailingZeros(); }
+
+    /** Stock is kept in grams; raw loads are talked about in tonnes. */
+    public static BigDecimal tonnes(long grams) { return BigDecimal.valueOf(grams, 6).stripTrailingZeros(); }
 
     private List<Team> teams(Connection conn) throws SQLException {
         Map<Long, List<Long>> members = new LinkedHashMap<>();
@@ -450,9 +525,16 @@ public final class SortingService {
 
     private static Request mapRequest(ResultSet r) throws SQLException {
         return new Request(r.getLong("id"), r.getString("sorter"), r.getString("helper"), r.getString("driver"),
-                r.getString("team"), r.getString("station"), r.getString("lot"), r.getLong("requested_grams"),
+                r.getString("team"), r.getString("station"), r.getString("lot"), nullableLong(r,"requested_grams"),
                 nullableLong(r,"delivered_grams"), nullableLong(r,"processed_grams"), r.getLong("output"), r.getString("requested_at"),
-                r.getString("delivered_at"), r.getString("finished_at"), r.getString("cancelled_at"));
+                r.getString("delivered_at"), r.getString("finished_at"), r.getString("cancelled_at"),
+                nullableLong(r,"requested_lot_id"), r.getString("material"));
+    }
+
+    private static Lot mapLot(ResultSet r) throws SQLException {
+        return new Lot(r.getLong("id"), r.getString("reference"), r.getString("material"), r.getString("source_area"),
+                nullableLong(r, "location_id"), r.getString("location_code"), r.getLong("received_grams"),
+                r.getLong("available_grams"), r.getString("received_at"));
     }
 
     private static Bag mapBag(ResultSet r) throws SQLException {
