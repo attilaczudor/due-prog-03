@@ -218,7 +218,12 @@ public final class AppContext {
         this.invoicePdfExporter = new InvoicePdfExporter(i18n, qrCodeService, settingsDao::getCompanyProfile);
         this.invoiceArchiveService = new InvoiceArchiveService(invoicesDir, invoicePdfExporter);
         this.invoiceService = new InvoiceService(databaseManager, invoiceDao, orderDao, orderItemDao,
-                customerDao, financeConfigDao, invoiceArchiveService);
+                customerDao, financeConfigDao, invoiceArchiveService,
+                userId -> userDao.findById(userId)
+                        .filter(hu.due.rewear.model.User::active)
+                        .map(user -> roleModuleService.isModuleEnabled(user.roleCode(),
+                                hu.due.rewear.model.AppModule.INVOICES))
+                        .orElse(false));
         this.financialReportPdfExporter = new FinancialReportPdfExporter(i18n, settingsDao::getCompanyProfile);
         this.partnerStatementService = new PartnerStatementService(i18n, settingsDao::getCompanyProfile);
         this.receiptVaultService = new ReceiptVaultService(receiptsDir, invoiceDao);

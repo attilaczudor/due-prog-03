@@ -84,6 +84,17 @@ public final class InvoiceService {
     private final CustomerDao customerDao;
     private final FinanceConfigDao financeConfigDao;
     private final InvoiceArchiveService archive;
+    private final Access access;
+
+    /**
+     * Decides whether a user may carry out money actions on invoices. The application wires this to the
+     * Invoices module of the role matrix, so the service enforces exactly what the screen shows rather
+     * than trusting that only the right people can open it.
+     */
+    @FunctionalInterface
+    public interface Access {
+        boolean mayManage(long userId);
+    }
 
     public InvoiceService(DatabaseManager db,
                           InvoiceDao invoiceDao,
@@ -91,7 +102,8 @@ public final class InvoiceService {
                           OrderItemDao orderItemDao,
                           CustomerDao customerDao,
                           FinanceConfigDao financeConfigDao,
-                          InvoiceArchiveService archive) {
+                          InvoiceArchiveService archive,
+                          Access access) {
         this.db = db;
         this.invoiceDao = invoiceDao;
         this.orderDao = orderDao;
@@ -99,6 +111,18 @@ public final class InvoiceService {
         this.customerDao = customerDao;
         this.financeConfigDao = financeConfigDao;
         this.archive = archive;
+        this.access = java.util.Objects.requireNonNull(access, "access");
+    }
+
+    /** Whether this user may change invoice statuses and issue credit notes. */
+    public boolean mayManage(long userId) {
+        return access.mayManage(userId);
+    }
+
+    private void requireAccess(long userId) {
+        if (!access.mayManage(userId)) {
+            throw new SecurityException("You do not have access to invoice actions.");
+        }
     }
 
     /**
@@ -497,6 +521,7 @@ public final class InvoiceService {
      * </ul>
      */
     public Invoice issueCreditNote(long originalInvoiceId, long userId) {
+        requireAccess(userId);
         Invoice created = saveWithDocuments(conn -> {
             Invoice orig = invoiceDao.findById(conn, originalInvoiceId)
                     .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + originalInvoiceId));
@@ -556,6 +581,7 @@ public final class InvoiceService {
      * issue and due date), then refreshes the archived PDF so the stored document shows the real issue date.
      */
     public Invoice changeStatus(long invoiceId, InvoiceStatus targetStatus, long userId) {
+        requireAccess(userId);
         // Only a draft's stored PDF is rewritten (to carry its real issue date); an issued invoice's archive is never touched.
         boolean wasDraft = invoiceDao.findById(invoiceId).map(i -> i.status() == InvoiceStatus.DRAFT).orElse(false);
         Invoice changed = saveWithDocuments(conn -> {

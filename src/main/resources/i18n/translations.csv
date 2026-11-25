@@ -836,3 +836,13 @@ picklist.collected,Collected {0} of {1} packages ({2}%),{0} / {1} csomag összes
 picklist.remaining_weight,Still to collect: {0} kg,Még összeszedendő: {0} kg
 picklist.empty,Nothing to collect.,Nincs összeszedendő csomag.
 picklist.nothing,"There is nothing to pick. An order needs reserved packages, and a scheduled order also needs an assigned driver and dock.","Nincs mit összeszedni. A rendeléshez foglalt csomagok kellenek, az ütemezett rendeléshez pedig kijelölt sofőr és kiadó zóna is."
+invoice.history.title,History,Előzmények
+invoice.history.when,When,Mikor
+invoice.history.event,Event,Esemény
+invoice.history.by,By,Ki
+invoice.history.note,Note,Megjegyzés
+invoice.event.ISSUED,Issued,Kiállítva
+invoice.event.PAID,Marked paid,Kifizetettnek jelölve
+invoice.event.PAYMENT_WITHDRAWN,Payment withdrawn,Kifizetés visszavonva
+invoice.event.CREDIT_NOTE_ISSUED,Credit note issued,Sztornó számla kiállítva
+invoice.event.CREDIT_NOTE_FOR,Credit note for,Sztornó számla a következőhöz

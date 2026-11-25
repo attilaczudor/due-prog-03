@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -238,8 +238,8 @@ file handling, backup and restore, stock reservation, credit notes and time hand
 ### Documentation numbers to carry into the Hungarian reports
 
 Deferred with the rest of the submission documents, but the figures are now:
-**837** translation keys (reports say 810), **172** main Java sources (Programterv says 161), **42** tables and **24** indexes (reports say 41 and 23),
-**35** test classes (says 24), **127** tests (says 62), **172** main sources, **837** translation keys (reports say 810; passes 5 and 6 added 26), **42** tables, **24** indexes.
+**847** translation keys (reports say 810), **172** main Java sources (Programterv says 161), **42** tables and **24** indexes (reports say 41 and 23),
+**36** test classes (says 24), **131** tests (says 62), **172** main sources, **847** translation keys (reports say 810; passes 5, 6 and 8 added 36), **42** tables, **24** indexes.
 
 ---
 
@@ -429,13 +429,39 @@ guard (4 failures), allowing withdrawal after a credit note, and skipping the le
 
 ### Not done
 
-- There is no role check in the service: any signed-in user who can open the invoice dialog can mark paid
-  or issue a credit note. The screen's visibility is the only gate.
-- The history is stored and tested but not shown anywhere in the UI yet.
+- No role check in the service and no history in the UI: both were done in pass 8.
 - Invoice numbers are still assigned when a draft is created, not when it is issued, so drafts issued out
   of order produce numbers that do not follow issue dates; a draft that is abandoned leaves a gap.
 - The dialog change was checked by compiling only, not by clicking through it.
 - Money is still stored as SQLite REAL (rounded before storage); moving to integer minor units remains open.
+
+---
+
+## Pass 8 — who may act on invoices, and the history on screen (25 November 2026)
+
+- [x] **Access enforced in the service.** `changeStatus` and `issueCreditNote` now refuse (with a
+  `SecurityException`, before anything is read or written) unless the acting user is active and their role has
+  the Invoices module in the role matrix. The service takes an `Access` rule at construction, and the
+  application wires it to the matrix, so the rule is the same one the menu uses: by default Admin, Manager and
+  Super Admin; granting or revoking the module for a role changes who can act, immediately. A deactivated or
+  unknown user is refused. There is no permissive default constructor.
+- [x] **History in the invoice dialog.** A table under the items lists each event with time, what happened
+  (with the status change), who did it and any note. It refreshes after every action. The Apply and
+  credit-note buttons are also disabled for a user without access. Ten new translation keys (English and
+  Hungarian).
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **131 / 131** across 36 classes (+4 `InvoiceAccessTest`). Mutation checks:
+making the check a no-op failed 3 of 4 tests; dropping the "active user" condition failed the deactivated-user
+test.
+
+### Not done
+
+- Creating invoices (from an order, manually or from a receipt) is not gated by this rule. An order's invoice
+  is created from the Orders screen, which has its own module, and gating it by Invoices could stop a legitimate
+  Orders-only role; that needs a decision about the intended roles first.
+- The dialog was checked by compiling only; the history table and disabled buttons were not seen on screen.
 
 ---
 

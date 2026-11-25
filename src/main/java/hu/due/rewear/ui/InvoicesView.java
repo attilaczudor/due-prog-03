@@ -510,7 +510,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
         BrutalistStyle.styleTable(itemsTable);
         itemsTable.setPreferredScrollableViewportSize(new Dimension(550, 145));
         itemsTable.getColumnModel().getColumn(0).setPreferredWidth(220);
-        body.add(new JScrollPane(itemsTable), BorderLayout.CENTER);
+        var history = BrutalistStyle.nonEditableTableModel();
+        history.setColumnIdentifiers(new Object[]{i18n.t("invoice.history.when"), i18n.t("invoice.history.event"),
+                i18n.t("invoice.history.by"), i18n.t("invoice.history.note")});
+        JTable historyTable = new JTable(history);
+        BrutalistStyle.styleTable(historyTable);
+        historyTable.setPreferredScrollableViewportSize(new Dimension(550, 90));
+        var center = new JPanel(new BorderLayout(0, 8));
+        center.add(new JScrollPane(itemsTable), BorderLayout.CENTER);
+        var historyBox = new JPanel(new BorderLayout(0, 4));
+        historyBox.add(new JLabel(i18n.t("invoice.history.title")), BorderLayout.NORTH);
+        historyBox.add(new JScrollPane(historyTable), BorderLayout.CENTER);
+        center.add(historyBox, BorderLayout.SOUTH);
+        body.add(center, BorderLayout.CENTER);
 
         var status = new JComboBox<StatusChoice>();
         var apply = new JButton(i18n.t("invoice.status_update"));
@@ -554,11 +566,22 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 }
             }
             status.setSelectedItem(current);
-            status.setEnabled(!allowed.isEmpty());
-            apply.setEnabled(!allowed.isEmpty());
+            // A role without access to invoice actions may look, but not change anything.
+            boolean mayManage = ctx.getInvoiceService().mayManage(ctx.getSession().requireCurrentUser().id());
+            status.setEnabled(mayManage && !allowed.isEmpty());
+            apply.setEnabled(mayManage && !allowed.isEmpty());
+            history.setRowCount(0);
+            for (var event : ctx.getInvoiceService().history(invoice.id())) {
+                String label = i18n.t("invoice.event." + event.eventType());
+                String move = event.fromStatus() == null || event.toStatus() == null ? ""
+                        : "  (" + i18n.t("status.invoice." + event.fromStatus()) + " → "
+                        + i18n.t("status.invoice." + event.toStatus()) + ")";
+                history.addRow(new Object[]{event.createdAt().toString().replace('T', ' '), label + move,
+                        event.userName() == null ? "" : event.userName(), event.note() == null ? "" : event.note()});
+            }
             reminder.setEnabled(invoice.direction() == InvoiceDirection.OUTGOING
                     && (invoice.status() == InvoiceStatus.ISSUED || invoice.status() == InvoiceStatus.OVERDUE));
-            credit.setEnabled(invoice.category() != InvoiceCategory.CREDIT_NOTE
+            credit.setEnabled(mayManage && invoice.category() != InvoiceCategory.CREDIT_NOTE
                     && invoice.status() != InvoiceStatus.CANCELLED);
             receipt.setText(i18n.t(invoice.hasAttachment() ? "invoice.receipt.view" : "invoice.receipt.attach"));
         };
