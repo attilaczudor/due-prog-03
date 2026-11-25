@@ -70,3 +70,6 @@ graphify-out/
 .LSOverride
 Thumbs.db
 Desktop.ini
+
+# Deep research working notes (the finished report lives in reports/)
+research_notes/

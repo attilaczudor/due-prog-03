@@ -203,7 +203,7 @@ public final class StocktakeService {
             if (!stocktake.open()) {
                 throw new IllegalStateException("This stocktake is already closed.");
             }
-            InventoryPackage found = packages.findByQrCode(qr)
+            InventoryPackage found = packages.findByQrCode(conn, qr)
                     .orElseThrow(() -> new IllegalArgumentException("No package with code " + qr + "."));
             if (found.status() == PackageStatus.SHIPPED || found.status() == PackageStatus.DISCARDED) {
                 throw new IllegalStateException("Package " + qr + " has already left the warehouse.");
@@ -430,14 +430,22 @@ public final class StocktakeService {
                 WHERE p.status IN ('IN_STOCK','RESERVED')
                   AND p.id NOT IN (SELECT package_id FROM stocktake_counts WHERE session_id = ?)
                 """);
+        // The scope is bound as a parameter rather than pasted into the statement: a zone is text somebody
+        // typed, and escaping quotation marks by hand is how that goes wrong.
+        List<Object> params = new ArrayList<>();
+        params.add(sessionId);
         if (stocktake.scopeLocationId() != null) {
-            sql.append(" AND p.location_id = ").append(stocktake.scopeLocationId());
+            sql.append(" AND p.location_id = ?");
+            params.add(stocktake.scopeLocationId());
         } else if (stocktake.scopeZone() != null) {
-            sql.append(" AND upper(l.zone) = '").append(stocktake.scopeZone().replace("'", "''")).append("'");
+            sql.append(" AND upper(l.zone) = ?");
+            params.add(stocktake.scopeZone().toUpperCase(Locale.ROOT));
         }
         sql.append(" ORDER BY l.code, p.qr_code");
         try (PreparedStatement ps = conn.prepareStatement(sql.toString())) {
-            ps.setLong(1, sessionId);
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 List<Missing> gone = new ArrayList<>();
                 while (rs.next()) {

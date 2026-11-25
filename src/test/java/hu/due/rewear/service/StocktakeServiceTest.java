@@ -275,6 +275,27 @@ class StocktakeServiceTest {
     }
 
     @Test
+    void aZoneWhoseNameContainsAQuoteIsHandledAsDataNotAsSql() {
+        setUp();
+        // Nothing stops a zone being named with an apostrophe, and the missing-stock query filters by zone.
+        String awkwardZone = "O'BRIEN";
+        long shelfId = ctx.getLocationDao().insert("OB-01-01", awkwardZone, "01", "01",
+                LocationType.STORAGE, new BigDecimal("500"));
+        InventoryPackage moved = onShelf(shelfA);
+        ctx.getInventoryService().relocatePackage(moved.id(), shelfId, "into the awkward zone", manager.id());
+
+        Session session = stocktake.open(awkwardZone, null, null);
+        var missing = stocktake.missing(session.id());
+
+        assertTrue(missing.stream().anyMatch(m -> m.packageId() == moved.id()),
+                "The package in that zone should be listed as not yet counted");
+        assertTrue(missing.stream().allMatch(m -> m.locationCode().equals("OB-01-01")),
+                "Only that zone belongs to the session: " + missing);
+        assertEquals(Outcome.FOUND, stocktake.count(session.id(), moved.qrCode(), null, false, null).outcome());
+        assertTrue(stocktake.missing(session.id()).isEmpty());
+    }
+
+    @Test
     void aZoneSessionAcceptsItsOwnZoneAndFlagsAnythingElseAsUnexpected() {
         setUp();
         InventoryPackage inZone = onShelf(shelfA);

@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44**, pass 15 to **164 across 45**, pass 16 to **165 across 46** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44**, pass 15 to **164 across 45**, pass 16 to **165 across 46**, pass 17 to **166** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -813,6 +813,42 @@ The same filter builds both queries, so the list and its totals cannot drift apa
   a deliberate, occasional action rather than something a screen does while someone waits.
 - The measurement runs on one machine with a warm page cache; it compares operations against each other
   rather than predicting what a particular computer will do.
+
+---
+
+## Pass 17 — housekeeping audit (25 November 2026)
+
+A systematic sweep for defects rather than new features. Most of it came back clean, which is worth recording
+as much as the two things that did not:
+
+- **Compiler:** zero warnings under `-Xlint:all` once the `[serial]` category the project has always excluded
+  is set aside. 
+- **`ResultSet.wasNull()`:** every one of the fourteen uses reads the column and checks immediately, so the
+  bug found in pass 13 was the only one of its kind.
+- **Resources:** every `ResultSet` and `PreparedStatement` is in a try-with-resources block.
+- **Swallowed exceptions:** the only empty catches are three deliberate `ArithmeticException` ignores in
+  weight parsing, each falling through to a message the user can act on.
+- **Threading:** `AsyncUiRunner` does its work in `doInBackground` and touches Swing only in `done`.
+
+### Two real defects, both in code this plan added earlier
+
+- **A second database connection opened inside an open transaction.** `StocktakeService.count` looked a
+  package up through `findByQrCode`, which opens its own connection, while the caller's transaction was
+  already open. SQLite allows it, so nothing failed, but such a read cannot see the transaction's own
+  uncommitted work — a bug waiting for the first caller that changes a package before counting it. There is
+  now a connection-aware `findByQrCode(Connection, String)`, and the count uses it.
+- **A user-entered value pasted into SQL.** The missing-stock query inlined the session's zone with
+  hand-escaped quotation marks. It is a bound parameter now. A zone may be named with an apostrophe —
+  nothing in the application prevents it — and a test counts stock in a zone called `O'BRIEN`; reverting to
+  the inlined version fails it with a SQL syntax error.
+
+### Left alone, deliberately
+
+`User.avatarPng` is a `byte[]` inside a record, so two users loaded separately compare as different even with
+identical avatars. Nothing in the application relies on `User` equality, so changing the model would be churn
+for its own sake; it is recorded here instead.
+
+`./mvnw clean verify`: BUILD SUCCESS, **166 / 166** across 46 classes.
 
 ---
 

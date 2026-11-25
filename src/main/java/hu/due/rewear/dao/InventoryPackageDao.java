@@ -145,6 +145,17 @@ public final class InventoryPackageDao {
         }
     }
 
+    /** Transaction-aware lookup: the caller's connection sees its own uncommitted changes. */
+    public Optional<InventoryPackage> findByQrCode(Connection conn, String qrCode) throws SQLException {
+        String sql = BASE_SELECT + " WHERE ip.qr_code = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, qrCode);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
+            }
+        }
+    }
+
     public Optional<InventoryPackage> findByQrCode(String qrCode) {
         String sql = BASE_SELECT + " WHERE upper(ip.qr_code) = upper(?)";
         try (Connection conn = db.getConnection();
