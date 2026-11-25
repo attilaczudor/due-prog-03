@@ -6,7 +6,7 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**182 fő Java forrásfájl**, **45 JUnit 5 tesztosztály**, **164 teszt**):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**182 fő Java forrásfájl**, **46 JUnit 5 tesztosztály**, **165 teszt**, ebből 1 csak kérésre fut):
 
 ```mermaid
 flowchart TD
@@ -389,7 +389,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **45 tesztosztály, összesen 164 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **46 tesztosztály, összesen 165 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -438,3 +438,4 @@ A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevi
 | `StocktakeServiceTest` | 7 | Polc számolása, rossz polcon talált csomag áthelyezése, súlytűrés, sérült áru leírása lezáráskor, hiányzó tételek jelentése leírás nélkül, egyszerre egy leltár és szerepkörök, zónaleltár |
 | `QuarantineMigrationTest` | 2 | A karantén két `CHECK` megszorítást bővít: a készlet- és mozgástábla újraépítése minden sor, azonosító és index megőrzésével, valamint a már naprakész adatbázis érintetlenül hagyása |
 | `MoneyStorageTest` | 3 | Az összegek szövegként tárolása és pontos visszaolvasása, tíz tizedes pontos összeadása, valamint régi, lebegőpontos adatbázis veszteségmentes átalakítása |
+| `LoadMeasurementTest` | 1 | Terhelésmérés 50 000 csomaggal: oldalsáv-jelvények, készletlista, értékelés, szedési lista, leltár és kapcsolatnyitás ideje (csak `-Dload.rows=...` esetén fut) |

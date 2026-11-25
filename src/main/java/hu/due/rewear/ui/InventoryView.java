@@ -85,6 +85,12 @@ public final class InventoryView extends JPanel implements NavigableView {
     private final JTable table = new JTable(tableModel);
     private final JLabel summaryLabel = new JLabel(" ");
 
+    /** How many rows the table holds at once; the totals beside it always describe the whole filter. */
+    private static final int MAX_ROWS_SHOWN = 2000;
+
+    /** One screenful of packages plus what the filter matches in total. */
+    private record LoadedPage(List<InventoryPackage> rows, hu.due.rewear.dao.InventoryPackageDao.FilterSummary summary) { }
+
     private List<InventoryPackage> currentRows = List.of();
     private boolean loadingFilters = false;
     private JPanel filterBarPanel;
@@ -308,14 +314,15 @@ public final class InventoryView extends JPanel implements NavigableView {
                 selectedValue(packageFilter),
                 selectedValue(locationFilter)
         );
+        // The table shows a bounded slice, because a full warehouse holds far more rows than anyone scrolls
+        // through; the totals beside it are counted in the database, so they describe the whole filter.
         AsyncUiRunner.runLatest("inventory.load", this,
-                () -> ctx.getPackageDao().findByFilter(filter),
-                rows -> {
-                    currentRows = rows;
+                () -> new LoadedPage(ctx.getPackageDao().findByFilter(filter, MAX_ROWS_SHOWN),
+                        ctx.getPackageDao().summarise(filter)),
+                page -> {
+                    currentRows = page.rows();
                     tableModel.setRowCount(0);
-                    BigDecimal totalWeight = BigDecimal.ZERO;
                     for (InventoryPackage p : currentRows) {
-                        totalWeight = totalWeight.add(p.weightKg());
                         tableModel.addRow(new Object[]{
                                 p.qrCode(),
                                 p.targetGroupCode() + " — " + p.localizedTargetGroup(lang),
@@ -334,7 +341,12 @@ public final class InventoryView extends JPanel implements NavigableView {
                         table.getColumnModel().getColumn(7).setCellRenderer(new StatusCellRenderer());
                     }
 
-                    summaryLabel.setText(i18n.t("inventory.summary", currentRows.size(), FormatUtil.stripZeros(totalWeight)));
+                    String summary = i18n.t("inventory.summary", page.summary().packages(),
+                            FormatUtil.stripZeros(page.summary().totalWeightKg()));
+                    if (page.summary().packages() > currentRows.size()) {
+                        summary += "  |  " + i18n.t("inventory.showing_first", currentRows.size());
+                    }
+                    summaryLabel.setText(summary);
                 },
                 ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
                         i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));

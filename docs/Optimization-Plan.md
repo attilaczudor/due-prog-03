@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44**, pass 15 to **164 across 45** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44**, pass 15 to **164 across 45**, pass 16 to **165 across 46** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -759,6 +759,60 @@ changing value.
 - Weights are still `REAL`. They are measurements rather than money, and the QR convention fixes them at two
   decimals, but the same argument would eventually apply.
 - The VAT rate and the exchange rate are still `REAL`. The rates in use (27, 18, 5, 0) are exact in binary.
+
+---
+
+## Pass 16 — measured under a full warehouse (25 November 2026)
+
+`LoadMeasurementTest` seeds a given number of packages and times what the application does with them. It is
+skipped unless a size is asked for, so the normal build stays quick:
+
+```sh
+./mvnw test -Dtest=LoadMeasurementTest -Dload.rows=50000
+```
+
+### What 50,000 packages cost, before any change
+
+| Operation | Time |
+| --- | ---: |
+| One full sidebar badge refresh (six queries) | 209 ms |
+| Inventory list, every row | 1930 ms |
+| Stock valuation | 87 ms |
+| Weight by quality grade | 104 ms |
+| Pick list across every open order | 45 ms |
+| Open a stocktake and list what is missing | 482 ms |
+| Invoice ledger | 8 ms |
+| Rota month | 40 ms |
+| Opening one database connection | 1.17 ms |
+
+### What the numbers say
+
+- **No connection pool is needed.** Opening a connection costs about 1.2 ms, so the six queries behind a badge
+  refresh spend roughly 7 ms of their 209 ms on connections. The plan asked whether per-call connections
+  should be pooled; measured, they are not the problem.
+- **The badge refresh is fine** at a tenth of its ten-second interval, and it already runs off the event
+  thread.
+- **Only one operation grew badly with the warehouse:** the inventory screen, which loaded every package.
+  At 50,000 rows that is about two seconds and fifty thousand objects held in memory, for a table nobody
+  scrolls to the end of.
+
+### Changed
+
+The inventory screen now loads the newest 2,000 rows and counts the totals in the database, so the figures
+beside the table still describe the whole filter and the screen says when it is showing only the newest rows.
+The same filter builds both queries, so the list and its totals cannot drift apart.
+
+| Operation | Before | After |
+| --- | ---: | ---: |
+| Inventory screen | 1930 ms | **84 ms** |
+| Its totals (exact, over every matching row) | — | 20 ms |
+
+### Not done
+
+- Nothing was changed about the stocktake's missing-stock list (482 ms for a whole-warehouse count), which is
+  a deliberate, occasional action rather than something a screen does while someone waits.
+- The measurement runs on one machine with a warm page cache; it compares operations against each other
+  rather than predicting what a particular computer will do.
 
 ---
 

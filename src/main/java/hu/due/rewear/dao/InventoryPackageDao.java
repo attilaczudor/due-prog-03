@@ -191,10 +191,12 @@ public final class InventoryPackageDao {
         }
     }
 
-    public List<InventoryPackage> findByFilter(PackageFilter filter) {
-        StringBuilder sql = new StringBuilder(BASE_SELECT).append(" WHERE 1=1 ");
-        List<Object> params = new ArrayList<>();
+    /** What a filter matches in total, however many rows the screen chooses to show. */
+    public record FilterSummary(long packages, BigDecimal totalWeightKg) { }
 
+    /** Builds the {@code WHERE} clause shared by the listing and its totals. */
+    private static String whereClause(PackageFilter filter, List<Object> params) {
+        StringBuilder sql = new StringBuilder(" WHERE 1=1 ");
         if (filter != null) {
             if (filter.qrSearch() != null && !filter.qrSearch().isBlank()) {
                 sql.append(" AND (upper(ip.qr_code) LIKE upper(?) OR lower(COALESCE(ip.notes, '')) LIKE lower(?)) ");
@@ -227,11 +229,26 @@ public final class InventoryPackageDao {
                 params.add(filter.locationId());
             }
         }
+        return sql.toString();
+    }
 
-        sql.append(" ORDER BY ip.created_at DESC, ip.id DESC");
+    public List<InventoryPackage> findByFilter(PackageFilter filter) {
+        return findByFilter(filter, 0);
+    }
 
+    /**
+     * Packages matching the filter, newest first.
+     *
+     * @param limit how many rows at most, or {@code 0} for all of them. A warehouse can hold tens of
+     *              thousands of packages, and a screen that tries to show every one of them keeps a person
+     *              waiting for rows they will never scroll to.
+     */
+    public List<InventoryPackage> findByFilter(PackageFilter filter, int limit) {
+        List<Object> params = new ArrayList<>();
+        String sql = BASE_SELECT + whereClause(filter, params)
+                + " ORDER BY ip.created_at DESC, ip.id DESC" + (limit > 0 ? " LIMIT " + limit : "");
         try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+             PreparedStatement ps = conn.prepareStatement(sql)) {
             for (int i = 0; i < params.size(); i++) {
                 ps.setObject(i + 1, params.get(i));
             }
@@ -244,6 +261,26 @@ public final class InventoryPackageDao {
             }
         } catch (SQLException e) {
             throw new DaoException("Failed to search inventory packages", e);
+        }
+    }
+
+    /** How many packages the filter matches and what they weigh, counted in the database. */
+    public FilterSummary summarise(PackageFilter filter) {
+        List<Object> params = new ArrayList<>();
+        String sql = "SELECT COUNT(*) AS packages, COALESCE(SUM(ip.weight_kg), 0) AS total_kg"
+                + " FROM inventory_packages ip" + whereClause(filter, params);
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            for (int i = 0; i < params.size(); i++) {
+                ps.setObject(i + 1, params.get(i));
+            }
+            try (ResultSet rs = ps.executeQuery()) {
+                rs.next();
+                return new FilterSummary(rs.getLong("packages"),
+                        BigDecimal.valueOf(rs.getDouble("total_kg")));
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to summarise inventory packages", e);
         }
     }
 

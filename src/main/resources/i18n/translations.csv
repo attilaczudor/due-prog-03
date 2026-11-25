@@ -153,7 +153,8 @@ inventory.edit.code_changed,QR code updated to match new details — reprint lab
 inventory.discard,Discard Package,Selejtezés
 inventory.discard.confirm,Mark package {0} as DISCARDED?,Biztosan selejtezi a(z) {0} csomagot?
 inventory.select_one,Please select a package from the table first.,Kérjük előbb válasszon ki egy csomagot a táblázatból.
-inventory.summary,Showing {0} package(s) — Total: {1} kg,Megjelenítve: {0} csomag — Összesen: {1} kg
+inventory.summary,{0} package(s) match — Total: {1} kg,{0} csomag felel meg — Összesen: {1} kg
+inventory.showing_first,showing the newest {0},a legújabb {0} látható
 locations.title,Warehouse Locations,Raktárhelyek
 locations.zone,Zone,Zóna
 locations.aisle,Aisle,Sor
