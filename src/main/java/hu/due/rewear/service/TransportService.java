@@ -162,7 +162,7 @@ public final class TransportService {
                     Long assignedDock = rs.wasNull() ? null : dockId;
                     tasks.add(new StagingTask(
                             rs.getLong("package_id"), rs.getString("qr_code"),
-                            BigDecimal.valueOf(rs.getDouble("weight_kg")), rs.getLong("loc_id"),
+                            hu.due.rewear.dao.ExactDecimal.get(rs, "weight_kg"), rs.getLong("loc_id"),
                             rs.getString("loc_code"), LocationType.fromDb(rs.getString("location_type")),
                             rs.getLong("order_id"), rs.getString("order_number"), rs.getString("customer_name"),
                             rs.getString("order_status"), assignedForklift, rs.getString("assigned_forklift_name"),

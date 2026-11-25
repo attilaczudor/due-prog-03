@@ -92,8 +92,8 @@ CREATE TABLE IF NOT EXISTS package_types (
     code TEXT NOT NULL UNIQUE,
     name_en TEXT NOT NULL,
     name_hu TEXT NOT NULL,
-    tare_weight_kg REAL NOT NULL DEFAULT 0 CHECK (tare_weight_kg >= 0),
-    max_weight_kg REAL NOT NULL DEFAULT 100 CHECK (max_weight_kg > 0),
+    tare_weight_kg TEXT NOT NULL DEFAULT '0',
+    max_weight_kg TEXT NOT NULL DEFAULT '100',
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
@@ -106,12 +106,15 @@ CREATE TABLE IF NOT EXISTS warehouse_locations (
     shelf TEXT NOT NULL,
     location_type TEXT NOT NULL DEFAULT 'STORAGE'
         CHECK (location_type IN ('OPERATOR_STATION', 'STORAGE', 'DISPATCH_ZONE')),
-    max_capacity_kg REAL NOT NULL CHECK (max_capacity_kg > 0),
+    max_capacity_kg TEXT NOT NULL,
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
--- Money is stored as an exact decimal string (for example '1800.00'), never as a floating point REAL,
--- so an amount is read back exactly as it was written. The bank ledger already did this.
+-- Money and mass are stored as exact decimal strings (for example '1800.00'), never as floating point
+-- REAL, so a value is read back exactly as it was written. The bank ledger already did this for money.
+-- Mass is included because the extended-producer-responsibility fee is charged per kilogram and the
+-- penalty for under-reporting is half the shortfall plus the fee, so a recorded mass is a financial
+-- control. Rates (VAT percentage, exchange rate) stay REAL: the values in use are exact in binary.
 
 -- 8. Core Inventory Packages (Sorted Second-Hand Clothing Bales/Bags/Boxes)
 CREATE TABLE IF NOT EXISTS inventory_packages (
@@ -122,7 +125,7 @@ CREATE TABLE IF NOT EXISTS inventory_packages (
     quality_grade_id INTEGER NOT NULL,
     package_type_id INTEGER NOT NULL,
     location_id INTEGER NOT NULL,
-    weight_kg REAL NOT NULL CHECK (weight_kg > 0),
+    weight_kg TEXT NOT NULL,
     hex_suffix TEXT NOT NULL CHECK (length(hex_suffix) = 2),
     status TEXT NOT NULL DEFAULT 'IN_STOCK'
         CHECK (status IN ('IN_STOCK', 'RESERVED', 'QUARANTINED', 'SHIPPED', 'DISCARDED')),
@@ -162,7 +165,7 @@ CREATE TABLE IF NOT EXISTS orders (
     status TEXT NOT NULL DEFAULT 'DRAFT'
         CHECK (status IN ('DRAFT', 'PACKING', 'SHIPPED', 'CANCELLED')),
     currency TEXT NOT NULL DEFAULT 'EUR',
-    total_weight_kg REAL NOT NULL DEFAULT 0 CHECK (total_weight_kg >= 0),
+    total_weight_kg TEXT NOT NULL DEFAULT '0',
     total_price TEXT NOT NULL DEFAULT '0',
     notes TEXT,
     created_by INTEGER NOT NULL,
@@ -275,7 +278,7 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     invoice_id INTEGER NOT NULL,
     description TEXT NOT NULL,
-    quantity REAL NOT NULL CHECK (quantity > 0),
+    quantity TEXT NOT NULL,
     unit TEXT NOT NULL DEFAULT 'kg',
     unit_price TEXT NOT NULL,
     line_net TEXT NOT NULL,

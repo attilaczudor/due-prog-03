@@ -688,8 +688,8 @@ public final class OrderService {
             ps.setLong(1, orderId);
             try (var rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    totalW = totalW.add(BigDecimal.valueOf(rs.getDouble("weight")));
-                    totalP = totalP.add(hu.due.rewear.dao.Money.get(rs, "line_total"));
+                    totalW = totalW.add(hu.due.rewear.dao.ExactDecimal.get(rs, "weight"));
+                    totalP = totalP.add(hu.due.rewear.dao.ExactDecimal.get(rs, "line_total"));
                 }
             }
         }

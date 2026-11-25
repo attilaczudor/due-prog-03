@@ -68,7 +68,7 @@ public final class SchemaInitializer {
         new SortingRosterMigration(dbManager).upgrade(sql);
         new SortingRawMaterialMigration(dbManager).upgrade(sql);
         new QuarantineMigration(dbManager).upgrade(sql);
-        new MoneyAsTextMigration(dbManager).upgrade(sql);
+        new ExactDecimalMigration(dbManager).upgrade(sql);
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
     }
 
@@ -255,19 +255,19 @@ public final class SchemaInitializer {
                 try (Statement stmt = conn.createStatement()) {
                     stmt.execute("""
                             INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                            VALUES ('ST-OP-01', 'OP', '01', '01', 'OPERATOR_STATION', 400.0, 1)
+                            VALUES ('ST-OP-01', 'OP', '01', '01', 'OPERATOR_STATION', '400', 1)
                             """);
                     stmt.execute("""
                             INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                            VALUES ('ST-OP-02', 'OP', '02', '01', 'OPERATOR_STATION', 400.0, 1)
+                            VALUES ('ST-OP-02', 'OP', '02', '01', 'OPERATOR_STATION', '400', 1)
                             """);
                     stmt.execute("""
                             INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                            VALUES ('ST-OP-03', 'OP', '03', '01', 'OPERATOR_STATION', 400.0, 1)
+                            VALUES ('ST-OP-03', 'OP', '03', '01', 'OPERATOR_STATION', '400', 1)
                             """);
                     stmt.execute("""
                             INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                            VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', 2000.0, 1)
+                            VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', '2000', 1)
                             """);
                     if (addedStationAssignment) {
                         stmt.execute("""

@@ -179,7 +179,7 @@ erDiagram
 | `code` | `TEXT` | `NOT NULL UNIQUE` | Helykód (pl. `ST-OP-01`, `A-01-01`, `DOCK-01`) |
 | `location_type` | `TEXT` | `CHECK ('OPERATOR_STATION','STORAGE','DISPATCH_ZONE')` | Operátori állomás / Tárolópolc / Kiadó gyűjtőzóna |
 | `zone`, `aisle`, `shelf` | `TEXT` | `NOT NULL` | Zóna, sor, polc bontás |
-| `max_capacity_kg` | `REAL` | `NOT NULL CHECK (> 0)` | Teherbírás (kg) |
+| `max_capacity_kg` | `TEXT` | `NOT NULL` | Teherbírás (kg), pontos tizedes szövegként |
 | `active` | `INTEGER` | `NOT NULL DEFAULT 1 CHECK (0,1)` | Aktív státusz |
 
 ### 3.12 `inventory_packages` (Központi csomag/bála készlet)
@@ -188,7 +188,7 @@ erDiagram
 | `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Egyedi azonosító |
 | `qr_code` | `TEXT` | `NOT NULL UNIQUE` | Teljes strukturált QR termékkód |
 | `target_group_id`, `garment_type_id`, `quality_grade_id`, `package_type_id`, `location_id` | `INTEGER` | `NOT NULL FK` | Hivatkozások a kódtörzsekre és aktuális raktárhelyre |
-| `weight_kg` | `REAL` | `NOT NULL CHECK (> 0)` | Nettó súly (kg) |
+| `weight_kg` | `TEXT` | `NOT NULL` | Nettó súly (kg), pontos tizedes szövegként |
 | `hex_suffix` | `TEXT` | `NOT NULL CHECK (length = 2)` | Véletlen 2 jegyű hexadecimális azonosító |
 | `status` | `TEXT` | `CHECK ('IN_STOCK','RESERVED','QUARANTINED','SHIPPED','DISCARDED')` | Életciklus-állapot. A `QUARANTINED` a leltáron sérültnek talált, félretett csomag: nincs eladva és nincs leírva, amíg valaki nem dönt róla. |
 | `notes` | `TEXT` | `NULL` | Opcionális megjegyzés |
@@ -209,7 +209,7 @@ erDiagram
 | `customer_id` | `INTEGER` | `NOT NULL FK -> customers(id)` | Megrendelő partner |
 | `status` | `TEXT` | `CHECK ('DRAFT','PACKING','SHIPPED','CANCELLED')` | Rendelés állapota |
 | `currency` | `TEXT` | `NOT NULL DEFAULT 'EUR'` | Rendelés devizája |
-| `total_weight_kg`, `total_price` | `REAL` | `NOT NULL DEFAULT 0 CHECK (>= 0)` | Összesített súly és végösszeg |
+| `total_weight_kg`, `total_price` | `TEXT` | `NOT NULL DEFAULT '0'` | Összesített súly és végösszeg, pontos tizedes szövegként |
 | `assigned_forklift_id` | `INTEGER` | `NULL FK -> users(id)` | Kijelölt targoncás felhasználó |
 | `dispatch_location_id` | `INTEGER` | `NULL FK -> warehouse_locations(id)` | Kijelölt kiadó gyűjtőzóna (pl. `DOCK-01`) |
 | `customer_arrived_at` | `TEXT` | `NULL` | Vevő megérkezésének időpontja (riasztáshoz és átadáshoz) |
@@ -350,10 +350,16 @@ soha nem írja le magától, mert annak eldöntése emberi felelősség.
 - **Harmadik normálforma (3NF):** Minden nem-kulcs attribútum kizárólag a saját elsődleges kulcsától függ:
   - A csomag tulajdonságai (`target_groups`, `garment_types`, `quality_grades`, `package_types`), szerepkörök (`roles`), devizák (`currencies`) és adókulcsok (`tax_types`) külön törzstáblákba vannak kiszervezve.
   - A raktárhely-foglaltság (`used_weight_kg`) és a készletértékelés (`StockValuation`) nem tárolt redundáns mező, hanem SQL aggregációval számított érték.
-  - **Pénzösszegek tárolása:** minden összeg (`net_amount`, `vat_amount`, `gross_amount`, `unit_price`,
-    `line_net`, `total_price`, `price_per_kg`, `line_total`, valamint a kódtörzsek kilónkénti árai) pontos
-    tizedes szövegként tárolódik, nem `REAL` lebegőpontos számként, így az összeg pontosan úgy olvasható
-    vissza, ahogy mentettük, és sok tétel összege sem csúszik el. A banki nyilvántartás eleve így tárolt.
+  - **Pénzösszegek és tömegek tárolása:** minden összeg (`net_amount`, `vat_amount`, `gross_amount`,
+    `unit_price`, `line_net`, `total_price`, `price_per_kg`, `line_total`, valamint a kódtörzsek kilónkénti
+    árai) **és minden kilogrammban mért mennyiség** (`weight_kg`, `total_weight_kg`, `max_capacity_kg`,
+    `tare_weight_kg`, `max_weight_kg`, `invoice_items.quantity`) pontos tizedes szövegként tárolódik, nem
+    `REAL` lebegőpontos számként, így az érték pontosan úgy olvasható vissza, ahogy mentettük, és sok tétel
+    összege sem csúszik el. A banki nyilvántartás eleve így tárolt. A tömeg azért tartozik ide, mert a
+    kiterjesztett gyártói felelősségi (EPR) díj a piacra helyezett kilogrammokra szól, és a hiányos vagy
+    téves adatszolgáltatás bírsága a díjkülönbözet fele a díjon felül: a rögzített tömeg tehát pénzügyi
+    kontroll. A százalékok és az árfolyam (`rate_percent`, `vat_rate`, `exchange_rate`) maradnak `REAL`
+    típusúak: ezek szorzók, és a használt értékek binárisan pontosak.
     Az egész számú (legkisebb pénzegység) tárolás helyett azért a szöveg, mert ahhoz minden olvasásnál és
     írásnál ismerni kellene a deviza tizedesjegyeinek számát, és egyetlen téves lépték százszorosára
     változtatná az összeget. Cserébe az összegeket nem SQL-ben, hanem Java oldalon kell összeadni, a

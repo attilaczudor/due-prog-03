@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Moves money from SQLite's {@code REAL} to an exact decimal string.
+ * Moves money and mass from SQLite's {@code REAL} to an exact decimal string.
  * <p>
  * A binary floating point number cannot hold every decimal amount, so an amount written as {@code REAL} is
  * not always the amount that comes back, and adding many of them drifts. Each money column is rewritten as
@@ -21,27 +21,33 @@ import java.util.Map;
  * Column types in SQLite belong to the table definition, so each table is rebuilt once from the current
  * schema, its indexes recreated and its ids preserved.
  */
-final class MoneyAsTextMigration {
+final class ExactDecimalMigration {
 
-    /** Every money column, by table. Weights and percentages are measurements, not money, and stay as they are. */
-    private static final Map<String, List<String>> MONEY_COLUMNS = Map.of(
+    /**
+     * Every column that must be exact, by table: money, and mass in kilograms. Percentages and exchange
+     * rates are left alone — the values in use are exact in binary and they are not charged per unit.
+     */
+    private static final Map<String, List<String>> EXACT_COLUMNS = Map.of(
             "garment_types", List.of("price_eur_per_kg", "price_huf_per_kg"),
             "quality_grades", List.of("default_price_per_kg", "default_price_huf_per_kg"),
-            "orders", List.of("total_price"),
+            "package_types", List.of("tare_weight_kg", "max_weight_kg"),
+            "warehouse_locations", List.of("max_capacity_kg"),
+            "inventory_packages", List.of("weight_kg"),
+            "orders", List.of("total_price", "total_weight_kg"),
             "order_items", List.of("price_per_kg", "line_total"),
             "invoices", List.of("net_amount", "vat_amount", "gross_amount"),
-            "invoice_items", List.of("unit_price", "line_net"));
+            "invoice_items", List.of("unit_price", "line_net", "quantity"));
 
     private final DatabaseManager db;
 
-    MoneyAsTextMigration(DatabaseManager db) {
+    ExactDecimalMigration(DatabaseManager db) {
         this.db = db;
     }
 
     void upgrade(String schema) {
         try (var conn = db.getConnection(); var statement = conn.createStatement()) {
-            List<String> stale = MONEY_COLUMNS.keySet().stream().sorted()
-                    .filter(table -> storesMoneyAsReal(conn, table)).toList();
+            List<String> stale = EXACT_COLUMNS.keySet().stream().sorted()
+                    .filter(table -> storesAnyAsReal(conn, table)).toList();
             if (stale.isEmpty()) {
                 return;
             }
@@ -50,7 +56,7 @@ final class MoneyAsTextMigration {
             try {
                 for (String table : stale) {
                     // Normalise the numbers while the column is still REAL, then rebuild the table as text.
-                    for (String column : MONEY_COLUMNS.get(table)) {
+                    for (String column : EXACT_COLUMNS.get(table)) {
                         statement.executeUpdate("UPDATE " + table + " SET " + column
                                 + " = rtrim(rtrim(printf('%.4f', " + column + "), '0'), '.')");
                     }
@@ -59,7 +65,7 @@ final class MoneyAsTextMigration {
                 }
                 try (ResultSet problem = statement.executeQuery("PRAGMA foreign_key_check")) {
                     if (problem.next()) {
-                        throw new SQLException("Invalid foreign key after the money update: "
+                        throw new SQLException("Invalid foreign key after the exact-decimal update: "
                                 + problem.getString(1) + " row " + problem.getString(2)
                                 + " -> " + problem.getString(3));
                     }
@@ -70,17 +76,17 @@ final class MoneyAsTextMigration {
                 throw ex;
             }
         } catch (SQLException ex) {
-            throw new DaoException("Could not store money as exact decimals", ex);
+            throw new DaoException("Could not store money and mass as exact decimals", ex);
         }
     }
 
-    /** True while the table's own definition still declares its money columns as {@code REAL}. */
-    private static boolean storesMoneyAsReal(Connection conn, String table) {
+    /** True while the table's own definition still declares any of its exact columns as {@code REAL}. */
+    private static boolean storesAnyAsReal(Connection conn, String table) {
         try (var ps = conn.prepareStatement("PRAGMA table_info(" + table + ")");
              ResultSet rs = ps.executeQuery()) {
-            List<String> money = MONEY_COLUMNS.get(table);
+            List<String> exact = EXACT_COLUMNS.get(table);
             while (rs.next()) {
-                if (money.contains(rs.getString("name")) && "REAL".equalsIgnoreCase(rs.getString("type"))) {
+                if (exact.contains(rs.getString("name")) && "REAL".equalsIgnoreCase(rs.getString("type"))) {
                     return true;
                 }
             }

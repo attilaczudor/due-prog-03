@@ -149,10 +149,10 @@ public final class InvoiceDao {
                             rs.getLong("id"),
                             rs.getLong("invoice_id"),
                             rs.getString("description"),
-                            bd(rs.getDouble("quantity")),
+                            ExactDecimal.get(rs, "quantity"),
                             rs.getString("unit"),
-                            Money.get(rs, "unit_price"),
-                            Money.get(rs, "line_net")
+                            ExactDecimal.get(rs, "unit_price"),
+                            ExactDecimal.get(rs, "line_net")
                     ));
                 }
                 return items;
@@ -423,11 +423,11 @@ public final class InvoiceDao {
             ps.setString(11, issueDate.toString());
             ps.setString(12, dueDate.toString());
             ps.setString(13, paidDate != null ? paidDate.toString() : null);
-            Money.set(ps, 14, netAmount);
+            ExactDecimal.set(ps, 14, netAmount);
             ps.setDouble(15, vatRate.doubleValue());
             ps.setString(16, emptyToNull(taxTypeCode));
-            Money.set(ps, 17, vatAmount);
-            Money.set(ps, 18, grossAmount);
+            ExactDecimal.set(ps, 17, vatAmount);
+            ExactDecimal.set(ps, 18, grossAmount);
             ps.setString(19, currency != null && !currency.isBlank() ? currency.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setDouble(20, rate);
             ps.setLong(21, createdBy);
@@ -451,10 +451,10 @@ public final class InvoiceDao {
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, invoiceId);
             ps.setString(2, description.trim());
-            ps.setDouble(3, quantity.doubleValue());
+            ExactDecimal.set(ps, 3, quantity);
             ps.setString(4, unit != null && !unit.isBlank() ? unit.trim() : "kg");
-            Money.set(ps, 5, unitPrice);
-            Money.set(ps, 6, lineNet);
+            ExactDecimal.set(ps, 5, unitPrice);
+            ExactDecimal.set(ps, 6, lineNet);
             ps.executeUpdate();
         }
     }
@@ -471,11 +471,11 @@ public final class InvoiceDao {
                               String currency, BigDecimal exchangeRate) throws SQLException {
         String sql = "UPDATE invoices SET net_amount = ?, vat_rate = ?, tax_type_code = ?, vat_amount = ?, gross_amount = ?, currency = ?, exchange_rate = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            Money.set(ps, 1, netAmount);
+            ExactDecimal.set(ps, 1, netAmount);
             ps.setDouble(2, vatRate.doubleValue());
             ps.setString(3, emptyToNull(taxTypeCode));
-            Money.set(ps, 4, vatAmount);
-            Money.set(ps, 5, grossAmount);
+            ExactDecimal.set(ps, 4, vatAmount);
+            ExactDecimal.set(ps, 5, grossAmount);
             ps.setString(6, currency != null && !currency.isBlank() ? currency.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setDouble(7, (exchangeRate != null && exchangeRate.compareTo(BigDecimal.ZERO) > 0)
                     ? exchangeRate.doubleValue() : hu.due.rewear.model.CurrencyCode.DEFAULT_EUR_HUF_RATE.doubleValue());
@@ -588,11 +588,11 @@ public final class InvoiceDao {
                 LocalDate.parse(rs.getString("issue_date")),
                 LocalDate.parse(rs.getString("due_date")),
                 paidRaw != null && !paidRaw.isBlank() ? LocalDate.parse(paidRaw) : null,
-                Money.get(rs, "net_amount"),
+                ExactDecimal.get(rs, "net_amount"),
                 bd(rs.getDouble("vat_rate")),
                 rs.getString("tax_type_code"),
-                Money.get(rs, "vat_amount"),
-                Money.get(rs, "gross_amount"),
+                ExactDecimal.get(rs, "vat_amount"),
+                ExactDecimal.get(rs, "gross_amount"),
                 rs.getString("currency"),
                 bd(rs.getDouble("exchange_rate")),
                 rs.getString("attachment_path"),

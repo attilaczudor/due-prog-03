@@ -24,7 +24,7 @@ public final class WarehouseLocationDao {
 
     private static final String BASE_SELECT = """
             SELECT wl.id, wl.code, wl.zone, wl.aisle, wl.shelf, wl.location_type, wl.max_capacity_kg, wl.active,
-                   COALESCE(SUM(CASE WHEN ip.status IN ('IN_STOCK', 'RESERVED') THEN ip.weight_kg ELSE 0 END), 0) AS used_weight_kg
+                   COALESCE(SUM(CASE WHEN ip.status IN ('IN_STOCK', 'RESERVED') THEN CAST(ip.weight_kg AS REAL) ELSE 0 END), 0) AS used_weight_kg
             FROM warehouse_locations wl
             LEFT JOIN inventory_packages ip ON ip.location_id = wl.id
             """;
@@ -117,7 +117,7 @@ public final class WarehouseLocationDao {
             ps.setString(3, aisle.trim());
             ps.setString(4, shelf.trim());
             ps.setString(5, (locationType != null ? locationType : LocationType.STORAGE).name());
-            ps.setDouble(6, maxCapacityKg.doubleValue());
+            ExactDecimal.set(ps, 6, maxCapacityKg);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -148,7 +148,7 @@ public final class WarehouseLocationDao {
             ps.setString(3, aisle.trim());
             ps.setString(4, shelf.trim());
             ps.setString(5, (locationType != null ? locationType : LocationType.STORAGE).name());
-            ps.setDouble(6, maxCapacityKg.doubleValue());
+            ExactDecimal.set(ps, 6, maxCapacityKg);
             ps.setInt(7, active ? 1 : 0);
             ps.setLong(8, id);
             ps.executeUpdate();
@@ -165,7 +165,7 @@ public final class WarehouseLocationDao {
                 rs.getString("aisle"),
                 rs.getString("shelf"),
                 LocationType.fromDb(rs.getString("location_type")),
-                BigDecimal.valueOf(rs.getDouble("max_capacity_kg")),
+                ExactDecimal.get(rs, "max_capacity_kg"),
                 rs.getInt("active") == 1,
                 BigDecimal.valueOf(rs.getDouble("used_weight_kg"))
         );

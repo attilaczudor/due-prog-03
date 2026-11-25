@@ -41,7 +41,7 @@ roughly a tenth of sorted weight and over half of revenue — grade mix, not thr
 
 Build in this order:
 
-- [ ] **Exact-decimal weights.** Smallest of the five and a precondition for three of the others. Money was fixed
+- [x] **Exact-decimal weights.** Done 25 November, pass 18. Smallest of the five and a precondition for three of the others. Money was fixed
       the same way; weight carries an EPR penalty of half the fee deficiency, a 100 g stocktake tolerance and
       contractual bale tolerances of a few percent.
 - [ ] **A real NAV Online Számla integration** replacing the demonstration. Immediate XML submission on issue, a

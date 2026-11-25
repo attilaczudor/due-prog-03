@@ -72,7 +72,7 @@ public final class InventoryPackageDao {
             ps.setLong(4, qualityGradeId);
             ps.setLong(5, packageTypeId);
             ps.setLong(6, locationId);
-            ps.setDouble(7, weightKg.doubleValue());
+            ExactDecimal.set(ps, 7, weightKg);
             ps.setString(8, hexSuffix.trim().toUpperCase(Locale.ROOT));
             ps.setString(9, status.name());
             ps.setString(10, notes);
@@ -278,7 +278,9 @@ public final class InventoryPackageDao {
     /** How many packages the filter matches and what they weigh, counted in the database. */
     public FilterSummary summarise(PackageFilter filter) {
         List<Object> params = new ArrayList<>();
-        String sql = "SELECT COUNT(*) AS packages, COALESCE(SUM(ip.weight_kg), 0) AS total_kg"
+        // The weight is summed in the database for the screen footer, so the cast to REAL is spelled out.
+        // A figure that has to be exact — an EPR declaration, an invoice — is summed in Java from the rows.
+        String sql = "SELECT COUNT(*) AS packages, COALESCE(SUM(CAST(ip.weight_kg AS REAL)), 0) AS total_kg"
                 + " FROM inventory_packages ip" + whereClause(filter, params);
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -309,7 +311,7 @@ public final class InventoryPackageDao {
     public void updateWeight(Connection conn, long packageId, BigDecimal weightKg, LocalDateTime updatedAt) throws SQLException {
         String sql = "UPDATE inventory_packages SET weight_kg = ?, updated_at = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setBigDecimal(1, weightKg);
+            ExactDecimal.set(ps, 1, weightKg);
             ps.setString(2, DaoDateUtil.format(updatedAt));
             ps.setLong(3, packageId);
             ps.executeUpdate();
@@ -345,7 +347,7 @@ public final class InventoryPackageDao {
             ps.setLong(4, qualityGradeId);
             ps.setLong(5, packageTypeId);
             ps.setLong(6, locationId);
-            ps.setDouble(7, weightKg.doubleValue());
+            ExactDecimal.set(ps, 7, weightKg);
             ps.setString(8, hexSuffix.trim().toUpperCase(Locale.ROOT));
             ps.setString(9, status.name());
             ps.setString(10, notes);
@@ -369,7 +371,7 @@ public final class InventoryPackageDao {
     }
 
     public BigDecimal sumWeightByStatus(PackageStatus status) {
-        String sql = "SELECT COALESCE(SUM(weight_kg), 0) FROM inventory_packages WHERE status = ?";
+        String sql = "SELECT COALESCE(SUM(CAST(weight_kg AS REAL)), 0) FROM inventory_packages WHERE status = ?";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
@@ -388,10 +390,10 @@ public final class InventoryPackageDao {
     public StockValuation sumInStockValuation() {
         String sql = """
                 SELECT COUNT(ip.id) AS pkg_count,
-                       COALESCE(SUM(ip.weight_kg), 0) AS total_kg,
-                       COALESCE(SUM(ip.weight_kg * CAST(CASE WHEN CAST(gt.price_eur_per_kg AS REAL) > 0
+                       COALESCE(SUM(CAST(ip.weight_kg AS REAL)), 0) AS total_kg,
+                       COALESCE(SUM(CAST(ip.weight_kg AS REAL) * CAST(CASE WHEN CAST(gt.price_eur_per_kg AS REAL) > 0
                            THEN gt.price_eur_per_kg ELSE qg.default_price_per_kg END AS REAL)), 0) AS total_eur,
-                       COALESCE(SUM(ip.weight_kg * CAST(CASE WHEN CAST(gt.price_huf_per_kg AS REAL) > 0
+                       COALESCE(SUM(CAST(ip.weight_kg AS REAL) * CAST(CASE WHEN CAST(gt.price_huf_per_kg AS REAL) > 0
                            THEN gt.price_huf_per_kg ELSE qg.default_price_huf_per_kg END AS REAL)), 0) AS total_huf
                 FROM inventory_packages ip
                 JOIN garment_types gt ON gt.id = ip.garment_type_id
@@ -432,7 +434,7 @@ public final class InventoryPackageDao {
         String sql = """
                 SELECT qg.code, qg.name_en, qg.name_hu,
                        COUNT(ip.id) AS pkg_count,
-                       COALESCE(SUM(ip.weight_kg), 0) AS total_weight
+                       COALESCE(SUM(CAST(ip.weight_kg AS REAL)), 0) AS total_weight
                 FROM quality_grades qg
                 JOIN inventory_packages ip ON ip.quality_grade_id = qg.id
                 WHERE ip.status IN ('IN_STOCK', 'RESERVED')
@@ -446,7 +448,7 @@ public final class InventoryPackageDao {
         String sql = """
                 SELECT gt.code, gt.name_en, gt.name_hu,
                        COUNT(ip.id) AS pkg_count,
-                       COALESCE(SUM(ip.weight_kg), 0) AS total_weight
+                       COALESCE(SUM(CAST(ip.weight_kg AS REAL)), 0) AS total_weight
                 FROM garment_types gt
                 JOIN inventory_packages ip ON ip.garment_type_id = gt.id
                 WHERE ip.status IN ('IN_STOCK', 'RESERVED')
@@ -502,7 +504,7 @@ public final class InventoryPackageDao {
                 rs.getString("pt_hu"),
                 rs.getLong("location_id"),
                 rs.getString("loc_code"),
-                BigDecimal.valueOf(rs.getDouble("weight_kg")),
+                ExactDecimal.get(rs, "weight_kg"),
                 rs.getString("hex_suffix"),
                 PackageStatus.valueOf(rs.getString("status")),
                 rs.getString("notes"),

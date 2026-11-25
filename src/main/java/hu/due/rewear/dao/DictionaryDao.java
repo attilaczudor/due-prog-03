@@ -99,8 +99,8 @@ public final class DictionaryDao {
                         rs.getString("code"),
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
-                        Money.get(rs, "price_eur_per_kg"),
-                        Money.get(rs, "price_huf_per_kg"),
+                        ExactDecimal.get(rs, "price_eur_per_kg"),
+                        ExactDecimal.get(rs, "price_huf_per_kg"),
                         rs.getInt("active") == 1
                 ));
             }
@@ -133,8 +133,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            Money.set(ps, 4, priceEurPerKg);
-            Money.set(ps, 5, priceHufPerKg);
+            ExactDecimal.set(ps, 4, priceEurPerKg);
+            ExactDecimal.set(ps, 5, priceHufPerKg);
         });
     }
 
@@ -149,8 +149,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            Money.set(ps, 4, priceEurPerKg);
-            Money.set(ps, 5, priceHufPerKg);
+            ExactDecimal.set(ps, 4, priceEurPerKg);
+            ExactDecimal.set(ps, 5, priceHufPerKg);
             ps.setInt(6, active ? 1 : 0);
             ps.setLong(7, id);
         });
@@ -179,8 +179,8 @@ public final class DictionaryDao {
                         rs.getString("code"),
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
-                        Money.get(rs, "default_price_per_kg"),
-                        Money.get(rs, "default_price_huf_per_kg"),
+                        ExactDecimal.get(rs, "default_price_per_kg"),
+                        ExactDecimal.get(rs, "default_price_huf_per_kg"),
                         rs.getInt("active") == 1
                 ));
             }
@@ -216,8 +216,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            Money.set(ps, 4, defaultPricePerKg);
-            Money.set(ps, 5, defaultPriceHufPerKg);
+            ExactDecimal.set(ps, 4, defaultPricePerKg);
+            ExactDecimal.set(ps, 5, defaultPriceHufPerKg);
         });
     }
 
@@ -232,8 +232,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            Money.set(ps, 4, defaultPricePerKg);
-            Money.set(ps, 5, defaultPriceHufPerKg);
+            ExactDecimal.set(ps, 4, defaultPricePerKg);
+            ExactDecimal.set(ps, 5, defaultPriceHufPerKg);
             ps.setInt(6, active ? 1 : 0);
             ps.setLong(7, id);
         });
@@ -262,8 +262,8 @@ public final class DictionaryDao {
                         rs.getString("code"),
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
-                        BigDecimal.valueOf(rs.getDouble("tare_weight_kg")),
-                        BigDecimal.valueOf(rs.getDouble("max_weight_kg")),
+                        ExactDecimal.get(rs, "tare_weight_kg"),
+                        ExactDecimal.get(rs, "max_weight_kg"),
                         rs.getInt("active") == 1
                 ));
             }
@@ -288,8 +288,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, tareWeightKg.doubleValue());
-            ps.setDouble(5, maxWeightKg.doubleValue());
+            ExactDecimal.set(ps, 4, tareWeightKg);
+            ExactDecimal.set(ps, 5, maxWeightKg);
         });
     }
 
@@ -304,8 +304,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, tareWeightKg.doubleValue());
-            ps.setDouble(5, maxWeightKg.doubleValue());
+            ExactDecimal.set(ps, 4, tareWeightKg);
+            ExactDecimal.set(ps, 5, maxWeightKg);
             ps.setInt(6, active ? 1 : 0);
             ps.setLong(7, id);
         });

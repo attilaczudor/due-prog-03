@@ -61,9 +61,9 @@ public final class OrderItemDao {
                             rs.getString("qr_code"),
                             rs.getString("summary_en"),
                             rs.getString("summary_hu"),
-                            BigDecimal.valueOf(rs.getDouble("weight_kg")),
-                            Money.get(rs, "price_per_kg"),
-                            Money.get(rs, "line_total"),
+                            ExactDecimal.get(rs, "weight_kg"),
+                            ExactDecimal.get(rs, "price_per_kg"),
+                            ExactDecimal.get(rs, "line_total"),
                             rs.getString("current_location_code"),
                             rs.getInt("handover_scanned") == 1
                     ));
@@ -87,8 +87,8 @@ public final class OrderItemDao {
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
             ps.setLong(1, orderId);
             ps.setLong(2, packageId);
-            Money.set(ps, 3, pricePerKg);
-            Money.set(ps, 4, lineTotal);
+            ExactDecimal.set(ps, 3, pricePerKg);
+            ExactDecimal.set(ps, 4, lineTotal);
             ps.executeUpdate();
             try (ResultSet keys = ps.getGeneratedKeys()) {
                 if (keys.next()) {
@@ -103,8 +103,8 @@ public final class OrderItemDao {
                                   BigDecimal pricePerKg, BigDecimal lineTotal) throws SQLException {
         String sql = "UPDATE order_items SET price_per_kg = ?, line_total = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            Money.set(ps, 1, pricePerKg);
-            Money.set(ps, 2, lineTotal);
+            ExactDecimal.set(ps, 1, pricePerKg);
+            ExactDecimal.set(ps, 2, lineTotal);
             ps.setLong(3, orderItemId);
             ps.executeUpdate();
         }

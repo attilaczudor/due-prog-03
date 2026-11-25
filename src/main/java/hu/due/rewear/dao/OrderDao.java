@@ -172,8 +172,8 @@ public final class OrderDao {
             ps.setLong(2, customerId);
             ps.setString(3, status.name());
             ps.setString(4, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR");
-            ps.setDouble(5, totalWeightKg.doubleValue());
-            Money.set(ps, 6, totalPrice);
+            ExactDecimal.set(ps, 5, totalWeightKg);
+            ExactDecimal.set(ps, 6, totalPrice);
             ps.setString(7, notes);
             ps.setLong(8, createdBy);
             ps.setString(9, DaoDateUtil.format(createdAt));
@@ -208,8 +208,8 @@ public final class OrderDao {
     public void updateTotals(Connection conn, long orderId, BigDecimal totalWeightKg, BigDecimal totalPrice) throws SQLException {
         String sql = "UPDATE orders SET total_weight_kg = ?, total_price = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setDouble(1, totalWeightKg.doubleValue());
-            Money.set(ps, 2, totalPrice);
+            ExactDecimal.set(ps, 1, totalWeightKg);
+            ExactDecimal.set(ps, 2, totalPrice);
             ps.setLong(3, orderId);
             ps.executeUpdate();
         }
@@ -278,8 +278,8 @@ public final class OrderDao {
                 rs.getString("customer_name"),
                 OrderStatus.valueOf(rs.getString("status")),
                 rs.getString("currency") != null ? rs.getString("currency").trim().toUpperCase(Locale.ROOT) : "EUR",
-                BigDecimal.valueOf(rs.getDouble("total_weight_kg")),
-                Money.get(rs, "total_price"),
+                ExactDecimal.get(rs, "total_weight_kg"),
+                ExactDecimal.get(rs, "total_price"),
                 rs.getString("notes"),
                 rs.getLong("created_by"),
                 rs.getString("created_by_name"),

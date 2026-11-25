@@ -22,19 +22,24 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Money is kept as an exact decimal, not as a binary floating point number, so an amount comes back exactly
- * as it was written and a column of amounts adds up exactly.
+ * Money and mass are kept as exact decimals, not as binary floating point numbers, so a value comes back
+ * exactly as it was written and a column of them adds up exactly. Mass counts because the
+ * extended-producer-responsibility fee is charged per kilogram placed on the market, which makes a recorded
+ * weight a financial control rather than merely a measurement.
  */
-class MoneyStorageTest {
+class ExactDecimalStorageTest {
 
-    /** Every money column in the schema, by table. */
-    private static final Map<String, List<String>> MONEY = Map.of(
+    /** Every column that must be exact, by table: money, and mass in kilograms. */
+    private static final Map<String, List<String>> EXACT = Map.of(
             "garment_types", List.of("price_eur_per_kg", "price_huf_per_kg"),
             "quality_grades", List.of("default_price_per_kg", "default_price_huf_per_kg"),
-            "orders", List.of("total_price"),
+            "package_types", List.of("tare_weight_kg", "max_weight_kg"),
+            "warehouse_locations", List.of("max_capacity_kg"),
+            "inventory_packages", List.of("weight_kg"),
+            "orders", List.of("total_price", "total_weight_kg"),
             "order_items", List.of("price_per_kg", "line_total"),
             "invoices", List.of("net_amount", "vat_amount", "gross_amount"),
-            "invoice_items", List.of("unit_price", "line_net"));
+            "invoice_items", List.of("unit_price", "line_net", "quantity"));
 
     @TempDir
     Path tempDir;
@@ -49,7 +54,7 @@ class MoneyStorageTest {
     /** Columns whose stored values are not text, as "table.column(type)". */
     private static List<String> notStoredAsText(Connection conn) throws SQLException {
         List<String> wrong = new ArrayList<>();
-        for (var entry : MONEY.entrySet()) {
+        for (var entry : EXACT.entrySet()) {
             for (String column : entry.getValue()) {
                 String sql = "SELECT DISTINCT typeof(" + column + ") FROM " + entry.getKey();
                 try (Statement st = conn.createStatement(); ResultSet rs = st.executeQuery(sql)) {
@@ -84,7 +89,7 @@ class MoneyStorageTest {
         assertEquals(0, new BigDecimal("0.27").compareTo(reloaded.grossAmount()));
 
         try (Connection conn = ctx.getDatabaseManager().getConnection()) {
-            assertEquals(List.of(), notStoredAsText(conn), "These money columns are not text");
+            assertEquals(List.of(), notStoredAsText(conn), "These columns are not text");
             // The exact digits are what is on disk, not a float that happens to print that way.
             try (Statement st = conn.createStatement();
                  ResultSet rs = st.executeQuery("SELECT net_amount FROM invoices WHERE id=" + invoice.id())) {
@@ -194,6 +199,118 @@ class MoneyStorageTest {
                     "Invoice " + invoice.invoiceNumber() + " changed value");
         }
         assertTrue(grossBefore.size() == ctx.getInvoiceDao().findAll().size(), "No invoice may be lost");
+    }
+
+
+    /**
+     * Rebuilds a table with one column's declared type changed, keeping its rows, the way an older database
+     * held them. The definition is taken from the database itself so the test does not repeat the schema.
+     */
+    private static void putColumnBackToReal(Connection conn, String table, String column) throws SQLException {
+        String create;
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT sql FROM sqlite_master WHERE type='table' AND name='" + table + "'")) {
+            rs.next();
+            create = rs.getString(1);
+        }
+        String asText = column + " TEXT";
+        assertTrue(create.contains(asText), column + " should be declared TEXT before the test changes it");
+        String asReal = create.replace(asText, column + " REAL").replace("DEFAULT '0'", "DEFAULT 0");
+        try (Statement st = conn.createStatement()) {
+            st.execute("PRAGMA foreign_keys = OFF");
+            st.execute("CREATE TABLE zz_backup AS SELECT * FROM " + table);
+            // Dropped and recreated under the same name, never renamed: SQLite rewrites the child tables'
+            // references to follow a rename, which would leave them pointing at a table that no longer exists.
+            st.execute("DROP TABLE " + table);
+            st.execute(asReal);
+            st.execute("INSERT INTO " + table + " SELECT * FROM zz_backup");
+            st.execute("DROP TABLE zz_backup");
+        }
+    }
+
+    @Test
+    void aWeightIsStoredWithTheDigitsItWasGiven() throws SQLException {
+        AppContext ctx = openApp("mass.db");
+        long userId = ctx.getUserDao().findByUsername("manager").orElseThrow().id();
+        // A scale reading to the gram: 10.050 kg. The trailing zero is part of the record — it says the
+        // reading was taken to three decimals — and a double cannot carry it, since 10.050 and 10.05 are
+        // the same number once the value has been through a double.
+        BigDecimal awkward = new BigDecimal("10.050");
+        long packageId;
+        try (Connection conn = ctx.getDatabaseManager().getConnection()) {
+            packageId = ctx.getPackageDao().insert(conn, "EXACT-KG-1",
+                    firstId(conn, "target_groups"), firstId(conn, "garment_types"),
+                    firstId(conn, "quality_grades"), firstId(conn, "package_types"),
+                    firstId(conn, "warehouse_locations"), awkward, "A1",
+                    hu.due.rewear.model.PackageStatus.IN_STOCK, null, userId, BusinessClock.now());
+        }
+
+        assertEquals(awkward, ctx.getPackageDao().findById(packageId).orElseThrow().weightKg(),
+                "A weight must survive the round trip exactly");
+        try (Connection conn = ctx.getDatabaseManager().getConnection();
+             Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery(
+                     "SELECT typeof(weight_kg), weight_kg FROM inventory_packages WHERE id=" + packageId)) {
+            rs.next();
+            assertEquals("text", rs.getString(1));
+            assertEquals("10.050", rs.getString(2), "The digits on disk are the digits that were weighed");
+        }
+    }
+
+    @Test
+    void anOlderDatabaseThatStoredWeightsAsFloatsIsConvertedWithoutLoss() throws SQLException {
+        AppContext ctx = openApp("legacy-mass.db");
+        var db = ctx.getDatabaseManager();
+        Map<Long, BigDecimal> weightBefore = new java.util.LinkedHashMap<>();
+        for (var pkg : ctx.getPackageDao().findByFilter(
+                new hu.due.rewear.model.PackageFilter(null, null, null, null, null, null, null))) {
+            weightBefore.put(pkg.id(), pkg.weightKg());
+        }
+        assertTrue(weightBefore.size() > 1, "The demo should have packages");
+
+        try (Connection conn = db.getConnection()) {
+            putColumnBackToReal(conn, "inventory_packages", "weight_kg");
+            try (Statement st = conn.createStatement();
+                 ResultSet rs = st.executeQuery("SELECT DISTINCT typeof(weight_kg) FROM inventory_packages")) {
+                rs.next();
+                assertEquals("real", rs.getString(1), "Precondition: the weights are floats again");
+            }
+        }
+        // One row carries the precision a scale reading never has, as an average or a conversion would leave.
+        long overPrecise;
+        try (Connection conn = db.getConnection(); Statement st = conn.createStatement()) {
+            overPrecise = firstId(conn, "inventory_packages");
+            st.execute("UPDATE inventory_packages SET weight_kg = 1.0/3 WHERE id = " + overPrecise);
+        }
+
+        new SchemaInitializer(db).initialize();
+
+        try (Connection conn = db.getConnection(); Statement st = conn.createStatement()) {
+            assertEquals(List.of(), notStoredAsText(conn), "Everything should be text after the upgrade");
+            try (ResultSet rs = st.executeQuery(
+                    "SELECT weight_kg FROM inventory_packages WHERE id = " + overPrecise)) {
+                rs.next();
+                assertEquals("0.3333", rs.getString(1), "A weight is capped at four decimals, not left at fifteen");
+            }
+        }
+        var after = ctx.getPackageDao().findByFilter(
+                new hu.due.rewear.model.PackageFilter(null, null, null, null, null, null, null));
+        assertEquals(weightBefore.size(), after.size(), "No package may be lost");
+        for (var pkg : after) {
+            if (pkg.id() != overPrecise) {
+                assertEquals(0, weightBefore.get(pkg.id()).compareTo(pkg.weightKg()),
+                        "Package " + pkg.qrCode() + " changed weight");
+            }
+        }
+    }
+
+    private static long firstId(Connection conn, String table) throws SQLException {
+        try (Statement st = conn.createStatement();
+             ResultSet rs = st.executeQuery("SELECT MIN(id) FROM " + table)) {
+            rs.next();
+            return rs.getLong(1);
+        }
     }
 
     /** Local shape so the test reads clearly; mapped onto the service's own input type. */

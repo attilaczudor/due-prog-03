@@ -112,7 +112,7 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 | PDF generálás | OpenPDF 2.0.3 | Hőcímke/A4 4-es PDF címkék, többdevizás A4 PDF számlák/jóváírások, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok |
 | Adatvizualizáció | XChart 3.8.8 | Dinamikus monokróm kör- és oszlopdiagramok a készlet súlyeloszlásáról |
 | Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (917 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
-| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **166 automatizált egység- és integrációs teszt** 46 tesztosztályban, Maven wrapper (`./mvnw`) |
+| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **168 automatizált egység- és integrációs teszt** 46 tesztosztályban, Maven wrapper (`./mvnw`) |
 
 ---
 

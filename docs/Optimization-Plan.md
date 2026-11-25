@@ -729,16 +729,16 @@ application.
 
 ### Built
 
-- [x] **`Money`**, one place that writes an amount as its plain decimal text and reads it back as `BigDecimal`.
+- [x] **`Money`** (renamed `ExactDecimal` in pass 18), one place that writes an amount as its plain decimal text and reads it back as `BigDecimal`.
   Ten money columns across five tables changed from `REAL` to `TEXT`.
 - [x] **The order total is summed in Java** rather than by `SUM(line_total)`, so the figure a customer is
   invoiced is exact. The quality-grade listing orders by `CAST(... AS REAL)`, since text sorts alphabetically.
-- [x] **`MoneyAsTextMigration`** rebuilds the five tables once from the current schema, recreating indexes and
+- [x] **`MoneyAsTextMigration`** (renamed `ExactDecimalMigration` in pass 18) rebuilds the five tables once from the current schema, recreating indexes and
   preserving ids, and caps any amount carrying more precision than money should at four decimals.
 
 ### Verification
 
-`./mvnw clean verify`: BUILD SUCCESS, **164 / 164** across 45 classes (+3 `MoneyStorageTest`): an amount with
+`./mvnw clean verify`: BUILD SUCCESS, **164 / 164** across 45 classes (+3 `MoneyStorageTest`, since renamed `ExactDecimalStorageTest`): an amount with
 awkward digits survives the round trip exactly and is on disk as `0.21`; ten amounts of `0.10` add up to
 exactly `1.00`; and a database whose invoices were put back into a `REAL` column converts without any invoice
 changing value.
@@ -849,6 +849,56 @@ identical avatars. Nothing in the application relies on `User` equality, so chan
 for its own sake; it is recorded here instead.
 
 `./mvnw clean verify`: BUILD SUCCESS, **166 / 166** across 46 classes.
+
+---
+
+## Pass 18 — weights stored exactly (25 November 2026)
+
+### Why, having argued the other way
+
+In pass 15 I looked at the weight columns and left them as `REAL`, on the numerical argument that
+`BigDecimal.valueOf(double)` round-trips the shortest decimal that identifies the double, so a weight typed in
+and read back matches. That argument is correct and beside the point. The research in
+[the report](../reports/Warehouse%20system%20improvements%20by%20role.md) made the case I had missed: the
+Hungarian extended-producer-responsibility fee is charged on kilograms placed on the market, and the penalty
+for omitted or incorrect reporting is half the fee deficiency on top of the fee itself. A recorded mass in this
+business is a financial control, not a measurement, and the same reasoning that moved money off floating point
+applies to it unchanged. The user asked for this first of the five roadmap items.
+
+### Built
+
+- [x] **`Money` is now `ExactDecimal`**, with the mass justification written into its Javadoc so the next
+  person does not have to rediscover it. Its behaviour is unchanged.
+- [x] **Six mass columns changed from `REAL` to `TEXT`**: `package_types.tare_weight_kg` and `max_weight_kg`,
+  `warehouse_locations.max_capacity_kg`, `inventory_packages.weight_kg`, `orders.total_weight_kg`, and
+  `invoice_items.quantity`, which carries the kilograms an invoice line bills for.
+- [x] **Rates stay `REAL`** — `tax_types.rate_percent`, `invoices.vat_rate`, `invoices.exchange_rate`. They are
+  multipliers rather than quantities charged per unit, and the values in use are exact in binary.
+- [x] **`ExactDecimalMigration`** (the renamed money migration) now covers nine tables, converting mass by the
+  same rebuild and the same four-decimal cap. One migration, one pass over the database.
+- [x] **The order's total weight is summed in Java**, next to the total price it already summed there, so the
+  weight on an order is the sum of its packages and not a float that drifted.
+- [x] **Six SQL weight aggregates keep an explicit `CAST(... AS REAL)`** with a comment saying what they are:
+  screen footers and dashboard figures. A number that must be exact — an EPR declaration, an invoice — is
+  summed in Java from the rows.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **168 / 168** across 46 classes. `MoneyStorageTest` became
+`ExactDecimalStorageTest` and gained two tests: a scale reading of `10.050` kg is on disk with the trailing
+zero that says it was read to the gram, and a database whose packages were put back into a `REAL` column
+converts without any package changing weight. The screen and dialog walkthroughs pass, and the warehouse
+locations screen renders its capacities and occupancy bars from the text columns unchanged.
+
+Mutation checks, each confirmed to fail the suite before being reverted: dropping `inventory_packages` from the
+migration's column map; writing a new package weight with `setDouble`; and widening the precision cap from four
+decimals to seventeen. The second of these initially passed — SQLite's `TEXT` affinity renders `10.05` the same
+either way — which is why the test now uses a value with a trailing zero, the thing a double cannot carry.
+
+### Not done
+
+The EPR declaration itself. This pass makes an exact declaration possible; it does not write one. The report's
+second item, a real NAV Online Számla integration, is the next one on the board.
 
 ---
 
