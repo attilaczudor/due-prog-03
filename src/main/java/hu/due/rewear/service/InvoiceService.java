@@ -53,6 +53,12 @@ public final class InvoiceService {
     private static final Logger LOG = LoggerFactory.getLogger(InvoiceService.class);
     public static final BigDecimal DEFAULT_VAT_RATE = new BigDecimal("27.00");
 
+    /**
+     * Where issued documents are announced for tax reporting. It starts as a no-op so that invoicing works on
+     * its own, and the application context replaces it with the NAV integration once that is built.
+     */
+    private InvoiceReportingHook reportingHook = InvoiceReportingHook.NONE;
+
     /** Immutable line item input for multi-line manual invoice creation. */
     public record InvoiceLineInput(String description, BigDecimal quantity, String unit, BigDecimal unitPrice) {
     }
@@ -221,6 +227,7 @@ public final class InvoiceService {
                     netTotal, vatRate, taxCode, vatAmount, grossAmount, cur,
                     CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, now);
             insertOrderLines(conn, id, orderItems, decimals);
+            reportingHook.onInvoiceIssued(conn, id, userId);
             return id;
         }, true, null, null);
     }
@@ -435,6 +442,11 @@ public final class InvoiceService {
             for (ComputedLine cl : computed) {
                 invoiceDao.insertItem(conn, id, cl.desc(), cl.qty(), cl.unit(), cl.unitPrice(), cl.lineNet());
             }
+            // An invoice can be created already issued, without ever being a draft, so the announcement
+            // belongs here as well as in the status change. A draft is not reportable: it is not an invoice yet.
+            if (effStatus != InvoiceStatus.DRAFT) {
+                reportingHook.onInvoiceIssued(conn, id, userId);
+            }
             return id;
         }, false, receipts, attachment);
     }
@@ -568,6 +580,7 @@ public final class InvoiceService {
                             item.quantity(), item.unit(), item.unitPrice(), item.lineNet());
                 }
             }
+            reportingHook.onCreditNoteIssued(conn, id, originalInvoiceId, userId);
             return id;
         }, false, null, null);
         LOG.info("Issued credit note {} reversing invoice id={}", created.invoiceNumber(), originalInvoiceId);
@@ -580,6 +593,11 @@ public final class InvoiceService {
      * Issuing a draft sets its issue date to today and keeps its payment terms (the number of days between
      * issue and due date), then refreshes the archived PDF so the stored document shows the real issue date.
      */
+    /** Registers the tax-reporting integration. The application context calls this once at start-up. */
+    public void setReportingHook(InvoiceReportingHook hook) {
+        this.reportingHook = hook == null ? InvoiceReportingHook.NONE : hook;
+    }
+
     public Invoice changeStatus(long invoiceId, InvoiceStatus targetStatus, long userId) {
         requireAccess(userId);
         // Only a draft's stored PDF is rewritten (to carry its real issue date); an issued invoice's archive is never touched.
@@ -604,6 +622,9 @@ public final class InvoiceService {
             invoiceDao.updateStatus(conn, invoiceId, targetStatus, paidDate);
             invoiceDao.insertEvent(conn, invoiceId, event, existing.status(), targetStatus, null, userId,
                     BusinessClock.now());
+            if (targetStatus == InvoiceStatus.ISSUED && existing.status() == InvoiceStatus.DRAFT) {
+                reportingHook.onInvoiceIssued(conn, invoiceId, userId);
+            }
             return invoiceId;
         }, false, null, null, wasDraft);
         LOG.info("Invoice {} status changed to {} by user {}", changed.invoiceNumber(), targetStatus, userId);

@@ -630,43 +630,6 @@ invoice.entry.partner_both,Use {0} as both customer and supplier?,A(z) {0} partn
 admin.tab.nav,NAV Integration,NAV-integráció
 admin.tab.bank,Bank Integration,Banki integráció
 invoice.folder.all,All Invoices,Összes számla
-navdemo.title,NAV Online Invoice API 3.0 · Offline Demo,NAV Online Számla API 3.0 · Offline demó
-navdemo.note,Local simulation only. Outgoing invoices are previewed for issuer reporting. Incoming supplier invoices are previewed for lookup. Password and keys are never saved.,Helyi szimuláció. A kimenő számlák a kibocsátói adatszolgáltatás előnézetében jelennek meg. A bejövő számlákhoz lekérdezés tartozik. A jelszó és a kulcsok mentés nélkül maradnak.
-navdemo.environment,NAV environment (reference),NAV-környezet (tájékoztató)
-navdemo.endpoint,API base URL,API alap URL
-navdemo.tax_number,Taxpayer ID (8 digits),Adószám törzsszáma (8 számjegy)
-navdemo.login,Technical username,Technikai felhasználónév
-navdemo.password,Technical password,Technikai jelszó
-navdemo.signing_key,XML signing key,XML-aláírókulcs
-navdemo.exchange_key,XML exchange key,XML-cserekulcs
-navdemo.software_id,Software ID,Szoftverazonosító
-navdemo.software_name,Software name,Szoftver neve
-navdemo.software_version,Software version,Szoftver verziója
-navdemo.software_operation,Software operation type,Szoftver működési módja
-navdemo.developer,Software developer,Szoftver fejlesztője
-navdemo.developer_contact,Developer contact,Fejlesztő elérhetősége
-navdemo.developer_country,Developer country code,Fejlesztő országkódja
-navdemo.developer_tax,Developer tax number,Fejlesztő adószáma
-navdemo.outbound,Demo outgoing reporting,Kimenő adatszolgáltatás demója
-navdemo.inbound,Demo incoming lookup,Bejövő számlalekérdezés demója
-navdemo.results,Local invoice workflow preview,Helyi számlafolyamat előnézete
-navdemo.load_demo,Load Demo Values,Demóadatok betöltése
-navdemo.run,Run Local Demo,Helyi demó futtatása
-navdemo.operation,API operation,API-művelet
-navdemo.defaults_loaded,Demo values loaded.,A demóadatok betöltve.
-navdemo.saved,Demo settings saved. Credentials stay in this session.,A demóbeállítások mentve. A hitelesítő adatok csak ebben a munkamenetben érhetők el.
-navdemo.simulated,Local preview complete. Zero requests sent.,A helyi előnézet elkészült. Nem történt hálózati kérés.
-navdemo.required,Complete this field: {0},Töltse ki ezt a mezőt: {0}
-navdemo.tax_format,Enter the first eight digits of the Hungarian tax number.,Adja meg a magyar adószám első nyolc számjegyét.
-navdemo.software_format,Use 18 uppercase letters or digits or hyphens in the software ID.,A szoftverazonosító 18 nagybetűből vagy számjegyből vagy kötőjelből álljon.
-navdemo.country_format,Use a two-letter country code or leave it empty.,Kétbetűs országkódot adjon meg vagy hagyja üresen.
-navdemo.credentials_required,Fill in the password and both XML keys or load the demo values.,Töltse ki a jelszót és mindkét XML-kulcsot vagy töltse be a demóadatokat.
-navdemo.workflow_required,Select at least one demo workflow.,Válasszon legalább egy demófolyamatot.
-navdemo.draft,Draft · excluded,Piszkozat · kihagyva
-navdemo.credit_unlinked,Original invoice missing,Hiányzik az eredeti számla
-navdemo.pending,Local only,Csak helyi adat
-navdemo.demo_report,Simulated reporting,Szimulált adatszolgáltatás
-navdemo.demo_lookup,Simulated lookup,Szimulált lekérdezés
 bank.accounts,Bank Accounts,Bankszámlák
 bank.add_account,Add Account,Számla hozzáadása
 bank.edit_account,Edit Bank Account,Bankszámla szerkesztése
@@ -917,3 +880,58 @@ stocktake.in_quarantine,"{0} in quarantine","{0} csomag karanténban"
 status.package.QUARANTINED,Quarantined,Karanténban
 movement.QUARANTINE,Quarantined,Karanténba helyezve
 movement.QUARANTINE_RELEASE,Returned to stock,Visszavéve készletre
+nav.title,NAV Online Invoice 3.0 — real-time reporting,NAV Online Számla 3.0 — valós idejű adatszolgáltatás
+nav.note,"Outgoing invoices are reported to the tax authority as they are issued. Reporting starts switched off and pointed at the test environment; nothing is sent until a technical user is entered and it is turned on. The password and the two keys are kept outside the database, in {0}, readable only by this account, and they are not included in backups.","A kimenő számlák kiállításkor kerülnek a NAV felé. Az adatszolgáltatás alapértelmezetten kikapcsolt és a teszt környezetre mutat; addig semmi nem indul el, amíg nincs technikai felhasználó megadva és bekapcsolva. A jelszó és a két kulcs az adatbázison kívül, itt tárolódik: {0} — csak ez a felhasználói fiók olvashatja, és a mentésekbe nem kerül bele."
+nav.enabled,Reporting switched on,Adatszolgáltatás bekapcsolva
+nav.environment,NAV environment,NAV-környezet
+nav.endpoint,API base URL,API alap URL
+nav.tax_number,Taxpayer ID (8 digits),Adószám törzsszáma (8 számjegy)
+nav.vat_code,VAT code (1 digit),ÁFA-kód (1 számjegy)
+nav.county_code,County code (2 digits),Megyekód (2 számjegy)
+nav.login,Technical username,Technikai felhasználónév
+nav.password,Technical password,Technikai jelszó
+nav.signing_key,XML signing key,XML-aláírókulcs
+nav.exchange_key,XML exchange key (16 characters),XML-cserekulcs (16 karakter)
+nav.software_id,Software ID,Szoftverazonosító
+nav.software_name,Software name,Szoftver neve
+nav.software_version,Software version,Szoftver verziója
+nav.software_operation,Software operation type,Szoftver működési módja
+nav.developer,Software developer,Szoftver fejlesztője
+nav.developer_contact,Developer contact,Fejlesztő elérhetősége
+nav.developer_country,Developer country code,Fejlesztő országkódja
+nav.developer_tax,Developer tax number,Fejlesztő adószáma
+nav.queue,Reporting queue,Adatszolgáltatási sor
+nav.operation,Operation,Művelet
+nav.transaction,Transaction ID,Tranzakcióazonosító
+nav.message,NAV response,NAV válasza
+nav.save_credentials,Save Credentials,Hitelesítő adatok mentése
+nav.run_queue,Send and Check Now,Küldés és ellenőrzés most
+nav.retry,Queue Again,Újra sorba
+nav.annul,Request Annulment,Technikai érvénytelenítés kérése
+nav.history,History,Előzmények
+nav.select_row,Select a row first.,Előbb válasszon egy sort.
+nav.required,Complete this field: {0},Töltse ki ezt a mezőt: {0}
+nav.tax_format,Enter the first eight digits of the Hungarian tax number.,Adja meg a magyar adószám első nyolc számjegyét.
+nav.software_format,Use 18 uppercase letters or digits or hyphens in the software ID.,A szoftverazonosító 18 nagybetűből vagy számjegyből vagy kötőjelből álljon.
+nav.country_format,Use a two-letter country code or leave it empty.,Kétbetűs országkódot adjon meg vagy hagyja üresen.
+nav.vat_code_format,The VAT code is a single digit from 1 to 5.,Az ÁFA-kód egyetlen számjegy 1 és 5 között.
+nav.county_format,The county code is two digits.,A megyekód két számjegy.
+nav.credentials_required,Enter the password and both keys.,Adja meg a jelszót és mindkét kulcsot.
+nav.exchange_key_length,The exchange key is exactly 16 characters.,A cserekulcs pontosan 16 karakter.
+nav.credentials_saved,Credentials saved to {0}.,A hitelesítő adatok mentve ide: {0}.
+nav.confirm_production,"This will report real invoices for a real taxpayer. A mistaken report can only be annulled with human approval at NAV. Continue?","Ez valódi számlákat jelent be egy valódi adózó nevében. A téves adatszolgáltatás csak a NAV-nál, emberi jóváhagyással vonható vissza. Folytatja?"
+nav.queue_run,"Sent: {0}. Confirmed: {1}. Failed: {2}. Waiting to retry: {3}.","Elküldve: {0}. Visszaigazolva: {1}. Sikertelen: {2}. Újrapróbálásra vár: {3}."
+nav.annul_reason,Why is the earlier report wrong?,Miért hibás a korábbi adatszolgáltatás?
+nav.annul_recorded,"Recorded. A technical annulment takes effect only once it is approved on NAVs own web interface.","Rögzítve. A technikai érvénytelenítés csak a NAV saját felületén történő jóváhagyás után lép életbe."
+nav.state.off,Reporting is switched off. Nothing is sent.,Az adatszolgáltatás ki van kapcsolva. Semmi nem kerül elküldésre.
+nav.state.incomplete,Switched on but not usable yet: the technical user or the keys are missing.,"Bekapcsolva, de még nem használható: hiányzik a technikai felhasználó vagy a kulcsok."
+nav.state.test,Reporting to the NAV test environment.,Adatszolgáltatás a NAV teszt környezetébe.
+nav.state.live,Reporting to the live NAV service.,Adatszolgáltatás az éles NAV szolgáltatásba.
+nav.state.unprotected,the credentials file is not restricted to this account,a hitelesítő fájl nincs csak ehhez a fiókhoz korlátozva
+nav.state.pending,Queued,Sorban
+nav.state.submitted,Sent — awaiting NAV,Elküldve — NAV válaszára vár
+nav.state.done,Reported,Bejelentve
+nav.state.warn,Reported with warnings,Bejelentve figyelmeztetéssel
+nav.state.error,NOT reported,NINCS bejelentve
+nav.state.aborted,NOT reported — NAV aborted,NINCS bejelentve — a NAV megszakította
+nav.state.annul_requested,Annulment requested,Érvénytelenítés kérve

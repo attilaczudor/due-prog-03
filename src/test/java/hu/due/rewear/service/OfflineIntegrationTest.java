@@ -6,8 +6,8 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.dao.BankLedgerDao.Account;
 import hu.due.rewear.dao.BankLedgerDao.Transaction;
 import hu.due.rewear.i18n.I18nManager;
-import hu.due.rewear.model.NavDemoSettings;
-import hu.due.rewear.model.NavDemoSettings.Field;
+import hu.due.rewear.model.NavSettings;
+import hu.due.rewear.model.NavSettings.Field;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -58,17 +58,19 @@ class OfflineIntegrationTest {
     }
 
     @Test
-    void navDemoSetupSavesOnlySupportedNonSecretFields() {
+    void navSetupSavesTheIdentityAndNeverTheSecrets() {
         var ctx = context();
-        var settings = new NavDemoSettings(Map.of(Field.TAX_NUMBER, "87654321", Field.LOGIN, "local-demo-user"));
-        ctx.getSettingsDao().saveNavDemoSettings(settings);
-        var reloaded = context().getSettingsDao().getNavDemoSettings();
+        var settings = new NavSettings(Map.of(Field.TAX_NUMBER, "87654321", Field.LOGIN, "tech-user-1"));
+        ctx.getSettingsDao().saveNavSettings(settings);
+        var reloaded = context().getSettingsDao().getNavSettings();
         assertEquals("87654321", reloaded.value(Field.TAX_NUMBER));
-        assertEquals("local-demo-user", reloaded.value(Field.LOGIN));
-        assertEquals("TEST", reloaded.value(Field.ENVIRONMENT));
-        assertTrue(ctx.getSettingsDao().get("nav.demo.password").isEmpty());
-        assertTrue(ctx.getSettingsDao().get("nav.demo.signing_key").isEmpty());
-        assertTrue(ctx.getSettingsDao().get("nav.demo.exchange_key").isEmpty());
+        assertEquals("tech-user-1", reloaded.value(Field.LOGIN));
+        assertEquals("TEST", reloaded.value(Field.ENVIRONMENT), "A fresh setup points at the test environment");
+        assertFalse(reloaded.enabled(), "Reporting must start switched off");
+        // The secrets have no key in the database at all, under any name.
+        assertTrue(ctx.getSettingsDao().get("nav.password").isEmpty());
+        assertTrue(ctx.getSettingsDao().get("nav.signing_key").isEmpty());
+        assertTrue(ctx.getSettingsDao().get("nav.exchange_key").isEmpty());
     }
 
 }

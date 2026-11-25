@@ -112,7 +112,7 @@ erDiagram
 
 **Eladói cím és IBAN:** A `company.address.street`, `company.address.city` és `company.address.postal_code` külön tárolja a cím elemeit. A korábbi `company.address` mező beolvasáskor tartalék adatforrás. A `company.iban.<DEVIZA>` üres értéke törli az adott deviza IBAN-ját, az alapértelmezett számlaszámot is felülírva.
 
-**NAV demó:** A `nav.demo.*` kulcsok a környezetet és a szimuláció beállításait tárolják. A jelszó, az aláírókulcs és a cserekulcs nem kerül a fájlba.
+**NAV adatszolgáltatás:** A `nav.*` kulcsok az adózói azonosítót, a technikai felhasználó nevét, a környezetet és a be/kikapcsolt állapotot tárolják. A jelszó, az aláírókulcs és a cserekulcs **nem az adatbázisban** van, hanem a `data/nav-credentials.properties` fájlban, amelyet csak az alkalmazást futtató felhasználói fiók olvashat, és amely a mentésekbe sem kerül bele.
 
 **Banki nyilvántartás:** A `bank_accounts` a bankot, számlanevet, IBAN-t vagy számlaszámot, BIC-et, devizát, nyitó dátumot és egyenleget tárolja. A `bank_transactions` számlánként rögzíti a könyvelési dátumot, előjeles összeget, partnert és közleményt. Az összegek decimális szövegként tárolódnak. A `(bank_name, account_reference, currency)` kombináció egyedi. Az `idx_bank_transactions_account_date` a történet lekérdezését gyorsítja.
 
@@ -290,6 +290,30 @@ erDiagram
 | `created_at` | `TEXT` | `NOT NULL` | A művelet időpontja |
 
 Az állapotváltás és a hozzá tartozó esemény ugyanabban a tranzakcióban mentődik, ezért nincs napló nélküli állapotváltás. Az indexe: `idx_invoice_events_invoice`.
+
+### 3.46–3.47 NAV adatszolgáltatás (`nav_invoice_reports`, `nav_report_events`)
+| Oszlop | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Egyedi azonosító |
+| `invoice_id` | `INTEGER` | `NOT NULL FK -> invoices(id) ON DELETE CASCADE` | A bejelentett számla |
+| `operation` | `TEXT` | `NOT NULL CHECK (CREATE, MODIFY, STORNO, ANNUL)` | A NAV felé jelzett művelet |
+| `state` | `TEXT` | `NOT NULL CHECK (PENDING, SUBMITTED, DONE, WARN, ERROR, ABORTED, ANNUL_REQUESTED)` | Hol tart az adatszolgáltatás |
+| `request_id`, `transaction_id` | `TEXT` | `NULL` | A kérés azonosítója és a NAV tranzakcióazonosítója (ez az adatszolgáltatás bizonyítéka) |
+| `invoice_index` | `INTEGER` | `NOT NULL DEFAULT 1` | A számla sorszáma a kötegen belül |
+| `response_code`, `message` | `TEXT` | `NULL` | A NAV válaszkódja és szövege |
+| `attempt_count` | `INTEGER` | `NOT NULL DEFAULT 0` | Hányadik próbálkozásnál tart |
+| `next_attempt_at` | `TEXT` | `NULL` | Kiesés után mikor próbálható újra |
+| `submitted_at`, `completed_at`, `created_at`, `updated_at` | `TEXT` | | Időbélyegek |
+
+A `nav_report_events` minden állapotváltást rögzít (`from_state`, `to_state`, `detail`, `created_by`), mert az
+adatszolgáltatás megtörténtét a cégnek bizonyítania kell. **A számla saját `status` mezője nem mondja meg, hogy a NAV
+tud-e róla:** azt kizárólag az itteni `state` mondja meg, és a kötelezettség csak `DONE` vagy `WARN` állapotban teljesült.
+
+A `tax_types` tábla két új, `NULL`-ozható oszlopot kapott: `nav_vat_exemption_case` és `nav_vat_exemption_reason`.
+A nulla kulcsos sor a NAV kódlistájából származó mentességi esetet kell hordozzon; ha nincs beállítva, az alkalmazás
+**megtagadja a küldést**, mert a kitalált kód elutasított — vagyis be nem jelentett — számlát eredményezne.
+
+Indexek: `idx_nav_reports_invoice`, `idx_nav_reports_state`, `idx_nav_report_events_report`.
 
 ---
 

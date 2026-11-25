@@ -44,7 +44,7 @@ Build in this order:
 - [x] **Exact-decimal weights.** Done 25 November, pass 18. Smallest of the five and a precondition for three of the others. Money was fixed
       the same way; weight carries an EPR penalty of half the fee deficiency, a 100 g stocktake tolerance and
       contractual bale tolerances of a few percent.
-- [ ] **A real NAV Online Számla integration** replacing the demonstration. Immediate XML submission on issue, a
+- [x] **A real NAV Online Számla integration.** Done 25 November, pass 19. replacing the demonstration. Immediate XML submission on issue, a
       per-invoice reporting state machine with the transaction id stored as evidence, retry on outage, an operator
       queue for errors, and technical annulment modelled apart from a commercial credit note. Penalty up to
       HUF 1,000,000 per invoice; fifteen warnings became blocking errors on 15 September 2025.

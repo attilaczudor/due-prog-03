@@ -604,3 +604,40 @@ CREATE TABLE IF NOT EXISTS payroll_shifts (
     saved_by INTEGER NOT NULL REFERENCES users(id),
     UNIQUE (worker_id, work_day, department_id, role_code)
 );
+
+-- 46. NAV Online Számla reporting
+-- One row per report sent, or owed, to the tax authority. The obligation is met only when NAV has
+-- processed the report, so the state here — not the invoice's own status — is what says whether an
+-- issued invoice is known to the authority. The transaction id is the evidence that it is.
+CREATE TABLE IF NOT EXISTS nav_invoice_reports (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL REFERENCES invoices(id) ON DELETE CASCADE,
+    operation TEXT NOT NULL CHECK (operation IN ('CREATE', 'MODIFY', 'STORNO', 'ANNUL')),
+    state TEXT NOT NULL CHECK (state IN ('PENDING', 'SUBMITTED', 'DONE', 'WARN', 'ERROR', 'ABORTED', 'ANNUL_REQUESTED')),
+    request_id TEXT,
+    transaction_id TEXT,
+    invoice_index INTEGER NOT NULL DEFAULT 1,
+    response_code TEXT,
+    message TEXT,
+    attempt_count INTEGER NOT NULL DEFAULT 0,
+    next_attempt_at TEXT,
+    submitted_at TEXT,
+    completed_at TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+-- Every state change, kept because the report is the company's evidence of having reported.
+CREATE TABLE IF NOT EXISTS nav_report_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    report_id INTEGER NOT NULL REFERENCES nav_invoice_reports(id) ON DELETE CASCADE,
+    from_state TEXT,
+    to_state TEXT NOT NULL,
+    detail TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_nav_reports_invoice ON nav_invoice_reports(invoice_id);
+CREATE INDEX IF NOT EXISTS idx_nav_reports_state ON nav_invoice_reports(state, next_attempt_at);
+CREATE INDEX IF NOT EXISTS idx_nav_report_events_report ON nav_report_events(report_id, id);

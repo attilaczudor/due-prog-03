@@ -4,7 +4,6 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.EmailSettings;
-import hu.due.rewear.model.NavDemoSettings;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -81,31 +80,34 @@ public final class SettingsDao {
         }
     }
 
-    public NavDemoSettings getNavDemoSettings() {
-        var fields = new java.util.EnumMap<NavDemoSettings.Field, String>(NavDemoSettings.Field.class);
+    /** The real Online Számla setup. Secrets are not here; they live in the credential file. */
+    public hu.due.rewear.model.NavSettings getNavSettings() {
+        var fields = new java.util.EnumMap<hu.due.rewear.model.NavSettings.Field, String>(
+                hu.due.rewear.model.NavSettings.Field.class);
         try (var conn = db.getConnection();
-             var query = conn.prepareStatement("SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'nav.demo.%'");
+             var query = conn.prepareStatement(
+                     "SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'nav.%'");
              var rows = query.executeQuery()) {
             var lookup = new java.util.HashMap<String, String>();
             while (rows.next()) lookup.put(rows.getString(1), rows.getString(2));
-            for (var field : NavDemoSettings.Field.values()) {
-                String value = lookup.get("nav.demo." + field.key());
+            for (var field : hu.due.rewear.model.NavSettings.Field.values()) {
+                String value = lookup.get("nav." + field.key());
                 if (value != null) fields.put(field, value);
             }
-            return new NavDemoSettings(fields);
+            return new hu.due.rewear.model.NavSettings(fields);
         } catch (SQLException ex) {
-            throw new DaoException("Could not load NAV demo setup", ex);
+            throw new DaoException("Could not load the NAV setup", ex);
         }
     }
 
-    public void saveNavDemoSettings(NavDemoSettings settings) {
+    public void saveNavSettings(hu.due.rewear.model.NavSettings navSettings) {
         db.runInTransaction(conn -> {
             try (var query = conn.prepareStatement("""
                     INSERT INTO app_settings(setting_key, setting_value) VALUES(?, ?)
                     ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
                     """)) {
-                for (var field : NavDemoSettings.Field.values()) {
-                    upsertSetting(query, "nav.demo." + field.key(), settings.value(field));
+                for (var field : hu.due.rewear.model.NavSettings.Field.values()) {
+                    upsertSetting(query, "nav." + field.key(), navSettings.value(field));
                 }
             }
         });

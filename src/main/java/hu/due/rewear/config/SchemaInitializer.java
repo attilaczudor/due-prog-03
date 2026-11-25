@@ -61,6 +61,11 @@ public final class SchemaInitializer {
             addColumnIfMissing(conn, "orders", "delivery_date", "TEXT");
             addColumnIfMissing(conn, "sorting_bags", "packed_by", "INTEGER REFERENCES users(id)");
             addColumnIfMissing(conn, "sorting_bags", "pack_day", "TEXT");
+            // A zero-rated line must name an exemption case from NAV's own code list. The code belongs to the
+            // tax type rather than to the invoice, because it is the same for every invoice under that type.
+            addColumnIfMissing(conn, "tax_types", "nav_vat_exemption_case", "TEXT");
+            addColumnIfMissing(conn, "tax_types", "nav_vat_exemption_reason", "TEXT");
+            migrateNavDemoSettings(conn);
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_sorting_pack_worker_day ON sorting_bags(packed_by, pack_day)");
             }
@@ -70,6 +75,39 @@ public final class SchemaInitializer {
         new QuarantineMigration(dbManager).upgrade(sql);
         new ExactDecimalMigration(dbManager).upgrade(sql);
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
+    }
+
+    /**
+     * Carries the old offline demonstration's setup over to the real integration's keys, once.
+     *
+     * <p>The demonstration shipped with sample values — a made-up tax number and a placeholder technical user
+     * — so only the fields an installation might genuinely have changed are carried over, and reporting is
+     * left switched off. Nobody should find themselves reporting to the tax authority because a demo setting
+     * was renamed underneath them.
+     */
+    private void migrateNavDemoSettings(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                     "SELECT COUNT(*) FROM app_settings WHERE setting_key LIKE 'nav.demo.%'")) {
+            if (!rs.next() || rs.getInt(1) == 0) {
+                return;
+            }
+        }
+        try (PreparedStatement copy = conn.prepareStatement("""
+                INSERT INTO app_settings(setting_key, setting_value)
+                SELECT replace(setting_key, 'nav.demo.', 'nav.'), setting_value FROM app_settings
+                WHERE setting_key LIKE 'nav.demo.%'
+                  AND setting_key NOT IN ('nav.demo.outbound', 'nav.demo.inbound', 'nav.demo.login')
+                ON CONFLICT(setting_key) DO NOTHING
+                """)) {
+            copy.executeUpdate();
+        }
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("DELETE FROM app_settings WHERE setting_key LIKE 'nav.demo.%'");
+            stmt.execute("INSERT INTO app_settings(setting_key, setting_value) VALUES('nav.enabled', 'false')"
+                    + " ON CONFLICT(setting_key) DO UPDATE SET setting_value = 'false'");
+        }
+        LOG.info("Carried the offline NAV demonstration settings over to the reporting integration, switched off");
     }
 
     private void ensureTaxAndPartnerSchema(Connection conn) throws SQLException {

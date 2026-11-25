@@ -7,6 +7,9 @@ import hu.due.rewear.dao.DictionaryDao;
 import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
+import hu.due.rewear.dao.NavReportDao;
+import hu.due.rewear.nav.NavCredentialStore;
+import hu.due.rewear.service.NavReportingService;
 import hu.due.rewear.dao.InvoiceDao;
 import hu.due.rewear.dao.NotificationDao;
 import hu.due.rewear.dao.OrderDao;
@@ -82,6 +85,9 @@ public final class AppContext {
     private final DictionaryDao dictionaryDao;
     private final WarehouseLocationDao locationDao;
     private final InventoryPackageDao packageDao;
+    private final NavReportDao navReportDao;
+    private final NavReportingService navReportingService;
+    private final NavCredentialStore navCredentialStore;
     private final StockMovementDao movementDao;
     private final CustomerDao customerDao;
     private final OrderDao orderDao;
@@ -249,6 +255,13 @@ public final class AppContext {
         this.orderService.setNotificationService(notificationService);
         this.transportService.setNotificationService(notificationService);
         this.backupService = new BackupService(databaseManager);
+        // The credentials sit beside the database rather than inside it, so a backup bundle or a copy of the
+        // database never carries the keys that can file tax returns for the company.
+        this.navCredentialStore = new NavCredentialStore(dataDir.resolve("nav-credentials.properties"));
+        this.navReportDao = new NavReportDao(databaseManager);
+        this.navReportingService = new NavReportingService(databaseManager, navReportDao, invoiceDao,
+                settingsDao, navCredentialStore, notificationService);
+        this.invoiceService.setReportingHook(navReportingService);
 
         invoiceService.syncOverdueStatuses();
         initLocalizationFromPreferences();
@@ -303,6 +316,18 @@ public final class AppContext {
 
     public WarehouseLocationDao getLocationDao() {
         return locationDao;
+    }
+
+    public NavReportDao getNavReportDao() {
+        return navReportDao;
+    }
+
+    public NavReportingService getNavReportingService() {
+        return navReportingService;
+    }
+
+    public NavCredentialStore getNavCredentialStore() {
+        return navCredentialStore;
     }
 
     public InventoryPackageDao getPackageDao() {

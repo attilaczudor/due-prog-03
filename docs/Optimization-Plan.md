@@ -902,6 +902,81 @@ second item, a real NAV Online Számla integration, is the next one on the board
 
 ---
 
+## Pass 19 — NAV Online Számla, for real (25 November 2026)
+
+### What was there
+
+A configuration form and a table that said what *would* happen. It sent nothing. Against that, the obligation is
+to transmit in XML immediately on issue, without manual intervention, and it is discharged only once NAV has
+processed the report — an `ERROR` response means the invoice is simply not reported. The penalty reported for
+a missed invoice is up to HUF 1,000,000, and fifteen former warnings became blocking errors on 15 September
+2025. This was the one item on the roadmap with no discretionary component.
+
+### Built
+
+- [x] **The protocol, in `hu.due.rewear.nav`**, with no database and no user interface in it: the three
+  request documents, the response reader, the invoice document, and the cryptography — SHA-512 for the
+  password, SHA3-512 for the request signature including one digest per invoice, AES-128 for the exchange
+  token. The XML parser is locked down before use: this is XML from outside, and a parser left on its defaults
+  will follow a doctype to a file or a URL of the document's choosing.
+- [x] **A transport-neutral `ReportableInvoice`** between the application's invoice and the XML. ViDA's
+  cross-border reporting starts on 1 July 2030 and will want a different format from the same facts; the
+  Hungarian specification itself has been revised twice in a year. Assembling the facts and formatting them
+  are now separate steps.
+- [x] **A per-invoice state machine** — `PENDING → SUBMITTED → DONE / WARN / ERROR / ABORTED` — in
+  `NavReportLifecycle`, with the transaction id stored as evidence and every move recorded in
+  `nav_report_events`. The invoice's own status does not say whether the authority knows about it; this does.
+- [x] **Retry that tells the two failures apart.** An outage is retried with a doubling wait. A rejection on
+  content is not retried at all — the same bytes would be rejected the same way — and raises a notification to
+  the management roles instead, because an unreported invoice needs a person, not a queue.
+- [x] **`ANNUL` modelled apart from commercial cancellation.** A credit note is a `STORNO`, reportable and
+  linked structurally to the invoice it cancels, with the modification index NAV orders corrections by.
+  Annulment says an earlier *report* was wrong and requires human approval in NAV's own web interface, so the
+  application records the request and the state says plainly that the matter is not closed.
+- [x] **A refusal where a guess was tempting.** A zero-rated line must carry an exemption case from NAV's code
+  list. That list was not among the material the research could obtain, so rather than invent a code — which
+  would produce a rejected report, which is an unreported invoice — the tax type carries the case, and an
+  invoice whose tax type has none is refused with a message naming what to fix.
+- [x] **Credentials outside the database**, in a file readable only by the account that runs the application.
+  Not encrypted, and the Javadoc says why: a desktop application has nowhere to hide a key from someone who
+  already has the machine, and decoration described as encryption is worse than none. Backups copy the
+  database; they do not copy this.
+- [x] **Off by default, pointed at the test environment**, with a confirmation before anything is switched to
+  the live service. The queue still fills while reporting is off, so the backlog is visible rather than lost.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **192 / 192** across 48 classes (+24). The reporting tests run a real
+HTTP server on this machine standing in for NAV, so real request bytes, real XML and real response handling
+are exercised; the live service is never contacted, and the test that proves the off switch works asserts that
+the local service received nothing at all. The fake verifies the request signature with its own implementation
+of the published rule rather than calling the application's signer.
+
+The signing tests compare against digests produced outside this codebase from the same inputs. That matters
+here more than usual: the live service cannot be used to check an implementation, so the only honest check is
+a second implementation. A test that hashed a value with the class under test and compared it to itself would
+pass whatever the class did.
+
+Two defects were found this way rather than in production. The fake's first attempt at extracting the invoice
+operation was ambiguous, because `invoiceOperation` is nested inside a wrapper element of the same name —
+precisely the misreading a careless implementation would make. And the queue was asking NAV about invoices it
+had submitted milliseconds earlier; submission and polling are now separate passes, which removes a wasted
+round trip per invoice.
+
+Mutation checks, each confirmed to fail the suite before being reverted: removing the enabled check so the off
+switch stops gating; treating an outage as a rejection; using SHA-512 where SHA3-512 is required; and guessing
+an exemption code instead of refusing.
+
+### Not done
+
+Incoming-invoice lookup (`queryInvoiceDigest` / `queryInvoiceData`), which is a convenience rather than an
+obligation. Automatic running of the queue on a timer: it runs when an operator presses the button, which is
+honest for an application that is not always open, but a scheduled run belongs with the shift-handover work.
+And the integration has been exercised against a service of our own, not against NAV's test environment —
+that needs a technical user the company must create, and it is the first thing to do before this goes live.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

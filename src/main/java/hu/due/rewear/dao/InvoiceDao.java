@@ -125,6 +125,21 @@ public final class InvoiceDao {
         }
     }
 
+    /** The invoice this one amends, when it is a credit note; null otherwise. */
+    public Long findCreditForInvoiceId(Connection conn, long invoiceId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT credit_for_invoice_id FROM invoices WHERE id = ?")) {
+            ps.setLong(1, invoiceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (!rs.next()) {
+                    return null;
+                }
+                long value = rs.getLong(1);
+                return rs.wasNull() ? null : value;
+            }
+        }
+    }
+
     public List<InvoiceItem> findItemsByInvoiceId(long invoiceId) {
         try (Connection conn = db.getConnection()) {
             return findItemsByInvoiceId(conn, invoiceId);
