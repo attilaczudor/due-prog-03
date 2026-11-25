@@ -234,7 +234,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         if (order == null) return;
         I18nManager i18n = ctx.getI18n();
         var drivers = ctx.getUserDao().findAll().stream()
-                .filter(u -> u.active() && u.roleCode() == hu.due.rewear.model.RoleCode.FORKLIFT)
+                .filter(u -> u.active() && u.roleCode() == hu.due.rewear.model.RoleCode.DELIVERY_DRIVER)
                 .toList();
         var docks = ctx.getLocationDao().findByType(hu.due.rewear.model.LocationType.DISPATCH_ZONE, true);
 

@@ -6,13 +6,13 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**173 fő Java forrásfájl**, **37 JUnit 5 tesztosztály**, **136 teszt**):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**173 fő Java forrásfájl**, **38 JUnit 5 tesztosztály**, **139 teszt**):
 
 ```mermaid
 flowchart TD
     UI["UI Réteg (hu.due.rewear.ui)<br/>LoginFrame, MainFrame (modul-alapú oldalsáv, élő jelvények, auto-refresh),<br/>18 oldalmenümodul (TransportView PUTAWAY/STAGING, TodoView,<br/>NotificationsView, MessagesView, EmailView + RecipientMultiSelectField,<br/>SortingView, PayrollView, AdminModulesPanel, AdminEmailSettingsPanel, OrderHandoverDialog, SetupWizardDialog (első indítás),<br/>PrintPreviewDialog, DocumentPreviewDialog, AsyncUiRunner, SectionNavigation)"]
     SVC["Üzleti Logika & PDF Réteg (hu.due.rewear.service)<br/>AuthService, SessionContext, RoleModuleService, ProductCodeService,<br/>QrCodeService, InventoryService, TransportService, SortingService, OrderService, PayrollService,<br/>ScannerService, InvoiceService, ReceiptVaultService, PartnerStatementService,<br/>EmailService, ChatService, NotificationService, TodoService,<br/>PDF/CSV exportálók (köztük PickListPdfExporter),<br/>BackupService + BackupBundle (teljes mentés), MailAttachmentVault, MailExportJanitor,<br/>InvoiceLifecycle, OnboardingService, PickListService"]
-    I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (859 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
+    I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (864 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
     DAO["Adatelérési Réteg (hu.due.rewear.dao)<br/>JDBC DAO-k, például RoleDao, UserDao, RoleModulePermissionDao, SettingsDao,<br/>FinanceConfigDao, DictionaryDao, WarehouseLocationDao, InventoryPackageDao,<br/>StockMovementDao, CustomerDao, OrderDao, OrderItemDao, InvoiceDao,<br/>EmailDao, ChatDao, NotificationDao, TodoDao<br/>(összesen 20 DAO osztály)"]
     MODEL["Domain Modellek (hu.due.rewear.model)<br/>Java 17 Record POJO-k és Enumok (AppModule, RoleCode, LocationType,<br/>InventoryPackage, Order, Invoice, EmailMessage, ChatRoom, AppNotification, ...)"]
     DB[("Beágyazott SQLite 3 (42 tábla, 24 deklarált index)<br/>data/rewear-wms.db + data/invoices/ + data/receipts/ + data/mail-attachments/")]
@@ -384,7 +384,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **37 tesztosztály, összesen 136 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **38 tesztosztály, összesen 139 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -425,3 +425,4 @@ A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevi
 | `InvoiceLifecycleTest` | 7 | A számla állapotgépe minden állapot × cél párra, kiállítás dátuma, események, jóváíró számla kapcsolata és régi adatok összekapcsolása |
 | `InvoiceAccessTest` | 4 | Pénzügyi műveletek jogosultsága a szerepkör-mátrix szerint, inaktív és ismeretlen felhasználó elutasítása |
 | `RawMaterialSupplyTest` | 5 | Napi begyűjtés anyaggal és gyűjtési területtel, betárolás utáni elérhetőség, tétel igénylése súly nélkül, kifogyott és be nem tárolt tétel, szerepkörök, demó gyűjtési területek |
+| `RoleHierarchyTest` | 3 | A 11 szerepkör megléte és kétnyelvű megnevezése, modulhozzáférés szerepkörönként (két targoncás szerepkör, pénzügy és bérszámfejtés elkülönítése), a régi egységes targoncás szerepkör egyszeri szétválasztása |

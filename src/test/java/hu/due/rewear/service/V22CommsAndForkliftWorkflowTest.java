@@ -81,7 +81,7 @@ class V22CommsAndForkliftWorkflowTest {
     void forkliftPutawayAndOrderStagingFlowMovesStationToShelfToDispatchZone() {
         AppContext ctx = newContext();
         User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
-        assertEquals(RoleCode.FORKLIFT, forklift.roleCode());
+        assertEquals(RoleCode.SUPPLY_DRIVER, forklift.roleCode());
         assertEquals("mark.toth@rewear-wms.hu", forklift.email());
 
         WarehouseLocation shelf = ctx.getLocationDao().findByType(LocationType.STORAGE, true).get(0);
@@ -112,7 +112,9 @@ class V22CommsAndForkliftWorkflowTest {
         assertFalse(pendingTask.isAtDispatchZone());
 
         // 3. Forklift moves it to DISPATCH_ZONE (DOCK-01)
-        ctx.getTransportService().stageToDispatchZone(List.of(onShelf.id()), dock.id(), forklift.id());
+        User deliveryDriver = ctx.getUserDao().findByUsername("forklift2").orElseThrow();
+        assertEquals(RoleCode.DELIVERY_DRIVER, deliveryDriver.roleCode());
+        ctx.getTransportService().stageToDispatchZone(List.of(onShelf.id()), dock.id(), deliveryDriver.id());
         var stagedTask = ctx.getTransportService().findOrderStagingTasks().stream()
                 .filter(t -> t.packageId() == onShelf.id())
                 .findFirst().orElseThrow();

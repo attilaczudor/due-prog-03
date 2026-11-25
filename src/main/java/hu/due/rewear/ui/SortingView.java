@@ -51,7 +51,8 @@ final class SortingView extends JPanel implements NavigableView {
         setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
         add(sections);
         RoleCode role = ctx.getSession().requireCurrentUser().roleCode();
-        boolean manages = ctx.getSession().isManagerOrAdmin();
+        // The production leaders run the sorting floor alongside management.
+        boolean manages = role.runsProduction();
         var requestActions = controls();
         var bagActions = controls();
         if (role == RoleCode.SORTER) {
@@ -61,7 +62,7 @@ final class SortingView extends JPanel implements NavigableView {
                 Request request = requests.selected();
                 if (request != null && confirmation("sorting.request.cancel_confirm")) service.cancelRequest(request.id());
             });
-        } else if (role == RoleCode.FORKLIFT) {
+        } else if (role == RoleCode.SUPPLY_DRIVER) {
             addAction(requestActions, "sorting.request.deliver", true, this::deliver);
         } else if (role == RoleCode.SORTING_HELPER) {
             addAction(bagActions, "sorting.bag.pack", true, this::packBag);
@@ -71,11 +72,11 @@ final class SortingView extends JPanel implements NavigableView {
         }
 
         // Raw materials come first: they are where the whole sorting flow starts.
-        if (manages || role == RoleCode.FORKLIFT || role == RoleCode.SORTER) {
+        if (manages || role == RoleCode.SUPPLY_DRIVER || role == RoleCode.SORTER) {
             var rawActions = controls();
             if (role == RoleCode.SORTER) addAction(rawActions, "sorting.lot.call", true, this::requestSupply);
             if (manages) addAction(rawActions, "sorting.lot.receive", true, this::receive);
-            if (manages || role == RoleCode.FORKLIFT) addAction(rawActions, "sorting.lot.store", role == RoleCode.FORKLIFT, this::storeLot);
+            if (manages || role == RoleCode.SUPPLY_DRIVER) addAction(rawActions, "sorting.lot.store", role == RoleCode.SUPPLY_DRIVER, this::storeLot);
             addSection("sorting.materials", MainFrame.VIEW_INVENTORY, lots, rawActions);
         }
         if (role == RoleCode.OPERATOR || role == RoleCode.SORTING_HELPER) {
@@ -253,7 +254,7 @@ final class SortingView extends JPanel implements NavigableView {
         var users = ctx.getUserDao().findAll().stream().filter(User::active).toList();
         var sorters = memberList(people(users, RoleCode.SORTER), team == null ? List.of() : team.sorterIds());
         var helpers = memberList(people(users, RoleCode.SORTING_HELPER), team == null ? List.of() : team.helperIds());
-        var driver = choices(people(users, RoleCode.FORKLIFT));
+        var driver = choices(people(users, RoleCode.SUPPLY_DRIVER));
         var station = choices(ctx.getLocationDao().findByType(LocationType.OPERATOR_STATION, true).stream()
                 .map(row -> new Choice<>(row.id(), row.code())).toList());
         var name = new JTextField(team == null ? "" : team.name(), 20);

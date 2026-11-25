@@ -87,7 +87,7 @@ public final class OrderService {
         LOG.info("Created order {} ({}) for customerId={} by userId={}", created.orderNumber(), cur, customerId, userId);
         if (notificationService != null) {
             notificationService.notifyRoles(
-                    java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
+                    java.util.Set.of(hu.due.rewear.model.RoleCode.DELIVERY_DRIVER),
                     hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
                     "New Order: " + created.orderNumber(),
                     "Order " + created.orderNumber() + " (" + created.customerName() + ") created — prepare for dispatch collection.",
@@ -288,7 +288,7 @@ public final class OrderService {
                         title, msg, hu.due.rewear.ui.MainFrame.VIEW_STAGING);
             } else {
                 notificationService.notifyRoles(
-                        java.util.Set.of(hu.due.rewear.model.RoleCode.FORKLIFT),
+                        java.util.Set.of(hu.due.rewear.model.RoleCode.DELIVERY_DRIVER),
                         hu.due.rewear.model.AppNotification.CAT_ORDER_STAGING,
                         title, msg, hu.due.rewear.ui.MainFrame.VIEW_STAGING);
             }
@@ -318,7 +318,7 @@ public final class OrderService {
             }
             if (forkliftUserId != null) {
                 try (var ps = conn.prepareStatement("""
-                        SELECT 1 FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.active=1 AND r.code='FORKLIFT'
+                        SELECT 1 FROM users u JOIN roles r ON r.id=u.role_id WHERE u.id=? AND u.active=1 AND r.code='DELIVERY_DRIVER'
                         """)) {
                     ps.setLong(1, forkliftUserId);
                     try (var rows = ps.executeQuery()) {
@@ -430,7 +430,7 @@ public final class OrderService {
                 if (rows.next()) {
                     String role = rows.getString(1);
                     if (role.equals("ADMIN") || role.equals("SUPER_ADMIN") || role.equals("MANAGER")
-                            || (role.equals("FORKLIFT") && Objects.equals(order.assignedForkliftId(), userId))) return;
+                            || (role.equals("DELIVERY_DRIVER") && Objects.equals(order.assignedForkliftId(), userId))) return;
                 }
             }
         }

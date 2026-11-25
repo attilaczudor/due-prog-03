@@ -81,8 +81,17 @@ public final class SessionContext {
         return hasRole(RoleCode.OPERATOR);
     }
 
-    public synchronized boolean isForklift() {
-        return hasRole(RoleCode.FORKLIFT);
+    public synchronized boolean isSupplyDriver() {
+        return hasRole(RoleCode.SUPPLY_DRIVER);
+    }
+
+    public synchronized boolean isDeliveryDriver() {
+        return hasRole(RoleCode.DELIVERY_DRIVER);
+    }
+
+    /** Either kind of forklift driver. */
+    public synchronized boolean isDriver() {
+        return isSupplyDriver() || isDeliveryDriver();
     }
 
     public boolean canUseIntake() {
@@ -90,12 +99,12 @@ public final class SessionContext {
     }
 
     public boolean canUseTransportQueue() {
-        return isManagerOrAdmin() || isForklift();
+        return isManagerOrAdmin() || isDriver();
     }
 
-    /** Forklift Drivers use the dedicated scan-to-collect workflow inside Order Staging instead of the standalone QR Scanner Station. */
+    /** Drivers use the dedicated scan-to-collect workflow in their own queue instead of the standalone QR Scanner Station. */
     public boolean canUseQrScannerStation() {
-        return !isForklift();
+        return !isDriver();
     }
 
     /** Only Management/Admins may send or receive external emails; Operators &amp; Forklift Drivers are internal-only. */

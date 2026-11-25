@@ -39,7 +39,7 @@ A **ReWear WMS** egy többplatformos, asztali **Java 17 GUI alkalmazás**, amely
    - Elkülönített deviza-főkönyvek (`EUR`, `HUF`, `USD`, egyedi devizák), ország-alapú adótípusok (`HU 27%`, `EU B2B 0%`, `Export 0%`), Adminban szerkeszthető eladói cégprofil címmezőkkel és devizánkénti IBAN-okkal, többsoros számlák, 1-kattintásos **Jóváíró számla (`CN-YYYY-NNNN`)**, automatikus **`OVERDUE`** detektálás + `mailto:` felszólítás, hordozható **számlaarchívum és bizonylattár (`./data/invoices/ÉÉÉÉ/HH/`, `./data/receipts/ÉÉÉÉ/HH/`)**, és A4 **P&L + Készletértékelés PDF**.
 7. **Szuper Admin modul-alapú jogosultságkezelés (`Szerepkörök`):** A **18 menüpont** külön modulként szerepel (`AppModule`), amelyeket a `SUPER_ADMIN` szerepkörönként valós időben ki- és bekapcsolhat az adatbázisban tárolt mátrixból.
 8. **NAV- és banki integrációs demó:** Helyi NAV Online Számla 3.0 előnézet, számlánkénti iránnyal. Banki számlák és tranzakciók pontos, külön devizás egyenleggel.
-9. **CSV-alapú többnyelvűség (859 EN/HU kulcs) és Brutalist monokróm UX:** Egyetlen UTF-8 `translations.csv` fájlból töltődő kétnyelvű felület, kontrasztos világos/sötét monokróm megjelenés (`#FFFFFF`/`#000000`, `arc = 0`), manuális Frissítés gombok nélküli azonnali és 10 mp-es háttér-frissítés, háttérszálú `AsyncUiRunner`, valamint gyorsbillentyűk (`Cmd/Ctrl+1..9/0`, `F5`, `Esc`).
+9. **CSV-alapú többnyelvűség (864 EN/HU kulcs) és Brutalist monokróm UX:** Egyetlen UTF-8 `translations.csv` fájlból töltődő kétnyelvű felület, kontrasztos világos/sötét monokróm megjelenés (`#FFFFFF`/`#000000`, `arc = 0`), manuális Frissítés gombok nélküli azonnali és 10 mp-es háttér-frissítés, háttérszálú `AsyncUiRunner`, valamint gyorsbillentyűk (`Cmd/Ctrl+1..9/0`, `F5`, `Esc`).
 
 10. **Nyersanyag-ellátás a begyűjtéstől a válogatóig:** A napi járatok az ország különböző gyűjtési területeiről
     hozzák be a használt ruhát; minden begyűjtés külön tételként kerül be az anyag és a terület megnevezésével.
@@ -54,20 +54,31 @@ A **ReWear WMS** egy többplatformos, asztali **Java 17 GUI alkalmazás**, amely
 
 ## 2. Szerepkörök és alapértelmezett modul-jogosultsági mátrix (RBAC)
 
-A hitelesítés BCrypt jelszó-hash-eléssel történik. Az alkalmazás **7 szerepkört** és **18 menümodult** kezel. A `SUPER_ADMIN` mindig teljes, korlátozatlan hozzáféréssel rendelkezik, és az **Adminisztráció → Szerepkörök** nézetben módosíthatja a szerepköröknél engedélyezhető modulokat. A bérszámfejtéshez Adminisztrátor vagy Szuperadmin szerepkör szükséges.
+A hitelesítés BCrypt jelszó-hash-eléssel történik. Az alkalmazás **11 szerepkört** és **19 menümodult** kezel. A `SUPER_ADMIN` mindig teljes, korlátozatlan hozzáféréssel rendelkezik, és az **Adminisztráció → Szerepkörök** nézetben módosíthatja a szerepköröknél engedélyezhető modulokat. A bérszámfejtéshez Adminisztrátor vagy Szuperadmin szerepkör szükséges.
 
-| Modul (`AppModule`) | Szuperadmin | Adminisztrátor | Raktárvezető | Állomásvezető | Válogató operátor | Válogatósegéd | Targoncás |
-|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| Áttekintés és Teendők (`DASHBOARD`, `TODO`) | Igen | Igen | Igen | Igen | Igen | Igen | Igen |
-| Válogatás (`SORTING`) | Igen | Igen | Igen | Igen | Igen | Igen | Igen |
-| Csomagfelvétel és QR szkenner (`INTAKE`, `SCANNER`) | Igen | Igen | Igen | Igen | Nem | Nem | Nem |
-| Betárolás és Összekészítés (`PUTAWAY`, `STAGING`) | Igen | Igen | Igen | Nem | Nem | Nem | Igen |
-| Készlet (`INVENTORY`) | Igen | Igen | Igen | Igen | Nem | Nem | Igen |
-| Raktárhelyek és Kódtörzsek (`LOCATIONS`, `DICTIONARIES`) | Igen | Igen | Igen | Nem | Nem | Nem | Nem |
-| Ügyfelek, Rendelések és Pénzügyek (`CUSTOMERS`, `ORDERS`, `INVOICES`) | Igen | Igen | Igen | Nem | Nem | Nem | Nem |
-| Bérszámfejtés (`PAYROLL`) | Igen | Igen | Nem | Nem | Nem | Nem | Nem |
-| Értesítések, Üzenetek és E-mail (`NOTIFICATIONS`, `MESSAGES`, `EMAIL`) | Igen | Igen | Igen | Belső mail | Belső mail | Belső mail | Belső mail |
-| Adminisztráció (`ADMIN`) | Igen | Igen | Nem | Nem | Nem | Nem | Nem |
+| Modul (`AppModule`) | Szuperadmin | Adminisztrátor | Raktárvezető | Termelési vezető | Műszakvezető | Bérszámfejtés/HR | Állomásvezető | Alapanyag-targoncás | Kiszállítási targoncás | Válogató | Válogatósegéd |
+|---|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
+| Áttekintés és Teendők (`DASHBOARD`, `TODO`) | Igen | Igen | Igen | Igen | Igen | Igen | Igen | Igen | Igen | Igen | Igen |
+| Beosztás (`ROTA`) | Igen | Igen | Igen | Szerkeszt | Szerkeszt | Szerkeszt | Saját | Saját | Saját | Saját | Saját |
+| Válogatás (`SORTING`) | Igen | Igen | Igen | Igen | Igen | Nem | Igen | Igen | Nem | Igen | Igen |
+| Csomagfelvétel és QR szkenner (`INTAKE`, `SCANNER`) | Igen | Igen | Igen | Igen | Igen | Nem | Igen | Nem | Nem | Nem | Nem |
+| Betárolás (`PUTAWAY`) | Igen | Igen | Igen | Igen | Igen | Nem | Nem | Igen | Nem | Nem | Nem |
+| Összekészítés (`STAGING`) | Igen | Igen | Igen | Igen | Igen | Nem | Nem | Nem | Igen | Nem | Nem |
+| Készlet (`INVENTORY`) | Igen | Igen | Igen | Igen | Igen | Nem | Igen | Igen | Igen | Nem | Nem |
+| Raktárhelyek és Kódtörzsek (`LOCATIONS`, `DICTIONARIES`) | Igen | Igen | Igen | Igen | Nem | Nem | Nem | Nem | Nem | Nem | Nem |
+| Ügyfelek, Rendelések és Pénzügyek (`CUSTOMERS`, `ORDERS`, `INVOICES`) | Igen | Igen | Igen | Nem | Nem | Nem | Nem | Nem | Nem | Nem | Nem |
+| Bérszámfejtés (`PAYROLL`) | Igen | Igen | Nem | Nem | Nem | Igen | Nem | Nem | Nem | Nem | Nem |
+| Értesítések, Üzenetek és E-mail | Igen | Igen | Igen | Igen | Igen | Igen | Belső mail | Belső mail | Belső mail | Belső mail | Belső mail |
+| Adminisztráció (`ADMIN`) | Igen | Igen | Nem | Nem | Nem | Nem | Nem | Nem | Nem | Nem | Nem |
+
+**Vállalati hierarchia.** A rendszergazda fölött nincs szerepkör; alatta az adminisztrátor fogja össze az üzletet.
+A raktárvezető a készletért, a partnerekért, a rendelésekért és a pénzügyekért felel. Vele egy szinten a
+**termelési vezető** viszi a válogatóüzemet, alatta a **műszakvezető** egy műszakot és annak beosztását.
+A **bérszámfejtés/HR** a béreket, a beosztást és a dolgozói adatokat látja, raktári műveleteket nem.
+A targoncás munka két szerepkörre vált szét: az **alapanyag-targoncás** szolgálja ki a válogatót (betárolja a
+beérkező nyersanyagot, kiadja a válogatóknak, és a kész, címkézett csomagokat az állomásról a polcra viszi),
+a **kiszállítási targoncás** pedig a vevői rendeléseket (összekészítés a kiadó zónába, majd a jármű rakodása).
+
 
 A számla állapotváltása és a jóváíró számla kiállítása a szolgáltatásban is csak aktív felhasználónak, az `INVOICES` modult használó szerepkörrel engedélyezett, így a mátrix módosítása azonnal érvényes. A Szerepkörök és az E-mail beállítások adminisztrációs aloldalai a Szuperadminhoz tartoznak. Az Állomásvezető meglévő fiókja megtartja az `OPERATOR` szerepkódot és a kijelölt állomást. A két targoncás munkafolyamaton belüli jogot a feladathoz rendelt személy határozza meg.
 
@@ -84,13 +95,13 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 | Nyelv és futtatás | Java 17 LTS, Apache Maven (NetBeans-kompatibilis) | Java rekordok, szabványos build, futtatható fat `.jar` (`maven-shade-plugin`), platformfüggetlen indító szkriptek (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) |
 | Grafikus felület (GUI) | Java Swing + FlatLaf 3.5.4 + `SwingWorker` | Egyedi Brutalist monokróm világos/sötét téma, vektoros ikonok, összecsukható fő- és másodlagos oldalsáv (`SectionNavigation`), kereshető címzettválasztó és háttérszálú I/O (`AsyncUiRunner`) |
 | Adatbázis-kezelés | Beágyazott SQLite + `sqlite-jdbc` | **42 táblás 3NF relációs séma**, **24 deklarált index**, külső kulcsok, atomi tranzakciók, automatikus séma-migráció és explicit első indítási választás (saját cég vagy demó) |
-| Biztonság & RBAC | `jBCrypt` + dinamikus `role_module_permissions` | Sóval ellátott BCrypt jelszó-hash-elés, 7 szerepkör, adatbázis-vezérelt modul-jogosultsági mátrix |
+| Biztonság & RBAC | `jBCrypt` + dinamikus `role_module_permissions` | Sóval ellátott BCrypt jelszó-hash-elés, 11 szerepkör, adatbázis-vezérelt modul-jogosultsági mátrix |
 | QR-kód kezelés | Google ZXing (`core` + `javase`) | Valós idejű QR generálás, PNG mentés, QR dekódolás képfájlból, szkenneléses komissiózás és átadás-ellenőrzés |
 | Nyomtatás és grafika | Java 2D (`Graphics2D`) + Java Print API (`PrinterJob`, `Printable`) | Vektoros hőcímke- és A4 dokumentum-rajzolás, mentés előtti előnézet, fizikai nyomtatás |
 | PDF generálás | OpenPDF 2.0.3 | Hőcímke/A4 4-es PDF címkék, többdevizás A4 PDF számlák/jóváírások, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok |
 | Adatvizualizáció | XChart 3.8.8 | Dinamikus monokróm kör- és oszlopdiagramok a készlet súlyeloszlásáról |
-| Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (859 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
-| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **136 automatizált egység- és integrációs teszt** 37 tesztosztályban, Maven wrapper (`./mvnw`) |
+| Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (864 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
+| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **139 automatizált egység- és integrációs teszt** 38 tesztosztályban, Maven wrapper (`./mvnw`) |
 
 ---
 

@@ -49,29 +49,46 @@ class V25RoleModulePermissionsTest {
         assertFalse(svc.isModuleEnabled(RoleCode.MANAGER, AppModule.ADMIN));
         assertTrue(svc.isModuleEnabled(RoleCode.OPERATOR, AppModule.INTAKE));
         assertFalse(svc.isModuleEnabled(RoleCode.OPERATOR, AppModule.PUTAWAY));
-        assertTrue(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.PUTAWAY));
-        assertTrue(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.STAGING));
-        assertFalse(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.SCANNER));
+        // The two driver roles have different jobs: the supply driver serves the sorting floor,
+        // the delivery driver serves customer orders.
+        assertTrue(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.PUTAWAY));
+        assertTrue(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.SORTING));
+        assertFalse(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.STAGING));
+        assertTrue(svc.isModuleEnabled(RoleCode.DELIVERY_DRIVER, AppModule.STAGING));
+        assertFalse(svc.isModuleEnabled(RoleCode.DELIVERY_DRIVER, AppModule.PUTAWAY));
+        assertFalse(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.SCANNER));
+        // Payroll figures stay with the office roles responsible for them.
+        assertTrue(svc.isModuleEnabled(RoleCode.HR_PAYROLL, AppModule.PAYROLL));
+        assertTrue(svc.isModuleEnabled(RoleCode.HR_PAYROLL, AppModule.ROTA));
+        assertFalse(svc.isModuleEnabled(RoleCode.MANAGER, AppModule.PAYROLL));
+        assertFalse(svc.isModuleEnabled(RoleCode.HR_PAYROLL, AppModule.INVENTORY));
+        // The production leaders run the floor but see no money.
+        assertTrue(svc.isModuleEnabled(RoleCode.PRODUCTION_LEAD, AppModule.SORTING));
+        assertTrue(svc.isModuleEnabled(RoleCode.PRODUCTION_LEAD, AppModule.DICTIONARIES));
+        assertFalse(svc.isModuleEnabled(RoleCode.PRODUCTION_LEAD, AppModule.INVOICES));
+        assertTrue(svc.isModuleEnabled(RoleCode.SHIFT_LEAD, AppModule.ROTA));
+        assertFalse(svc.isModuleEnabled(RoleCode.SHIFT_LEAD, AppModule.DICTIONARIES));
+        assertFalse(svc.isModuleEnabled(RoleCode.SHIFT_LEAD, AppModule.INVOICES));
 
         // 2. Non-Super-Admin cannot modify module rules
         ctx.getAuthService().login("admin", "admin123".toCharArray());
         assertThrows(SecurityException.class,
-                () -> svc.setModuleEnabled(RoleCode.FORKLIFT, AppModule.SCANNER, true));
+                () -> svc.setModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.SCANNER, true));
         ctx.getAuthService().logout();
 
         // 3. Super Admin enables SCANNER for FORKLIFT and disables EMAIL for OPERATOR
         ctx.getAuthService().login("superadmin", "superadmin123".toCharArray());
-        svc.setModuleEnabled(RoleCode.FORKLIFT, AppModule.SCANNER, true);
+        svc.setModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.SCANNER, true);
         svc.setModuleEnabled(RoleCode.OPERATOR, AppModule.EMAIL, false);
 
-        assertTrue(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.SCANNER));
+        assertTrue(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.SCANNER));
         assertFalse(svc.isModuleEnabled(RoleCode.OPERATOR, AppModule.EMAIL));
 
         // 4. Super Admin can never be locked out of any module, and Dashboard remains always on
         svc.setModuleEnabled(RoleCode.SUPER_ADMIN, AppModule.ADMIN, false);
-        svc.setModuleEnabled(RoleCode.FORKLIFT, AppModule.DASHBOARD, false);
+        svc.setModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.DASHBOARD, false);
         assertTrue(svc.isModuleEnabled(RoleCode.SUPER_ADMIN, AppModule.ADMIN));
-        assertTrue(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.DASHBOARD));
+        assertTrue(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.DASHBOARD));
 
         // 5. SessionContext reflects live persisted module rules for logged-in users
         ctx.getAuthService().logout();
@@ -86,7 +103,7 @@ class V25RoleModulePermissionsTest {
         // 6. Reset to defaults restores original rules
         ctx.getAuthService().login("superadmin", "superadmin123".toCharArray());
         svc.resetAllToDefaults();
-        assertFalse(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.SCANNER));
+        assertFalse(svc.isModuleEnabled(RoleCode.SUPPLY_DRIVER, AppModule.SCANNER));
         assertTrue(svc.isModuleEnabled(RoleCode.OPERATOR, AppModule.EMAIL));
     }
 

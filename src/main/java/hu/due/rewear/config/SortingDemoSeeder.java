@@ -75,7 +75,7 @@ final class SortingDemoSeeder {
         var manager = users.findByUsername("manager");
         if (stationManager.isEmpty() || driver.isEmpty() || manager.isEmpty()) return;
         User operator = stationManager.get();
-        if (operator.roleCode() != RoleCode.OPERATOR || driver.get().roleCode() != RoleCode.FORKLIFT
+        if (operator.roleCode() != RoleCode.OPERATOR || driver.get().roleCode() != RoleCode.SUPPLY_DRIVER
                 || !BCrypt.checkpw("operator123", operator.passwordHash())) return;
         long sorterRole = roles.findByCode(RoleCode.SORTER).orElseThrow().id();
         long helperRole = roles.findByCode(RoleCode.SORTING_HELPER).orElseThrow().id();
@@ -91,7 +91,9 @@ final class SortingDemoSeeder {
                 if (marker.executeUpdate() != 1) return;
             }
             if (available(conn, "forklift2")) {
-                users.insert(conn, "forklift2", driverHash, FULFILMENT_DRIVER.fullName(), driverRole, true, now);
+                // Only reached by an older demo workspace: the fulfilment driver serves customer orders.
+                long deliveryRole = roles.findByCode(RoleCode.DELIVERY_DRIVER).map(r -> r.id()).orElse(driverRole);
+                users.insert(conn, "forklift2", driverHash, FULFILMENT_DRIVER.fullName(), deliveryRole, true, now);
             }
             long station;
             try (var stmt = conn.createStatement();
@@ -228,7 +230,7 @@ final class SortingDemoSeeder {
                         AND role_id = (SELECT id FROM roles WHERE code = ?)
                         AND full_name = ? AND last_name = 'Minta' AND first_name = ?
                     """)) {
-                queueLegacyRename(ps, "forklift2", RoleCode.FORKLIFT, "Kiszállítási Targoncás", FULFILMENT_DRIVER);
+                queueLegacyRename(ps, "forklift2", RoleCode.DELIVERY_DRIVER, "Kiszállítási Targoncás", FULFILMENT_DRIVER);
                 for (int i = 0; i < HELPERS.size(); i++) {
                     int number = i + 1;
                     queueLegacyRename(ps, demoUsername("helper", number), RoleCode.SORTING_HELPER,

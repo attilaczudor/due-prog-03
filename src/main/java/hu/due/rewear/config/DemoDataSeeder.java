@@ -314,7 +314,7 @@ public final class DemoDataSeeder {
         long adminRoleId = roleDao.ensure(conn, RoleCode.ADMIN, "Administrator");
         long managerRoleId = roleDao.ensure(conn, RoleCode.MANAGER, "Warehouse Manager");
         long operatorRoleId = roleDao.ensure(conn, RoleCode.OPERATOR, "Station Manager");
-        long forkliftRoleId = roleDao.ensure(conn, RoleCode.FORKLIFT, "Forklift Driver");
+        long supplyDriverRoleId = roleDao.ensure(conn, RoleCode.SUPPLY_DRIVER, "Supply Forklift Driver");
 
         // 2. Demo Users (BCrypt) with auto-populated @rewear-wms.hu corporate emails
         long superId = userDao.insert(conn, "superadmin", BCrypt.hashpw("superadmin123", BCrypt.gensalt(10)),
@@ -326,7 +326,10 @@ public final class DemoDataSeeder {
         long operatorId = userDao.insert(conn, "operator", BCrypt.hashpw("operator123", BCrypt.gensalt(10)),
                 "Nagy Bence", operatorRoleId, true, now.minusDays(10));
         long forkliftId = userDao.insert(conn, "forklift", BCrypt.hashpw("forklift123", BCrypt.gensalt(10)),
-                "Tóth Márk", forkliftRoleId, true, now.minusDays(9));
+                "Tóth Márk", supplyDriverRoleId, true, now.minusDays(9));
+        long deliveryRoleId = roleDao.ensure(conn, RoleCode.DELIVERY_DRIVER, "Delivery Forklift Driver");
+        long deliveryId = userDao.insert(conn, "forklift2", BCrypt.hashpw("forklift2123", BCrypt.gensalt(10)),
+                "Kelemen Ádám", deliveryRoleId, true, now.minusDays(9));
 
         try (var ps = conn.prepareStatement("UPDATE users SET email = ? WHERE id = ?")) {
             Object[][] emails = {
@@ -334,7 +337,8 @@ public final class DemoDataSeeder {
                     {adminId, "gabor.szabo@rewear-wms.hu"},
                     {managerId, "eszter.kovacs@rewear-wms.hu"},
                     {operatorId, "bence.nagy@rewear-wms.hu"},
-                    {forkliftId, "mark.toth@rewear-wms.hu"}
+                    {forkliftId, "mark.toth@rewear-wms.hu"},
+                    {deliveryId, "adam.kelemen@rewear-wms.hu"}
             };
             for (Object[] row : emails) {
                 ps.setString(1, (String) row[1]);

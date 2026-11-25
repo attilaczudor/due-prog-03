@@ -105,7 +105,7 @@ public final class SortingService {
             // Sorters see only what they can actually call for: lots that are stored and still have stock.
             String lotFilter = actor.roleCode() == RoleCode.SORTER
                     ? " WHERE l.location_id IS NOT NULL AND l.available_grams>0" : "";
-            List<Lot> lots = management(actor) || actor.roleCode() == RoleCode.FORKLIFT || actor.roleCode() == RoleCode.SORTER
+            List<Lot> lots = management(actor) || actor.roleCode() == RoleCode.SUPPLY_DRIVER || actor.roleCode() == RoleCode.SORTER
                     ? query(conn, LOT_SELECT + lotFilter + " ORDER BY l.available_grams=0, l.material COLLATE NOCASE, l.reference",
                     SortingService::mapLot) : List.of();
             List<Team> teams = management(actor) ? teams(conn) : List.of();
@@ -150,8 +150,8 @@ public final class SortingService {
     /** Puts a received lot away at a storage location, which is what makes it available to sorters. */
     public void storeLot(long lotId, long locationId) {
         User actor = actor();
-        require(management(actor) || actor.roleCode() == RoleCode.FORKLIFT,
-                "Only a forklift driver or warehouse management may store raw stock.");
+        require(management(actor) || actor.roleCode() == RoleCode.SUPPLY_DRIVER,
+                "Only a supply driver or warehouse management may store raw stock.");
         db.runInTransaction(conn -> {
             locations.findById(conn, locationId).filter(l -> l.active() && l.locationType() == LocationType.STORAGE)
                     .orElseThrow(() -> new IllegalStateException("Select an active storage location."));
@@ -174,7 +174,7 @@ public final class SortingService {
         Integer rate = bonusPercent == null ? null : basisPoints(bonusPercent);
         db.runInTransaction(conn -> {
             for (long helper : helpers) verifyStaff(conn, helper, RoleCode.SORTING_HELPER);
-            verifyStaff(conn, driver, RoleCode.FORKLIFT);
+            verifyStaff(conn, driver, RoleCode.SUPPLY_DRIVER);
             verifyStation(conn, station);
             for (long sorter : sorters) verifyStaff(conn, sorter, RoleCode.SORTER);
             long id = teamId;
@@ -216,7 +216,7 @@ public final class SortingService {
             Team team = first(query(conn, """
                     SELECT t.* FROM sorting_teams t JOIN sorting_team_members m ON m.team_id=t.id WHERE m.sorter_id=?
                     """, r -> mapTeam(r, List.of(), List.of()), actor.id()), "Ask a manager to assign you to a sorting team.");
-            verifyStaff(conn, team.driverId(), RoleCode.FORKLIFT);
+            verifyStaff(conn, team.driverId(), RoleCode.SUPPLY_DRIVER);
             var helpers = query(conn, """
                     SELECT h.helper_id FROM sorting_team_helpers h JOIN users u ON u.id=h.helper_id
                     JOIN roles role ON role.id=u.role_id WHERE h.team_id=? AND u.active=1 AND role.code='SORTING_HELPER'
@@ -259,7 +259,7 @@ public final class SortingService {
     }
 
     private void deliverFrom(long requestId, Long chosenLot, BigDecimal deliveredKg) {
-        User actor = actor(RoleCode.FORKLIFT);
+        User actor = actor(RoleCode.SUPPLY_DRIVER);
         long weight = grams(deliveredKg, false);
         db.runInTransaction(conn -> {
             List<Long> called = query(conn, "SELECT requested_lot_id FROM sorting_requests WHERE id=? AND driver_id=?",
@@ -465,11 +465,9 @@ public final class SortingService {
         return session.requireCurrentUser();
     }
 
+    /** Who may receive raw stock, keep the teams and see every request: management and the production leaders. */
     private static boolean management(User user) {
-        return switch (user.roleCode()) {
-            case SUPER_ADMIN, ADMIN, MANAGER -> true;
-            default -> false;
-        };
+        return user.roleCode().runsProduction();
     }
 
     private record Scope(String where, Object[] params) { }
@@ -481,7 +479,7 @@ public final class SortingService {
         }
         String field = switch (actor.roleCode()) {
             case SORTER -> "sorter_id";
-            case FORKLIFT -> "driver_id";
+            case SUPPLY_DRIVER -> "driver_id";
             case OPERATOR -> "station_id";
             default -> "";
         };

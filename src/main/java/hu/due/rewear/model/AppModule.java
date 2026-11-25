@@ -24,6 +24,7 @@ public enum AppModule {
     ORDERS("orders", "nav.orders", Category.MANAGEMENT, false),
     INVOICES("invoices", "nav.invoices", Category.MANAGEMENT, false),
     PAYROLL("payroll", "nav.payroll", Category.MANAGEMENT, false),
+    ROTA("rota", "nav.rota", Category.MANAGEMENT, false),
     NOTIFICATIONS("notifications", "nav.notifications", Category.COMMUNICATIONS, false),
     MESSAGES("messages", "nav.messages", Category.COMMUNICATIONS, false),
     EMAIL("email", "nav.email", Category.COMMUNICATIONS, false),
@@ -76,8 +77,10 @@ public enum AppModule {
         return alwaysEnabled;
     }
 
+    /** Payroll figures stay with the office roles that are responsible for them. */
     public boolean allowsRole(RoleCode role) {
-        return this != PAYROLL || role == RoleCode.ADMIN || role == RoleCode.SUPER_ADMIN;
+        return this != PAYROLL || role == RoleCode.ADMIN || role == RoleCode.SUPER_ADMIN
+                || role == RoleCode.HR_PAYROLL;
     }
 
     public boolean defaultEnabledFor(RoleCode role) {
@@ -90,12 +93,28 @@ public enum AppModule {
         return switch (role) {
             case ADMIN -> true;
             case MANAGER -> this != ADMIN;
+            // Runs the sorting operation: the floor, its reference data and its rota, but no money.
+            case PRODUCTION_LEAD -> this == TODO || this == SORTING || this == INTAKE || this == PUTAWAY
+                    || this == STAGING || this == SCANNER || this == INVENTORY || this == LOCATIONS
+                    || this == DICTIONARIES || this == ROTA
+                    || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+            // Runs one shift: the same floor work and the rota, without the reference data.
+            case SHIFT_LEAD -> this == TODO || this == SORTING || this == INTAKE || this == PUTAWAY
+                    || this == STAGING || this == SCANNER || this == INVENTORY || this == ROTA
+                    || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+            // Payroll, the rota it is based on, and the worker records inside Payroll.
+            case HR_PAYROLL -> this == TODO || this == PAYROLL || this == ROTA
+                    || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             case OPERATOR -> this == TODO || this == SORTING || this == INTAKE || this == SCANNER || this == INVENTORY
+                    || this == ROTA || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+            case SORTER, SORTING_HELPER -> this == TODO || this == SORTING || this == ROTA
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
-            case SORTER, SORTING_HELPER -> this == TODO || this == SORTING
-                    || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
-            case FORKLIFT -> this == TODO || this == SORTING || this == PUTAWAY || this == STAGING || this == INVENTORY
-                    || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+            // Serves the sorting floor: raw material in, finished packages out to the shelves.
+            case SUPPLY_DRIVER -> this == TODO || this == SORTING || this == PUTAWAY || this == INVENTORY
+                    || this == ROTA || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+            // Serves customer orders: collecting to the dock and loading the vehicle.
+            case DELIVERY_DRIVER -> this == TODO || this == STAGING || this == INVENTORY
+                    || this == ROTA || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             case SUPER_ADMIN -> true;
         };
     }

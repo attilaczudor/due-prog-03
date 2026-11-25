@@ -62,7 +62,7 @@ public final class TodoService {
         List<SystemTodoItem> items = new ArrayList<>();
         RoleCode role = user.roleCode();
 
-        if (role == RoleCode.FORKLIFT) {
+        if (role.isDriver()) {
             appendForkliftTodos(user, items, i18n);
         } else if (role == RoleCode.OPERATOR) {
             appendOperatorTodos(user, items, i18n);

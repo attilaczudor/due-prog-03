@@ -167,7 +167,7 @@ public final class TransportView extends JPanel implements NavigableView {
                 selected.add(stagingRows.get(row).orderId());
             }
         }
-        Long driverFilter = ctx.getSession().isForklift() ? ctx.getSession().requireCurrentUser().id() : null;
+        Long driverFilter = ctx.getSession().isDeliveryDriver() ? ctx.getSession().requireCurrentUser().id() : null;
         var list = selected.isEmpty()
                 ? ctx.getPickListService().forDriver(driverFilter)
                 : ctx.getPickListService().forOrders(selected);
@@ -200,7 +200,7 @@ public final class TransportView extends JPanel implements NavigableView {
         Long fallbackDockId = (dispatchCombo.getSelectedItem() instanceof LocChoice c) ? c.location().id() : null;
         try {
             var me = ctx.getSession().requireCurrentUser();
-            boolean driverOnly = ctx.getSession().isForklift();
+            boolean driverOnly = ctx.getSession().isDeliveryDriver();
             TransportService.StagingTask done = ctx.getTransportService()
                     .scanAndCollectForOrder(code, fallbackDockId, me.id(), driverOnly);
             scanCollectField.setText("");
@@ -274,7 +274,7 @@ public final class TransportView extends JPanel implements NavigableView {
         try {
             long driverId = ctx.getSession().requireCurrentUser().id();
             int moved = ctx.getTransportService().stageToDispatchZone(ids, choice.location().id(), driverId,
-                    ctx.getSession().isForklift());
+                    ctx.getSession().isDeliveryDriver());
             refreshData();
             JOptionPane.showMessageDialog(this,
                     i18n.t("transport.moved_success", moved, choice.location().code()),
@@ -322,7 +322,7 @@ public final class TransportView extends JPanel implements NavigableView {
         } else {
             refreshLocationChoices(dispatchCombo, LocationType.DISPATCH_ZONE);
 
-            Long driverFilter = ctx.getSession().isForklift()
+            Long driverFilter = ctx.getSession().isDeliveryDriver()
                     ? ctx.getSession().requireCurrentUser().id()
                     : null;
             stagingRows = ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter);

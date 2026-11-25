@@ -20,6 +20,8 @@
 
 - [x] Track raw material as daily collection lines (material, collection area, storage location). A sorter now calls for a line instead of typing kilograms, since the delivered weight is only known when the driver brings it.
 
+- [x] Give the company a role hierarchy: production manager and shift leader above the floor, an HR/payroll role, and the single forklift role split into supply (sorting floor) and delivery (customer orders). Menus follow from the role.
+
 ## Next session
 
 - [ ] Click through what was only compiled or painted, not seen: the first-time setup dialog, the invoice dialog (history table, disabled buttons, status drop-down), the Pick list button and printed layout, the mail attachment open flow, and the Admin backup and restore buttons.

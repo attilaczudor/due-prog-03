@@ -47,7 +47,8 @@ class V23NotificationsTodoAndStationTest {
     void operatorCreationAndOrderAllocationTriggerForkliftNotificationsAndSystemTodos() {
         AppContext ctx = newContext();
         User operator = ctx.getUserDao().findByUsername("operator").orElseThrow();
-        User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
+        User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();          // supply: putaway
+        User deliveryDriver = ctx.getUserDao().findByUsername("forklift2").orElseThrow(); // delivery: orders
         User manager = ctx.getUserDao().findByUsername("manager").orElseThrow();
 
         // Demo operator is pre-assigned to ST-OP-01
@@ -74,20 +75,24 @@ class V23NotificationsTodoAndStationTest {
         long custId = ctx.getCustomerDao().findAll(true).get(0).id();
         WarehouseLocation dock = ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true).get(0);
         Order ord = ctx.getOrderService().createOrder(custId, "EUR", null, manager.id());
-        ctx.getOrderService().assignForkliftAndDock(ord.id(), forklift.id(), dock.id());
+        ctx.getOrderService().assignForkliftAndDock(ord.id(), deliveryDriver.id(), dock.id());
         InventoryPackage shelfPkg = ctx.getPackageDao().findByFilter(hu.due.rewear.model.PackageFilter.empty())
                 .stream()
                 .filter(p -> p.status() == hu.due.rewear.model.PackageStatus.IN_STOCK && p.locationId() != station.id())
                 .findFirst().orElseThrow();
         ctx.getOrderService().addPackageToOrder(ord.id(), shelfPkg.id(), new BigDecimal("5.00"), manager.id());
 
-        assertTrue(ctx.getNotificationService().countUnread(forklift.id()) >= fkNotifsBefore + 3);
+        // Work is split by role: the supply driver is told about putaway, the delivery driver about this order.
+        assertTrue(ctx.getNotificationService().countUnread(forklift.id()) >= fkNotifsBefore + 1);
+        assertTrue(ctx.getNotificationService().listForUser(deliveryDriver.id(), 10).stream()
+                .anyMatch(n -> AppNotification.CAT_ORDER_STAGING.equals(n.category())));
 
-        // 3. Forklift System To-Do list is logically ordered: P1 Order Staging before P2 Putaway
+        // 3. Each driver's System To-Do list shows the work that is actually theirs.
         List<SystemTodoItem> fkTodos = ctx.getTodoService().buildSystemTodosFor(forklift, ctx.getI18n());
         assertFalse(fkTodos.isEmpty());
-        assertEquals("P1", fkTodos.get(0).priorityBadge());
-        assertTrue(fkTodos.stream().anyMatch(t -> "P2".equals(t.priorityBadge())));
+        List<SystemTodoItem> deliveryTodos = ctx.getTodoService().buildSystemTodosFor(deliveryDriver, ctx.getI18n());
+        assertEquals("P1", deliveryTodos.get(0).priorityBadge(), "Collecting for a waiting order comes first");
+        assertTrue(fkTodos.stream().anyMatch(t -> "P2".equals(t.priorityBadge())), "Putaway is the supply driver's");
 
         // 4. Operator System To-Do list includes their assigned station status
         List<SystemTodoItem> opTodos = ctx.getTodoService().buildSystemTodosFor(operator, ctx.getI18n());
@@ -95,7 +100,7 @@ class V23NotificationsTodoAndStationTest {
 
         // 5. Forklift stages package to DOCK-01 -> Manager receives ORDER_READY notification
         int mgrNotifsBefore = ctx.getNotificationService().countUnread(manager.id());
-        ctx.getTransportService().stageToDispatchZone(List.of(shelfPkg.id()), dock.id(), forklift.id());
+        ctx.getTransportService().stageToDispatchZone(List.of(shelfPkg.id()), dock.id(), deliveryDriver.id());
         assertEquals(mgrNotifsBefore + 1, ctx.getNotificationService().countUnread(manager.id()));
     }
 

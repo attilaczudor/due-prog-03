@@ -188,7 +188,7 @@ public final class InventoryService {
                 saved.size(), userId, location.code());
         if (notificationService != null && location.locationType() == LocationType.OPERATOR_STATION && !saved.isEmpty()) {
             notificationService.notifyRoles(
-                    java.util.Set.of(RoleCode.FORKLIFT),
+                    java.util.Set.of(RoleCode.SUPPLY_DRIVER),
                     hu.due.rewear.model.AppNotification.CAT_PUTAWAY,
                     "Putaway Pickup: " + location.code(),
                     saved.size() + " package(s) created at " + location.code() + " (" + saved.get(0).qrCode() + ") ready for shelf putaway.",

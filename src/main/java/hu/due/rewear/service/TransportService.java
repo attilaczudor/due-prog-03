@@ -249,7 +249,7 @@ public final class TransportService {
         }
         try (var ps = conn.prepareStatement("""
                 SELECT 1 FROM orders o JOIN users u ON u.id=? JOIN roles r ON r.id=u.role_id
-                WHERE o.id=? AND o.delivery_date IS NOT NULL AND r.code='FORKLIFT'
+                WHERE o.id=? AND o.delivery_date IS NOT NULL AND r.code IN ('DELIVERY_DRIVER','SUPPLY_DRIVER')
                   AND (u.active=0 OR o.assigned_forklift_id<>u.id)
                 """)) {
             ps.setLong(1, driverUserId);

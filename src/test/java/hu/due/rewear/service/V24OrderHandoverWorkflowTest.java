@@ -47,7 +47,7 @@ class V24OrderHandoverWorkflowTest {
         AppContext ctx = new AppContext(db, prefs, i18n);
 
         User manager = ctx.getUserDao().findByUsername("manager").orElseThrow();
-        User forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
+        User forklift = ctx.getUserDao().findByUsername("forklift2").orElseThrow();
         WarehouseLocation dock = ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true).get(0);
 
         // 1. Manager creates an order, allocates 2 in-stock packages, and assigns Forklift Driver + DOCK-01

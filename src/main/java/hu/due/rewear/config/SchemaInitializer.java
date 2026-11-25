@@ -389,22 +389,48 @@ public final class SchemaInitializer {
      */
     private void ensureBaseRoles(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
+            // The old row is renamed before the roles below are inserted, so its module permissions
+            // carry over and the new code does not collide with a row that is about to be added.
+            boolean hadSingleDriverRole = stmt.executeUpdate(
+                    "UPDATE roles SET code='SUPPLY_DRIVER', name='Supply Forklift Driver' WHERE code='FORKLIFT'") == 1;
             stmt.execute("""
                     INSERT OR IGNORE INTO roles (code, name) VALUES
                     ('SUPER_ADMIN', 'Super Administrator'),
                     ('ADMIN', 'Administrator'),
                     ('MANAGER', 'Warehouse Manager'),
+                    ('PRODUCTION_LEAD', 'Production Manager'),
+                    ('SHIFT_LEAD', 'Shift Leader'),
+                    ('HR_PAYROLL', 'HR and Payroll'),
                     ('OPERATOR', 'Station Manager'),
-                    ('FORKLIFT', 'Forklift Driver'),
+                    ('SUPPLY_DRIVER', 'Supply Forklift Driver'),
+                    ('DELIVERY_DRIVER', 'Delivery Forklift Driver'),
                     ('SORTER', 'Sorting Operator'),
                     ('SORTING_HELPER', 'Sorting Helper')
                     """);
+            if (hadSingleDriverRole) {
+                splitForkliftDrivers(stmt);
+            }
             // Older databases stored the operator role under its former display name.
             stmt.execute("UPDATE roles SET name = 'Station Manager' WHERE code = 'OPERATOR' AND name = 'Sorting Operator'");
             // A legacy demo database showed its admin under the account owner's name; keep the demo roster consistent.
             stmt.execute("UPDATE users SET full_name = 'Szabó Gábor', last_name = 'Szabó', first_name = 'Gábor' "
                     + "WHERE lower(username) = 'admin' AND (full_name LIKE '%Attila Czudor%' OR full_name LIKE '%Czudor Attila%')");
         }
+    }
+
+    /**
+     * Moves the drivers of the former single {@code FORKLIFT} role onto the two new ones, once, in the run that
+     * renames the old role. The supply driver serves the sorting floor (raw material in, finished packages out
+     * to the shelves); the delivery driver serves customer orders. A driver who supplies a sorting team keeps
+     * the supply job; every other driver becomes a delivery driver, which is what the fulfilment accounts were
+     * already doing in practice. It never runs again, so people can be moved between the two afterwards.
+     */
+    private static void splitForkliftDrivers(Statement stmt) throws SQLException {
+        stmt.execute("""
+                UPDATE users SET role_id = (SELECT id FROM roles WHERE code='DELIVERY_DRIVER')
+                WHERE role_id = (SELECT id FROM roles WHERE code='SUPPLY_DRIVER')
+                  AND id NOT IN (SELECT driver_id FROM sorting_teams)
+                """);
     }
 
     private void ensureUserProfileColumns(Connection conn) throws SQLException {

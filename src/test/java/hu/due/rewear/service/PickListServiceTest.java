@@ -40,7 +40,8 @@ class PickListServiceTest {
 
     private AppContext ctx;
     private User manager;
-    private User forklift;
+    private User forklift;        // supply driver: collects raw material
+    private User deliveryDriver;  // delivery driver: walks the pick list for customer orders
     private WarehouseLocation dock;
     private long customerId;
 
@@ -52,6 +53,7 @@ class PickListServiceTest {
         ctx = new AppContext(db, prefs, i18n);
         manager = ctx.getUserDao().findByUsername("manager").orElseThrow();
         forklift = ctx.getUserDao().findByUsername("forklift").orElseThrow();
+        deliveryDriver = ctx.getUserDao().findByUsername("forklift2").orElseThrow();
         dock = ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true).get(0);
         customerId = ctx.getCustomerDao().findAll(true).get(0).id();
     }
@@ -186,9 +188,9 @@ class PickListServiceTest {
                 shelf("Z-01-01", "Z", "01", "01"), shelf("Z-01-02", "Z", "01", "02"));
         Order mine = orderWith(List.of(four.get(0)));
         Order notMine = orderWith(List.of(four.get(1)));
-        ctx.getOrderService().assignForkliftAndDock(mine.id(), forklift.id(), dock.id());
+        ctx.getOrderService().assignForkliftAndDock(mine.id(), deliveryDriver.id(), dock.id());
 
-        PickList driversList = ctx.getPickListService().forDriver(forklift.id());
+        PickList driversList = ctx.getPickListService().forDriver(deliveryDriver.id());
 
         assertEquals(List.of(mine.orderNumber()), driversList.lines().stream().map(PickLine::orderNumber).distinct().toList());
         assertFalse(driversList.lines().stream().anyMatch(l -> l.orderNumber().equals(notMine.orderNumber())));

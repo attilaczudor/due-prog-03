@@ -603,7 +603,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         final boolean hasOrders = navButtons.containsKey(VIEW_ORDERS);
         final boolean hasInvoices = navButtons.containsKey(VIEW_INVOICES);
         final boolean hasAdmin = navButtons.containsKey(VIEW_ADMIN) && ctx.getSession().isAdmin();
-        final boolean isForklift = ctx.getSession().isForklift();
+        final boolean ownStagingOnly = ctx.getSession().isDeliveryDriver();
 
         AsyncUiRunner.runLatest("mainframe.badges", null, () -> {
             int adminUpdates = hasAdmin ? ctx.getNotificationService().checkTranslationUpdate(me,
@@ -619,7 +619,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             }
             int putawayCount = hasPutaway ? ctx.getPackageDao().countPutawayQueue() : 0;
             int stagingCount = hasStaging
-                    ? ctx.getTransportService().countPendingStaging(isForklift ? me.id() : null) : 0;
+                    ? ctx.getTransportService().countPendingStaging(ownStagingOnly ? me.id() : null) : 0;
             int openOrders = hasOrders ? ctx.getOrderDao().countOpenOrders() : 0;
             int overdueInvoices = hasInvoices ? ctx.getInvoiceDao().countOverdue() : 0;
             return new BadgeSnapshot(

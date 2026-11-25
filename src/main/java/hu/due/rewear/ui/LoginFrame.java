@@ -56,7 +56,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final JButton sorterBtn = new JButton();
     private final JButton helperBtn = new JButton();
     private final JButton fulfilmentDriverBtn = new JButton();
-    private final JButton forkliftBtn = new JButton("FORKLIFT");
+    private final JButton forkliftBtn = new JButton();
 
     private final JComboBox<String> langCombo = new JComboBox<>();
 
