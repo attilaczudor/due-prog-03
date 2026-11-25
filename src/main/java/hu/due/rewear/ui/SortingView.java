@@ -35,6 +35,7 @@ final class SortingView extends JPanel implements NavigableView {
     private final DataTable<Request> requests = new DataTable<>();
     private final DataTable<Bag> bags = new DataTable<>();
     private final DataTable<Lot> lots = new DataTable<>();
+    private final DataTable<hu.due.rewear.model.PurchaseLot> purchases = new DataTable<>();
     private final DataTable<Team> teams = new DataTable<>();
     private final DataTable<Daily> daily = new DataTable<>();
     private final List<ActionButton> actions = new ArrayList<>();
@@ -78,6 +79,17 @@ final class SortingView extends JPanel implements NavigableView {
             if (manages) addAction(rawActions, "sorting.lot.receive", true, this::receive);
             if (manages || role == RoleCode.SUPPLY_DRIVER) addAction(rawActions, "sorting.lot.store", role == RoleCode.SUPPLY_DRIVER, this::storeLot);
             addSection("sorting.materials", MainFrame.VIEW_INVENTORY, lots, rawActions);
+        }
+        // Provenance sits next to the material it explains: a purchase lot is only useful where somebody is
+        // looking at what arrived.
+        if (manages || role == RoleCode.OPERATOR) {
+            var purchaseActions = controls();
+            if (manages) {
+                addAction(purchaseActions, "purchase.new", true, this::newPurchaseLot);
+            }
+            addAction(purchaseActions, "purchase.assess", role == RoleCode.OPERATOR, this::assessPurchaseLot);
+            addAction(purchaseActions, "purchase.history", false, this::purchaseHistory);
+            addSection("purchase.lots", MainFrame.VIEW_CUSTOMERS, purchases, purchaseActions);
         }
         if (role == RoleCode.OPERATOR || role == RoleCode.SORTING_HELPER) {
             addSection("sorting.bags", MainFrame.VIEW_INTAKE, bags, bagActions);
@@ -242,12 +254,92 @@ final class SortingView extends JPanel implements NavigableView {
     private void receive() {
         var reference = new JTextField(18);
         var material = new JTextField(24);
-        var area = new JTextField(24);
         var weight = new JTextField(12);
+        // Only assessed lots with something left can be drawn on, so the list cannot offer a choice the
+        // service would then have to refuse.
+        var open = ctx.getPurchaseLotService().openLots().stream()
+                .filter(hu.due.rewear.model.PurchaseLot::isAssessed)
+                .map(row -> new Choice<>(row.id(), row.reference() + " · " + row.originCountry()
+                        + " · " + row.collectionChannel()))
+                .toList();
+        var source = choices(open);
         if (form("sorting.lot.receive", "sorting.lot", reference, "sorting.lot.material", material,
-                "sorting.lot.area", area, "sorting.received_kg", weight)) {
-            service.receive(reference.getText(), material.getText(), area.getText(), decimal(weight));
+                "purchase.lot", source, "sorting.received_kg", weight)) {
+            if (open.isEmpty()) {
+                throw new IllegalArgumentException(t("purchase.none_open"));
+            }
+            service.receive(reference.getText(), material.getText(), null, decimal(weight), selected(source));
         }
+    }
+
+    private void newPurchaseLot() {
+        var reference = new JTextField(18);
+        var country = new JTextField(6);
+        var channel = new JComboBox<>(hu.due.rewear.model.CollectionChannel.values());
+        var suppliers = choices(ctx.getCustomerDao().findSuppliers(true).stream()
+                .map(row -> new Choice<>(row.id(), row.name()))
+                .toList());
+        var price = new JTextField("0", 10);
+        var currency = new JTextField("EUR", 6);
+        var gross = new JTextField(10);
+        var net = new JTextField(10);
+        var customsCode = new JTextField(12);
+        var customsText = new JTextField(24);
+        if (form("purchase.new", "purchase.lot", reference, "purchase.supplier", suppliers,
+                "purchase.country", country, "purchase.channel", channel,
+                "purchase.gross_kg", gross, "purchase.net_kg", net,
+                "purchase.price_per_kg", price, "purchase.currency", currency,
+                "purchase.customs_code", customsCode, "purchase.customs_text", customsText)) {
+            ctx.getPurchaseLotService().record(new hu.due.rewear.service.PurchaseLotService.NewLot(
+                    reference.getText(),
+                    suppliers.getItemCount() == 0 ? null : selected(suppliers),
+                    country.getText(),
+                    (hu.due.rewear.model.CollectionChannel) channel.getSelectedItem(),
+                    customsCode.getText(), customsText.getText(),
+                    decimal(price), currency.getText(), decimal(gross), decimal(net),
+                    null, null, null));
+        }
+    }
+
+    private void assessPurchaseLot() {
+        var lot = purchases.selected();
+        if (lot == null) {
+            JOptionPane.showMessageDialog(this, t("sorting.lot.select_first"), t("common.warning"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        var status = new JComboBox<>(new hu.due.rewear.model.LotLegalStatus[]{
+                hu.due.rewear.model.LotLegalStatus.WASTE,
+                hu.due.rewear.model.LotLegalStatus.FIT_FOR_REUSE});
+        var place = new JTextField(24);
+        var basis = new JTextField(30);
+        if (form("purchase.assess", "purchase.legal_status", status, "purchase.assess_place", place,
+                "purchase.assess_basis", basis)) {
+            ctx.getPurchaseLotService().assess(lot.id(),
+                    (hu.due.rewear.model.LotLegalStatus) status.getSelectedItem(),
+                    basis.getText(), place.getText());
+        }
+    }
+
+    private void purchaseHistory() {
+        var lot = purchases.selected();
+        if (lot == null) {
+            JOptionPane.showMessageDialog(this, t("sorting.lot.select_first"), t("common.warning"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        StringBuilder text = new StringBuilder();
+        for (var event : ctx.getPurchaseLotService().history(lot.id())) {
+            text.append(event.createdAt()).append("  ").append(event.eventType())
+                .append(event.createdByName() == null ? "" : "  (" + event.createdByName() + ")")
+                .append(event.detail() == null ? "" : "\n    " + event.detail())
+                .append('\n');
+        }
+        var area = new JTextArea(text.toString(), 12, 56);
+        area.setEditable(false);
+        area.setCaretPosition(0);
+        JOptionPane.showMessageDialog(this, new JScrollPane(area),
+                t("purchase.history") + " — " + lot.reference(), JOptionPane.PLAIN_MESSAGE);
     }
 
     private void editTeam(Team team) {
@@ -327,6 +419,13 @@ final class SortingView extends JPanel implements NavigableView {
         lots.set(state.lots(), row -> new Object[]{row.reference(), dash(row.material()), dash(row.sourceArea()),
                 row.stored() ? row.locationCode() : t("sorting.lot.awaiting_storage"),
                 amount(row.availableGrams()), amount(row.receivedGrams()), time(row.receivedAt())});
+        purchases.set(ctx.getPurchaseLotService().all(), row -> new Object[]{row.reference(),
+                dash(row.supplierName()), row.originCountry(), row.collectionChannel().name(),
+                t("purchase.status." + row.legalStatus().name().toLowerCase(java.util.Locale.ROOT)),
+                hu.due.rewear.util.FormatUtil.stripZeros(row.netWeightKg()),
+                hu.due.rewear.util.FormatUtil.stripZeros(row.purchasePricePerKg()) + " " + row.currency(),
+                hu.due.rewear.util.FormatUtil.stripZeros(row.totalCost()) + " " + row.currency(),
+                dash(row.assessedByName())});
         teams.set(state.teams(), row -> new Object[]{row.name(), row.sorterIds().size(), row.helperIds().size(), kg(row.targetGrams()),
                 row.bonusBasisPoints() == null ? "—" : percent(row.bonusBasisPoints())});
         daily.set(state.daily(), row -> new Object[]{row.sorter(), row.helper(), kg(row.processedGrams()),
@@ -346,6 +445,9 @@ final class SortingView extends JPanel implements NavigableView {
                 "sorting.packed_at", "sorting.registered_at", "sorting.qr");
         columns(lots, "sorting.lot", "sorting.lot.material", "sorting.lot.area", "sorting.lot.location",
                 "sorting.available_amount", "sorting.received_amount", "sorting.received_at");
+        columns(purchases, "purchase.lot", "purchase.supplier", "purchase.country", "purchase.channel",
+                "purchase.legal_status", "purchase.net_kg", "purchase.price_per_kg", "purchase.cost",
+                "purchase.assessed_by");
         columns(teams, "sorting.team", "sorting.team.sorters", "sorting.team.helpers", "sorting.target_kg", "sorting.bonus_rate");
         columns(daily, "role.SORTER", "role.SORTING_HELPER", "sorting.processed_kg", "sorting.target_kg",
                 "common.status", "sorting.bonus_rate");
@@ -369,7 +471,7 @@ final class SortingView extends JPanel implements NavigableView {
 
     @Override public void applyTheme() {
         sections.applyTheme();
-        for (var data : List.of(requests, bags, lots, teams, daily)) BrutalistStyle.styleTable(data.table);
+        for (var data : List.of(requests, bags, lots, purchases, teams, daily)) BrutalistStyle.styleTable(data.table);
         actions.forEach(action -> {
             if (action.primary()) BrutalistStyle.stylePrimaryButton(action.button());
             else BrutalistStyle.styleSecondaryButton(action.button());

@@ -66,6 +66,11 @@ public final class SchemaInitializer {
             addColumnIfMissing(conn, "tax_types", "nav_vat_exemption_case", "TEXT");
             addColumnIfMissing(conn, "tax_types", "nav_vat_exemption_reason", "TEXT");
             migrateNavDemoSettings(conn);
+            // Provenance for material received before purchase lots existed cannot be invented, so the link
+            // is nullable and those rows read as "not recorded" rather than being given a plausible-looking
+            // lot they never came from.
+            addColumnIfMissing(conn, "sorting_raw_lots", "purchase_lot_id",
+                    "INTEGER REFERENCES purchase_lots(id)");
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_sorting_pack_worker_day ON sorting_bags(packed_by, pack_day)");
             }

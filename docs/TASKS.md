@@ -48,7 +48,7 @@ Build in this order:
       per-invoice reporting state machine with the transaction id stored as evidence, retry on outage, an operator
       queue for errors, and technical annulment modelled apart from a commercial credit note. Penalty up to
       HUF 1,000,000 per invoice; fifteen warnings became blocking errors on 15 September 2025.
-- [ ] **A purchase lot and intake assessment record.** The schema keystone: supplier, country of origin, collection
+- [x] **A purchase lot and intake assessment record.** Done 26 November, pass 20. The schema keystone: supplier, country of origin, collection
       channel, purchase price per kilogram, gross and net weight, customs classification, and the named human
       judgement of whether material is waste or fit for re-use at collection. Retires the free-text collection area.
 - [ ] **Grade-yield reporting and a target that uses it.** Yield by grade per intake lot, team, shift and sorter,

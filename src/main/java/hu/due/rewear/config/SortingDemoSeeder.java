@@ -141,6 +141,65 @@ final class SortingDemoSeeder {
      * The daily collections the transit drivers bring in from their own drop-off areas. Idempotent: a lot
      * reference that already exists is left alone, so this can also run when an older demo workspace is upgraded.
      */
+    /**
+     * One purchase lot behind each demo collection, assessed the way the law requires.
+     *
+     * <p>Every one of these is waste: they were separately collected, and separately collected textiles are
+     * waste from the moment of collection. Only material a householder hands over in person, assessed there
+     * and then, can be anything else — so the demo shows the ordinary case rather than the exception.
+     *
+     * @return the purchase lot id for each collection, in the same order, or 0 where one already existed
+     */
+    private static long[] seedPurchaseLots(java.sql.Connection conn, long receivedBy, Object[][] lots)
+            throws SQLException {
+        long[] ids = new long[lots.length];
+        // Collected from the company's own drop-off boxes, except the last, which was bought in.
+        String[] channels = {"OWN_COLLECTION", "OWN_COLLECTION", "OWN_COLLECTION",
+                "OWN_COLLECTION", "HOUSEHOLD_COLLECTION", "COMMERCIAL_PURCHASE"};
+        String[] prices = {"0", "0", "0", "0", "0.42", "0.53"};
+        String insert = """
+                INSERT OR IGNORE INTO purchase_lots(reference, origin_country, collection_channel,
+                    customs_code, customs_description, purchase_price_per_kg, currency, gross_weight_kg,
+                    net_weight_kg, legal_status, assessed_by, assessed_at, assessment_basis,
+                    assessment_place, received_by, received_on, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,?,?,?,'WASTE',?,?,?,?,?,?,?,?)
+                """;
+        String stamp = hu.due.rewear.dao.DaoDateUtil.format(BusinessClock.now());
+        for (int i = 0; i < lots.length; i++) {
+            String reference = "PL-2026-" + String.format("%04d", i + 1);
+            java.math.BigDecimal net = java.math.BigDecimal.valueOf((Long) lots[i][3], 3);
+            java.math.BigDecimal gross = net.multiply(new java.math.BigDecimal("1.04"))
+                    .setScale(3, java.math.RoundingMode.HALF_UP);
+            try (var ps = conn.prepareStatement(insert)) {
+                ps.setString(1, reference);
+                ps.setString(2, "HU");
+                ps.setString(3, channels[i]);
+                ps.setString(4, "6309 00 00");
+                ps.setString(5, "Textile waste from the population");
+                ps.setString(6, prices[i]);
+                ps.setString(7, "EUR");
+                ps.setString(8, gross.toPlainString());
+                ps.setString(9, net.toPlainString());
+                ps.setLong(10, receivedBy);
+                ps.setString(11, stamp);
+                ps.setString(12, "Separately collected textiles, assessed on arrival");
+                ps.setString(13, (String) lots[i][2]);
+                ps.setLong(14, receivedBy);
+                ps.setString(15, BusinessClock.today().minusDays(lots.length - i).toString());
+                ps.setString(16, stamp);
+                ps.setString(17, stamp);
+                ps.executeUpdate();
+            }
+            try (var ps = conn.prepareStatement("SELECT id FROM purchase_lots WHERE reference = ?")) {
+                ps.setString(1, reference);
+                try (var rs = ps.executeQuery()) {
+                    ids[i] = rs.next() ? rs.getLong(1) : 0L;
+                }
+            }
+        }
+        return ids;
+    }
+
     private static void seedRawLots(java.sql.Connection conn, long receivedBy) throws SQLException {
         long[] storage = new long[3];
         int found = 0;
@@ -156,9 +215,13 @@ final class SortingDemoSeeder {
                 {"RAW-2026-0005", "Lakástextil / Home textiles", "Szeged és Csongrád", 3_100_000L},
                 {"RAW-2026-0006", "Cipő és táska / Shoes and bags", "Debrecen és Hajdú-Bihar", 2_400_000L}
         };
+        // Each collection descends from a purchase lot, so the demo shows the provenance chain rather than
+        // material that appears from nowhere.
+        long[] purchaseLots = seedPurchaseLots(conn, receivedBy, lots);
         try (var ps = conn.prepareStatement("""
                 INSERT OR IGNORE INTO sorting_raw_lots(reference,material,source_area,location_id,
-                received_grams,available_grams,received_by,received_at) VALUES (?,?,?,?,?,?,?,?)
+                received_grams,available_grams,received_by,received_at,purchase_lot_id)
+                VALUES (?,?,?,?,?,?,?,?,?)
                 """)) {
             for (int i = 0; i < lots.length; i++) {
                 long weight = (Long) lots[i][3];
@@ -172,6 +235,7 @@ final class SortingDemoSeeder {
                 ps.setLong(6, weight);
                 ps.setLong(7, receivedBy);
                 ps.setString(8, Instant.now().minusSeconds(86_400L * (lots.length - i)).toString());
+                if (purchaseLots[i] > 0) ps.setLong(9, purchaseLots[i]); else ps.setNull(9, java.sql.Types.INTEGER);
                 ps.executeUpdate();
             }
         }

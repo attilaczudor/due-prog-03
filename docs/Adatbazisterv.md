@@ -315,6 +315,34 @@ A nulla kulcsos sor a NAV kódlistájából származó mentességi esetet kell h
 
 Indexek: `idx_nav_reports_invoice`, `idx_nav_reports_state`, `idx_nav_report_events_report`.
 
+### 3.48–3.49 Beszerzési tételek (`purchase_lots`, `purchase_lot_events`)
+| Oszlop | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Egyedi azonosító |
+| `reference` | `TEXT` | `NOT NULL UNIQUE COLLATE NOCASE` | A tétel hivatkozási száma |
+| `supplier_id` | `INTEGER` | `NULL FK -> customers(id)` | A beszállító. Nincs külön beszállítói törzs: a `customers` tábla `partner_type` mezője már megkülönbözteti a vevőt, a szállítót és a mindkettőt, és egy második törzs előbb-utóbb eltérne az elsőtől |
+| `origin_country` | `TEXT` | `NOT NULL` | Származási ország kétbetűs kódja |
+| `collection_channel` | `TEXT` | `NOT NULL CHECK (HOUSEHOLD_COLLECTION, DIRECT_HANDOVER, COMMERCIAL_PURCHASE, IMPORT, OWN_COLLECTION)` | Hogyan került a céghez |
+| `customs_code`, `customs_description` | `TEXT` | `NULL` | Vámtarifaszám és megnevezése — ez árral járó üzleti döntés |
+| `purchase_price_per_kg`, `currency` | `TEXT` | `NOT NULL` | Beszerzési ár kilogrammonként, pontos tizedesként |
+| `gross_weight_kg`, `net_weight_kg` | `TEXT` | `NOT NULL` | Bruttó és nettó tömeg; a bekerülési érték a **nettó** tömegre számolódik, mert a raklapért nem fizet a cég |
+| `legal_status` | `TEXT` | `NOT NULL CHECK (UNASSESSED, WASTE, FIT_FOR_REUSE)` | Jogi besorolás |
+| `assessed_by`, `assessed_at`, `assessment_basis`, `assessment_place` | | `NULL` | Ki, mikor, mi alapján és hol minősítette |
+| `invoice_id` | `INTEGER` | `NULL FK -> invoices(id) ON DELETE SET NULL` | A hozzá tartozó bejövő számla |
+| `received_by`, `received_on`, `created_at`, `updated_at` | | `NOT NULL` | Átvevő és időbélyegek |
+
+A `sorting_raw_lots` tábla `purchase_lot_id` oszloppal bővült, így a lánc végigkövethető: **beszerzési tétel →
+nyersanyag-tétel → igénylés → zsák → raktári csomag → rendelés**. A származás nincs lemásolva a csomagra: egy
+helyen van rögzítve, és join-nal olvasható vissza, mert két példány előbb-utóbb eltérne egymástól.
+
+A `legal_status` nem egyszerű mező, hanem **szabály**: az elkülönítetten gyűjtött használt textil a gyűjtés
+pillanatától hulladék, kivéve, ha a végfelhasználó közvetlenül adta át, és a gyűjtés helyén szakmailag
+újrahasználatra alkalmasnak minősítették. Ezért az alkalmazás csak `DIRECT_HANDOVER` csatorna esetén engedi a
+`FIT_FOR_REUSE` besorolást, és akkor is csak névvel, hellyel és indoklással együtt; a `purchase_lot_events`
+tábla minden minősítést megőriz, mert a nyomtalanul felülírható szakvélemény semmit sem bizonyít.
+
+Indexek: `idx_purchase_lots_supplier`, `idx_purchase_lots_received`, `idx_purchase_lot_events_lot`.
+
 ---
 
 ### 3.31b Nyersanyag-tételek és igénylés (`sorting_raw_lots`, `sorting_requests`)

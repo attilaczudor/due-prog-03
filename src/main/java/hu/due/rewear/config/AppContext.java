@@ -8,6 +8,8 @@ import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.NavReportDao;
+import hu.due.rewear.dao.PurchaseLotDao;
+import hu.due.rewear.service.PurchaseLotService;
 import hu.due.rewear.nav.NavCredentialStore;
 import hu.due.rewear.service.NavReportingService;
 import hu.due.rewear.dao.InvoiceDao;
@@ -86,6 +88,8 @@ public final class AppContext {
     private final WarehouseLocationDao locationDao;
     private final InventoryPackageDao packageDao;
     private final NavReportDao navReportDao;
+    private final PurchaseLotDao purchaseLotDao;
+    private final PurchaseLotService purchaseLotService;
     private final NavReportingService navReportingService;
     private final NavCredentialStore navCredentialStore;
     private final StockMovementDao movementDao;
@@ -262,6 +266,9 @@ public final class AppContext {
         this.navReportingService = new NavReportingService(databaseManager, navReportDao, invoiceDao,
                 settingsDao, navCredentialStore, notificationService);
         this.invoiceService.setReportingHook(navReportingService);
+        this.purchaseLotDao = new PurchaseLotDao(databaseManager);
+        this.purchaseLotService = new PurchaseLotService(databaseManager, session, purchaseLotDao);
+        this.sortingService.setPurchaseLots(purchaseLotDao);
 
         invoiceService.syncOverdueStatuses();
         initLocalizationFromPreferences();
@@ -316,6 +323,14 @@ public final class AppContext {
 
     public WarehouseLocationDao getLocationDao() {
         return locationDao;
+    }
+
+    public PurchaseLotDao getPurchaseLotDao() {
+        return purchaseLotDao;
+    }
+
+    public PurchaseLotService getPurchaseLotService() {
+        return purchaseLotService;
     }
 
     public NavReportDao getNavReportDao() {

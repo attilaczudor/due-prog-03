@@ -82,6 +82,8 @@ public final class SortingService {
     private final NotificationService notifications;
     private final I18nManager i18n;
 
+    private hu.due.rewear.dao.PurchaseLotDao purchaseLots;
+
     public SortingService(DatabaseManager db, SessionContext session, DictionaryDao dictionaries,
                           WarehouseLocationDao locations, InventoryService inventory, InventoryPackageDao packages,
                           NotificationService notifications, I18nManager i18n) {
@@ -93,6 +95,14 @@ public final class SortingService {
         this.packages = packages;
         this.notifications = notifications;
         this.i18n = i18n;
+    }
+
+    /**
+     * Where received material comes from. Set by the application context after construction, because
+     * provenance arrived later than sorting did and the two are otherwise independent.
+     */
+    public void setPurchaseLots(hu.due.rewear.dao.PurchaseLotDao purchaseLots) {
+        this.purchaseLots = purchaseLots;
     }
 
     public Workspace workspace(LocalDate day) {
@@ -120,6 +130,20 @@ public final class SortingService {
      * available to sorters: a forklift driver is notified and stores it ({@link #storeLot}) first.
      */
     public long receive(String reference, String material, String sourceArea, BigDecimal weightKg) {
+        return receive(reference, material, sourceArea, weightKg, null);
+    }
+
+    /**
+     * Records one collection arriving at the facility, against the purchase lot it came from.
+     *
+     * <p>The purchase lot is what makes the material's origin, channel and legal status reconstructable
+     * later; material received without one can be sorted but can never be traced, which is why the
+     * collection area is now derived from the lot rather than typed. The lot has to have been assessed
+     * first: what the material legally is, is decided where it was collected, not afterwards when somebody
+     * needs an answer for a customs form.
+     */
+    public long receive(String reference, String material, String sourceArea, BigDecimal weightKg,
+                        Long purchaseLotId) {
         User actor = actor();
         require(management(actor), "Only warehouse management may receive raw stock.");
         long weight = grams(weightKg, false);
@@ -128,18 +152,41 @@ public final class SortingService {
         String area = sourceArea == null ? "" : sourceArea.strip();
         require(!label.isEmpty() && label.length() <= 100, "Enter a lot reference of up to 100 characters.");
         require(!what.isEmpty() && what.length() <= 120, "Enter the material of the lot (up to 120 characters).");
-        require(!area.isEmpty() && area.length() <= 120, "Enter the collection area of the lot (up to 120 characters).");
+        require(purchaseLotId != null || !area.isEmpty(),
+                "Choose the purchase lot this material came from, or name the collection area.");
+        require(area.length() <= 120, "The collection area may be up to 120 characters.");
         long id = db.executeInTransaction(conn -> {
+            String recordedArea = area;
+            if (purchaseLotId != null) {
+                require(purchaseLots != null, "Purchase lots are not available.");
+                var source = purchaseLots.findById(conn, purchaseLotId)
+                        .orElseThrow(() -> new IllegalStateException("The purchase lot does not exist."));
+                require(source.isAssessed(),
+                        "Purchase lot " + source.reference() + " has not been assessed yet. Record whether it"
+                                + " is waste or fit for re-use before taking it into sorting.");
+                long alreadyTaken = purchaseLots.receivedGrams(conn, purchaseLotId);
+                long lotGrams = source.netWeightKg().movePointRight(3).longValue();
+                require(alreadyTaken + weight <= lotGrams,
+                        "That is more than purchase lot " + source.reference() + " has left: "
+                                + kg(lotGrams - alreadyTaken) + " kg remain of " + kg(lotGrams) + " kg.");
+                // The area stops being free text the moment there is a lot to read it from.
+                recordedArea = source.originCountry() + " · " + source.collectionChannel();
+            }
             long lot = insertId(conn, """
-                    INSERT INTO sorting_raw_lots(reference,material,source_area,received_grams,available_grams,received_by,received_at)
-                    VALUES (?,?,?,?,?,?,?) RETURNING id
-                    """, label, what, area, weight, weight, actor.id(), now());
+                    INSERT INTO sorting_raw_lots(reference,material,source_area,received_grams,available_grams,received_by,received_at,purchase_lot_id)
+                    VALUES (?,?,?,?,?,?,?,?) RETURNING id
+                    """, label, what, recordedArea, weight, weight, actor.id(), now(), purchaseLotId);
+            if (purchaseLotId != null) {
+                purchaseLots.addEvent(conn, purchaseLotId, "TAKEN_INTO_STOCK",
+                        kg(weight) + " kg received as raw lot " + label, actor.id(),
+                        hu.due.rewear.util.BusinessClock.now());
+            }
             // Only the supply drivers of sorting teams, never the fulfilment driver who serves customer orders.
             for (long driver : query(conn, """
                     SELECT DISTINCT t.driver_id FROM sorting_teams t JOIN users u ON u.id=t.driver_id
                     WHERE u.active=1
                     """, row -> row.getLong(1))) {
-                alert(conn, driver, i18n.t("sorting.alert.lot_received", label), what + " · " + area + " · " + kg(weight) + " kg");
+                alert(conn, driver, i18n.t("sorting.alert.lot_received", label), what + " · " + recordedArea + " · " + kg(weight) + " kg");
             }
             return lot;
         });

@@ -935,3 +935,26 @@ nav.state.warn,Reported with warnings,Bejelentve figyelmeztetéssel
 nav.state.error,NOT reported,NINCS bejelentve
 nav.state.aborted,NOT reported — NAV aborted,NINCS bejelentve — a NAV megszakította
 nav.state.annul_requested,Annulment requested,Érvénytelenítés kérve
+purchase.lots,Purchase lots,Beszerzési tételek
+purchase.lot,Purchase lot,Beszerzési tétel
+purchase.new,New Purchase Lot,Új beszerzési tétel
+purchase.assess,Assess,Minősítés
+purchase.history,History,Előzmények
+purchase.supplier,Supplier,Beszállító
+purchase.country,Country of origin (2 letters),Származási ország (2 betű)
+purchase.channel,How it arrived,Beérkezés módja
+purchase.gross_kg,Gross weight (kg),Bruttó tömeg (kg)
+purchase.net_kg,Net weight (kg),Nettó tömeg (kg)
+purchase.price_per_kg,Purchase price per kg,Beszerzési ár kg-onként
+purchase.currency,Currency,Pénznem
+purchase.cost,Lot cost,Tétel bekerülési értéke
+purchase.customs_code,Customs code,Vámtarifaszám
+purchase.customs_text,Customs description,Vámtarifa megnevezése
+purchase.legal_status,Legal status,Jogi besorolás
+purchase.assess_place,Where the assessment was made,A minősítés helye
+purchase.assess_basis,What it was based on,A minősítés alapja
+purchase.assessed_by,Assessed by,Minősítette
+purchase.status.unassessed,Not yet assessed,Még nincs minősítve
+purchase.status.waste,Waste,Hulladék
+purchase.status.fit_for_reuse,Fit for re-use,Újrahasználatra alkalmas
+purchase.none_open,"There is no assessed purchase lot with material left. Record one, and assess it, first.","Nincs olyan minősített beszerzési tétel, amelyből még maradt anyag. Előbb rögzítsen egyet és minősítse."

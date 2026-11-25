@@ -641,3 +641,50 @@ CREATE TABLE IF NOT EXISTS nav_report_events (
 CREATE INDEX IF NOT EXISTS idx_nav_reports_invoice ON nav_invoice_reports(invoice_id);
 CREATE INDEX IF NOT EXISTS idx_nav_reports_state ON nav_invoice_reports(state, next_attempt_at);
 CREATE INDEX IF NOT EXISTS idx_nav_report_events_report ON nav_report_events(report_id, id);
+
+-- 48. Purchase lots: where unsorted material came from, and what it legally is
+-- Sorting draws from raw lots; raw lots come from a purchase lot; so every package and every order can be
+-- traced back to a supplier, a country and a collection channel. The legal status is a judgement a named
+-- person made at a named place, because that is what an export declaration turns on, and a judgement with
+-- nobody behind it is worth nothing when it is questioned.
+-- The supplier is a row in `customers`: that table already distinguishes CUSTOMER, SUPPLIER and BOTH, and a
+-- second master list of the same companies would only drift apart from the first.
+CREATE TABLE IF NOT EXISTS purchase_lots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    reference TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    supplier_id INTEGER REFERENCES customers(id),
+    origin_country TEXT NOT NULL,
+    collection_channel TEXT NOT NULL CHECK (collection_channel IN
+        ('HOUSEHOLD_COLLECTION', 'DIRECT_HANDOVER', 'COMMERCIAL_PURCHASE', 'IMPORT', 'OWN_COLLECTION')),
+    customs_code TEXT,
+    customs_description TEXT,
+    purchase_price_per_kg TEXT NOT NULL DEFAULT '0',
+    currency TEXT NOT NULL DEFAULT 'EUR',
+    gross_weight_kg TEXT NOT NULL,
+    net_weight_kg TEXT NOT NULL,
+    legal_status TEXT NOT NULL DEFAULT 'UNASSESSED'
+        CHECK (legal_status IN ('UNASSESSED', 'WASTE', 'FIT_FOR_REUSE')),
+    assessed_by INTEGER REFERENCES users(id),
+    assessed_at TEXT,
+    assessment_basis TEXT,
+    assessment_place TEXT,
+    invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
+    notes TEXT,
+    received_by INTEGER NOT NULL REFERENCES users(id),
+    received_on TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS purchase_lot_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    lot_id INTEGER NOT NULL REFERENCES purchase_lots(id) ON DELETE CASCADE,
+    event_type TEXT NOT NULL,
+    detail TEXT,
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_purchase_lots_supplier ON purchase_lots(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_purchase_lots_received ON purchase_lots(received_on);
+CREATE INDEX IF NOT EXISTS idx_purchase_lot_events_lot ON purchase_lot_events(lot_id, id);

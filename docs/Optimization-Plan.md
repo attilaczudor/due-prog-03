@@ -977,6 +977,76 @@ that needs a technical user the company must create, and it is the first thing t
 
 ---
 
+## Pass 20 — the purchase lot and the intake assessment (26 November 2026)
+
+### What was missing
+
+Intake was a collection with a free-text area, recorded by management, and that was the whole provenance of
+everything the company sorted. The research called this the schema keystone, and the reason is not
+bookkeeping. The published picture of a Central European sorter is a buyer of heterogeneous imported
+feedstock — 63% of clothes sorted in the Netherlands were imported, and one Humana facility bought from 70
+suppliers — and that provenance now carries legal weight. Household-collected textiles carry the Y46
+classification, whose export for recovery outside the OECD is prohibited and whose status is destroyed by
+mixing. And separately collected used textiles are waste from the moment of collection unless an end user
+handed them over directly and somebody professionally assessed them as fit for re-use at the collection point.
+That assessment is a human judgement made at intake, and an application that records an aggregate weight and
+a free-text area cannot reconstruct it afterwards.
+
+### Built
+
+- [x] **`purchase_lots`**: supplier, country of origin, collection channel, customs code and description,
+  purchase price per kilogram, gross and net weight, and the legal status with the person, place, time and
+  reason behind it. `purchase_lot_events` keeps every change, because a judgement that can be quietly revised
+  is not evidence of anything.
+- [x] **No second supplier master.** `customers` already distinguishes `CUSTOMER`, `SUPPLIER` and `BOTH` and
+  carries country, tax number and currency. A separate supplier table would have been the same companies
+  twice, drifting apart.
+- [x] **The legal rule is enforced, not merely stored.** `FIT_FOR_REUSE` is refused on any channel but a
+  direct handover, and refused there too without a place and a reason. The channel cannot be edited out from
+  under an assessment that only that channel permitted — it has to be re-assessed first.
+- [x] **The chain joins up**: purchase lot → raw lot → supply request → sorted bag → package → order. The
+  channel is recorded once, on the lot, and read back by joining; nothing is copied onto the package, so
+  there is no second copy to drift.
+- [x] **A mixed-consignment check.** `isMixedConsignment` flags an order drawing on more than one collection
+  channel, and also one drawing on material with no recorded provenance, because for a consignment those are
+  the same problem. Mixing destroys the classification of the whole, and that is discovered by somebody else,
+  at a border.
+- [x] **The collection area stops being free text** the moment a lot is behind it: it is derived from the
+  lot's country and channel, so the two cannot disagree. Unassessed material cannot be taken into sorting at
+  all, and no more can be drawn from a lot than was bought.
+- [x] **The cost is computed on net weight.** The company pays for cloth, not for the pallet, and a cost per
+  kilogram taken on gross weight quietly understates what every sorted kilogram has to earn back — which
+  matters when roughly €1.21/kg of cost has to come out of a mix whose prices run from €4.50/kg down to
+  €0.16/kg.
+- [x] **The demo shows the chain**, with a purchase lot behind each seeded collection, all assessed as waste,
+  which is what separately collected material is.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **210 / 210** across 50 classes (+18). `ProvenanceChainTest` walks the
+real chain — purchase lot, raw lot, request, bag, package, order — and asks at the end where the goods came
+from, including the two cases that should not look alike: one channel throughout, and two channels mixed.
+
+Mutation checks, each confirmed to fail the suite before being reverted: letting any channel be assessed fit
+for re-use; letting unassessed material into sorting; letting more be drawn from a lot than was bought;
+computing the cost on gross weight; dropping unknown provenance from the mixing check; and letting the channel
+be changed under an existing assessment.
+
+One embarrassment worth recording. The first mutation run reported every mutation as caught, which was wrong:
+the grep used to read the results matched only surefire's summary line, so a test class that failed to
+compile produced no output and looked identical to a clean pass. `ProvenanceChainTest` had never run at all —
+it imported `Product` from the wrong package. The check now fails loudly on a compilation error, and the
+mutations were re-run properly.
+
+### Not done
+
+The export document pack and the Y46 notification chain that this unlocks. Grade yield per purchase lot,
+which is the next roadmap item and now has a lot to attribute yield to. And the collection drivers still are
+not users of the application, so a lot is recorded by management rather than by the person who collected it —
+the record is now structured, but the hand that fills it in has not moved.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
