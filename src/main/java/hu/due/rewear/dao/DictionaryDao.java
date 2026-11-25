@@ -99,8 +99,8 @@ public final class DictionaryDao {
                         rs.getString("code"),
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
-                        BigDecimal.valueOf(rs.getDouble("price_eur_per_kg")),
-                        BigDecimal.valueOf(rs.getDouble("price_huf_per_kg")),
+                        Money.get(rs, "price_eur_per_kg"),
+                        Money.get(rs, "price_huf_per_kg"),
                         rs.getInt("active") == 1
                 ));
             }
@@ -133,8 +133,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, priceEurPerKg != null ? priceEurPerKg.doubleValue() : 0.0);
-            ps.setDouble(5, priceHufPerKg != null ? priceHufPerKg.doubleValue() : 0.0);
+            Money.set(ps, 4, priceEurPerKg);
+            Money.set(ps, 5, priceHufPerKg);
         });
     }
 
@@ -149,8 +149,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, priceEurPerKg != null ? priceEurPerKg.doubleValue() : 0.0);
-            ps.setDouble(5, priceHufPerKg != null ? priceHufPerKg.doubleValue() : 0.0);
+            Money.set(ps, 4, priceEurPerKg);
+            Money.set(ps, 5, priceHufPerKg);
             ps.setInt(6, active ? 1 : 0);
             ps.setLong(7, id);
         });
@@ -168,7 +168,7 @@ public final class DictionaryDao {
 
     public List<QualityGrade> findQualityGrades(boolean activeOnly) {
         String sql = "SELECT id, code, name_en, name_hu, default_price_per_kg, default_price_huf_per_kg, active FROM quality_grades "
-                + (activeOnly ? "WHERE active = 1 " : "") + "ORDER BY default_price_per_kg DESC, code";
+                + (activeOnly ? "WHERE active = 1 " : "") + "ORDER BY CAST(default_price_per_kg AS REAL) DESC, code";
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql);
              ResultSet rs = ps.executeQuery()) {
@@ -179,8 +179,8 @@ public final class DictionaryDao {
                         rs.getString("code"),
                         rs.getString("name_en"),
                         rs.getString("name_hu"),
-                        BigDecimal.valueOf(rs.getDouble("default_price_per_kg")),
-                        BigDecimal.valueOf(rs.getDouble("default_price_huf_per_kg")),
+                        Money.get(rs, "default_price_per_kg"),
+                        Money.get(rs, "default_price_huf_per_kg"),
                         rs.getInt("active") == 1
                 ));
             }
@@ -216,8 +216,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, defaultPricePerKg != null ? defaultPricePerKg.doubleValue() : 0.0);
-            ps.setDouble(5, defaultPriceHufPerKg != null ? defaultPriceHufPerKg.doubleValue() : 0.0);
+            Money.set(ps, 4, defaultPricePerKg);
+            Money.set(ps, 5, defaultPriceHufPerKg);
         });
     }
 
@@ -232,8 +232,8 @@ public final class DictionaryDao {
             ps.setString(1, code.trim().toUpperCase(Locale.ROOT));
             ps.setString(2, nameEn.trim());
             ps.setString(3, nameHu.trim());
-            ps.setDouble(4, defaultPricePerKg != null ? defaultPricePerKg.doubleValue() : 0.0);
-            ps.setDouble(5, defaultPriceHufPerKg != null ? defaultPriceHufPerKg.doubleValue() : 0.0);
+            Money.set(ps, 4, defaultPricePerKg);
+            Money.set(ps, 5, defaultPriceHufPerKg);
             ps.setInt(6, active ? 1 : 0);
             ps.setLong(7, id);
         });

@@ -671,25 +671,28 @@ public final class OrderService {
         return changeOrderStatus(orderId, OrderStatus.CANCELLED, userId);
     }
 
+    /**
+     * Recomputes an order's totals. The weight is a measurement and SQL may add it up, but the money is
+     * summed here with exact decimals: SQLite would add the line totals as floating point numbers.
+     */
     private void recalculateTotals(Connection conn, long orderId, int decimals) throws SQLException {
         String sql = """
-                SELECT COALESCE(SUM(ip.weight_kg), 0) AS total_w,
-                       COALESCE(SUM(oi.line_total), 0) AS total_p
+                SELECT ip.weight_kg AS weight, oi.line_total AS line_total
                 FROM order_items oi
                 JOIN inventory_packages ip ON ip.id = oi.package_id
                 WHERE oi.order_id = ?
                 """;
+        BigDecimal totalW = BigDecimal.ZERO;
+        BigDecimal totalP = BigDecimal.ZERO;
         try (var ps = conn.prepareStatement(sql)) {
             ps.setLong(1, orderId);
             try (var rs = ps.executeQuery()) {
-                BigDecimal totalW = BigDecimal.ZERO;
-                BigDecimal totalP = BigDecimal.ZERO;
-                if (rs.next()) {
-                    totalW = BigDecimal.valueOf(rs.getDouble("total_w"));
-                    totalP = CurrencyDef.roundForScale(BigDecimal.valueOf(rs.getDouble("total_p")), decimals);
+                while (rs.next()) {
+                    totalW = totalW.add(BigDecimal.valueOf(rs.getDouble("weight")));
+                    totalP = totalP.add(hu.due.rewear.dao.Money.get(rs, "line_total"));
                 }
-                orderDao.updateTotals(conn, orderId, totalW, totalP);
             }
         }
+        orderDao.updateTotals(conn, orderId, totalW, CurrencyDef.roundForScale(totalP, decimals));
     }
 }

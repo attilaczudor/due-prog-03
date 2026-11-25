@@ -341,8 +341,10 @@ public final class InventoryPackageDao {
         String sql = """
                 SELECT COUNT(ip.id) AS pkg_count,
                        COALESCE(SUM(ip.weight_kg), 0) AS total_kg,
-                       COALESCE(SUM(ip.weight_kg * CASE WHEN gt.price_eur_per_kg > 0 THEN gt.price_eur_per_kg ELSE qg.default_price_per_kg END), 0) AS total_eur,
-                       COALESCE(SUM(ip.weight_kg * CASE WHEN gt.price_huf_per_kg > 0 THEN gt.price_huf_per_kg ELSE qg.default_price_huf_per_kg END), 0) AS total_huf
+                       COALESCE(SUM(ip.weight_kg * CAST(CASE WHEN CAST(gt.price_eur_per_kg AS REAL) > 0
+                           THEN gt.price_eur_per_kg ELSE qg.default_price_per_kg END AS REAL)), 0) AS total_eur,
+                       COALESCE(SUM(ip.weight_kg * CAST(CASE WHEN CAST(gt.price_huf_per_kg AS REAL) > 0
+                           THEN gt.price_huf_per_kg ELSE qg.default_price_huf_per_kg END AS REAL)), 0) AS total_huf
                 FROM inventory_packages ip
                 JOIN garment_types gt ON gt.id = ip.garment_type_id
                 JOIN quality_grades qg ON qg.id = ip.quality_grade_id

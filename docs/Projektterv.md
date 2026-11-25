@@ -112,7 +112,7 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 | PDF generálás | OpenPDF 2.0.3 | Hőcímke/A4 4-es PDF címkék, többdevizás A4 PDF számlák/jóváírások, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok |
 | Adatvizualizáció | XChart 3.8.8 | Dinamikus monokróm kör- és oszlopdiagramok a készlet súlyeloszlásáról |
 | Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (917 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
-| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **161 automatizált egység- és integrációs teszt** 44 tesztosztályban, Maven wrapper (`./mvnw`) |
+| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **164 automatizált egység- és integrációs teszt** 45 tesztosztályban, Maven wrapper (`./mvnw`) |
 
 ---
 
@@ -148,6 +148,6 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 
 ### Ismert korlátok
 - A mentések nincsenek titkosítva, tárolásukkor ugyanolyan védelem szükséges, mint az élő adatmappánál; a visszaállítás után maradó `pre-restore-*` másolatokat kézzel kell törölni.
-- A NAV, a banki, a webshop és a külső e-mail kapcsolat demó/szimuláció. A pénzösszegek SQLite `REAL` típusban, tárolás előtt kerekítve szerepelnek; az egész számú (legkisebb pénzegység) tárolásra áttérés még nyitott.
+- A NAV, a banki, a webshop és a külső e-mail kapcsolat demó/szimuláció. A pénzösszegek pontos tizedes szövegként tárolódnak, így a tárolás nem veszít pontosságot.
 - A demó munkaterületből nem lehet saját cég munkaterületet csinálni, csak mentés visszaállításával. A számlaszám a piszkozat létrehozásakor készül, nem a kiállításkor. Egy nagyon régi (partnertípus nélküli) adatbázis frissítése még mintapartnereket vehet fel.
 - A szedési lista bejárási sorrendje növekvő zóna–sor–polc sorrend, az épület fizikai rajzát nem ismeri. Leltárfolyamat, sérült és karanténos áru és újramérés még nincs.

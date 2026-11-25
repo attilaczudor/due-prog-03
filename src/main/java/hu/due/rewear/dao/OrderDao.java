@@ -173,7 +173,7 @@ public final class OrderDao {
             ps.setString(3, status.name());
             ps.setString(4, (currencyCode != null && !currencyCode.isBlank()) ? currencyCode.trim().toUpperCase(Locale.ROOT) : "EUR");
             ps.setDouble(5, totalWeightKg.doubleValue());
-            ps.setDouble(6, totalPrice.doubleValue());
+            Money.set(ps, 6, totalPrice);
             ps.setString(7, notes);
             ps.setLong(8, createdBy);
             ps.setString(9, DaoDateUtil.format(createdAt));
@@ -209,7 +209,7 @@ public final class OrderDao {
         String sql = "UPDATE orders SET total_weight_kg = ?, total_price = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setDouble(1, totalWeightKg.doubleValue());
-            ps.setDouble(2, totalPrice.doubleValue());
+            Money.set(ps, 2, totalPrice);
             ps.setLong(3, orderId);
             ps.executeUpdate();
         }
@@ -279,7 +279,7 @@ public final class OrderDao {
                 OrderStatus.valueOf(rs.getString("status")),
                 rs.getString("currency") != null ? rs.getString("currency").trim().toUpperCase(Locale.ROOT) : "EUR",
                 BigDecimal.valueOf(rs.getDouble("total_weight_kg")),
-                BigDecimal.valueOf(rs.getDouble("total_price")),
+                Money.get(rs, "total_price"),
                 rs.getString("notes"),
                 rs.getLong("created_by"),
                 rs.getString("created_by_name"),

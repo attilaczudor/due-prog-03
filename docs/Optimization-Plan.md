@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44**, pass 15 to **164 across 45** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -709,6 +709,56 @@ parent and the key.
 
 - A session cannot be reopened once closed, and there is no printed count sheet.
 - Quarantined stock still counts towards a shelf's used weight, since it is physically on the shelf.
+
+---
+
+## Pass 15 — money stored exactly (25 November 2026)
+
+### The choice
+
+Money was stored as SQLite `REAL`, which is binary floating point: it cannot hold every decimal amount, so an
+amount is not always what comes back, and adding many of them drifts. The plan said integer minor units. I
+chose **exact decimal text** instead, for two reasons: minor units need the right scale at every read and
+write — and a currency has its own number of decimals, so an invoice line's scale depends on its invoice —
+where a single wrong scale silently changes an amount a hundredfold; and the bank ledger in this application
+already stored money as text, so this makes the codebase consistent rather than split.
+
+What it costs, stated plainly: SQL can no longer add money up exactly, and sorting by an amount needs a cast.
+Both were checked first — there was exactly one ordering by money and one SQL sum of money in the whole
+application.
+
+### Built
+
+- [x] **`Money`**, one place that writes an amount as its plain decimal text and reads it back as `BigDecimal`.
+  Ten money columns across five tables changed from `REAL` to `TEXT`.
+- [x] **The order total is summed in Java** rather than by `SUM(line_total)`, so the figure a customer is
+  invoiced is exact. The quality-grade listing orders by `CAST(... AS REAL)`, since text sorts alphabetically.
+- [x] **`MoneyAsTextMigration`** rebuilds the five tables once from the current schema, recreating indexes and
+  preserving ids, and caps any amount carrying more precision than money should at four decimals.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **164 / 164** across 45 classes (+3 `MoneyStorageTest`): an amount with
+awkward digits survives the round trip exactly and is on disk as `0.21`; ten amounts of `0.10` add up to
+exactly `1.00`; and a database whose invoices were put back into a `REAL` column converts without any invoice
+changing value.
+
+### Two things the mutation checks taught me
+
+- **Writing an amount as a double again did not fail any test.** A column with text affinity converts a bound
+  float to text, so the value still lands as `0.21`. That is reassuring — a call site that missed `Money`
+  degrades gracefully rather than corrupting data — but it means the guard proves the schema and the round
+  trip, not that every call site goes through `Money`.
+- **My justification for the normalising step was wrong.** I had written that it removes floating point noise;
+  SQLite already renders a stored float as a short decimal, so there is no noise to remove. What the step
+  actually does is cap excess precision, which is now what the comment says and what a test proves, by putting
+  `1.0/3` into the old column and expecting `0.3333` after the upgrade.
+
+### Not done
+
+- Weights are still `REAL`. They are measurements rather than money, and the QR convention fixes them at two
+  decimals, but the same argument would eventually apply.
+- The VAT rate and the exchange rate are still `REAL`. The rates in use (27, 18, 5, 0) are exact in binary.
 
 ---
 

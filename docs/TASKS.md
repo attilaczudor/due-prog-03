@@ -38,7 +38,7 @@
 - [ ] Design payroll approval history, closed periods, corrections, and controlled export after the business rules are agreed.
 - [x] Add stocktake sessions with damage, reweighing and quarantine. Damaged stock is held aside under its own status until somebody returns it to stock or writes it off.
 - [ ] Consider an S-shaped pick route once the physical layout is known. Consider an S-shaped pick route once the physical layout is known.
-- [ ] Move money from SQLite REAL to integer minor units (a migration touching many files).
+- [x] Store money exactly. Chose decimal text over integer minor units, because minor units need the right scale at every read and write and one wrong scale changes an amount a hundredfold.
 - [ ] Decide which roles may create invoices (from an order, manually, from a receipt) and gate that too; assign invoice numbers at issue instead of at draft creation.
 - [ ] Let a demo workspace become a company workspace without a backup restore; offer encrypted backups and clean-up of old `pre-restore-*` copies.
 - [ ] Measure scan-to-feedback and refresh latency under representative data volumes before deciding on a connection pool.

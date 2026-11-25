@@ -6,7 +6,7 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**180 fő Java forrásfájl**, **44 JUnit 5 tesztosztály**, **161 teszt**):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**182 fő Java forrásfájl**, **45 JUnit 5 tesztosztály**, **164 teszt**):
 
 ```mermaid
 flowchart TD
@@ -32,6 +32,9 @@ flowchart TD
 - **Observer / Listener minta:** `LanguageChangeListener`, `ThemeManager.ThemeChangeListener`, `NotificationService` és `RoleModuleService` változás-figyelők biztosítják a nyelv, téma, élő jelvények és modul-jogosultságok újraindítás nélküli, azonnali frissítését.
 - **Strategy / Document Source minta:** A `LabelPreset` enum (`THERMAL_100X150`, `THERMAL_80X100`, `A6_CARD`, `A4_4UP`) vezérli a címkenyomtatást (beleértve a kötelező mentés előtti előnézetet is), a `DocumentPageSource` interfész pedig egységesíti az A4 PDF számlák, jóváíró számlák, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok kezelését.
 - **Lazy View Factory & Off-EDT Worker minta:** A `MainFrame` `Supplier<NavigableView>` gyárakkal lustán hozza létre a nézeteket (kirajzolás előtti azonnali `refreshData()` hívással, üres képkocka nélkül), az `AsyncUiRunner` pedig `SwingWorker` segítségével a háttérszálra viszi a 250–300 DPI PDF generálást, CSV exportot, készletszűrést és oldalsáv-jelvény lekérdezéseket.
+- **Pontos pénzösszegek (`Money`):** Minden összeg pontos tizedes szövegként kerül az adatbázisba és
+  `BigDecimal`-ként vissza, így a tárolás nem veszít pontosságot. A rendelés végösszegét ezért Java oldalon
+  adjuk össze, nem `SUM()`-mal.
 - **Egyetlen üzleti óra (`BusinessClock`):** Minden üzleti dátum és időbélyeg a raktár `Europe/Budapest` időzónájából készül, nem a gép időzónájából. A `BusinessClockUsageTest` építési őrteszt, amely megbuktatja a buildet, ha valaki közvetlen `LocalDate.now()` hívást vagy SQLite UTC-órát (`datetime('now')`) használ. A `BusinessClockTest` a gépet Los Angelesbe állítja, és ellenőrzi, hogy a válogatás, a bérszámfejtés, a jogosultsági mátrix időbélyege és a csatolmánytár dátummappája budapesti marad.
 - **Állapotgép (`InvoiceLifecycle`):** A számla kézi állapotváltásai egyetlen helyen vannak megadva. Szabályok: `DRAFT → ISSUED`, `ISSUED`/`OVERDUE → PAID`, `PAID → ISSUED`; kiállítás után nincs visszatérés `DRAFT`-ba, a `CANCELLED` csak jóváíró számlával keletkezik és végleges, a jóváíró számla állapota nem módosítható, a jóváírt és kifizetett számla fizetése nem vonható vissza. Minden váltás naplóbejegyzést ír (`invoice_events`).
 - **Szolgáltatás-szintű jogosultság:** Az `InvoiceService.Access` szabályt a `AppContext` a szerepkör × modul mátrix `INVOICES` moduljához köti, így az állapotváltás és a jóváírás a szolgáltatásban is ellenőrzött (aktív felhasználó, jogosult szerepkör), nem csak a menü rejti el.
@@ -386,7 +389,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **44 tesztosztály, összesen 161 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **45 tesztosztály, összesen 164 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -434,3 +437,4 @@ A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevi
 | `DialogWalkthroughTest` | 3 | Modális ablakok megnyitása és ellenőrzése: számla előzményei, csak az engedélyezett állapotváltások felkínálása, jogosultság nélküli felhasználónál kikapcsolt gombok, targoncás szedési listája (kijelző nélküli környezetben kimarad) |
 | `StocktakeServiceTest` | 7 | Polc számolása, rossz polcon talált csomag áthelyezése, súlytűrés, sérült áru leírása lezáráskor, hiányzó tételek jelentése leírás nélkül, egyszerre egy leltár és szerepkörök, zónaleltár |
 | `QuarantineMigrationTest` | 2 | A karantén két `CHECK` megszorítást bővít: a készlet- és mozgástábla újraépítése minden sor, azonosító és index megőrzésével, valamint a már naprakész adatbázis érintetlenül hagyása |
+| `MoneyStorageTest` | 3 | Az összegek szövegként tárolása és pontos visszaolvasása, tíz tizedes pontos összeadása, valamint régi, lebegőpontos adatbázis veszteségmentes átalakítása |

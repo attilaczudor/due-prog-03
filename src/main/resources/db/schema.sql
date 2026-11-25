@@ -70,8 +70,8 @@ CREATE TABLE IF NOT EXISTS garment_types (
     code TEXT NOT NULL UNIQUE,
     name_en TEXT NOT NULL,
     name_hu TEXT NOT NULL,
-    price_eur_per_kg REAL NOT NULL DEFAULT 0 CHECK (price_eur_per_kg >= 0),
-    price_huf_per_kg REAL NOT NULL DEFAULT 0 CHECK (price_huf_per_kg >= 0),
+    price_eur_per_kg TEXT NOT NULL DEFAULT '0',
+    price_huf_per_kg TEXT NOT NULL DEFAULT '0',
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
@@ -81,8 +81,8 @@ CREATE TABLE IF NOT EXISTS quality_grades (
     code TEXT NOT NULL UNIQUE,
     name_en TEXT NOT NULL,
     name_hu TEXT NOT NULL,
-    default_price_per_kg REAL NOT NULL DEFAULT 0 CHECK (default_price_per_kg >= 0),
-    default_price_huf_per_kg REAL NOT NULL DEFAULT 0 CHECK (default_price_huf_per_kg >= 0),
+    default_price_per_kg TEXT NOT NULL DEFAULT '0',
+    default_price_huf_per_kg TEXT NOT NULL DEFAULT '0',
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
 
@@ -109,6 +109,9 @@ CREATE TABLE IF NOT EXISTS warehouse_locations (
     max_capacity_kg REAL NOT NULL CHECK (max_capacity_kg > 0),
     active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1))
 );
+
+-- Money is stored as an exact decimal string (for example '1800.00'), never as a floating point REAL,
+-- so an amount is read back exactly as it was written. The bank ledger already did this.
 
 -- 8. Core Inventory Packages (Sorted Second-Hand Clothing Bales/Bags/Boxes)
 CREATE TABLE IF NOT EXISTS inventory_packages (
@@ -160,7 +163,7 @@ CREATE TABLE IF NOT EXISTS orders (
         CHECK (status IN ('DRAFT', 'PACKING', 'SHIPPED', 'CANCELLED')),
     currency TEXT NOT NULL DEFAULT 'EUR',
     total_weight_kg REAL NOT NULL DEFAULT 0 CHECK (total_weight_kg >= 0),
-    total_price REAL NOT NULL DEFAULT 0 CHECK (total_price >= 0),
+    total_price TEXT NOT NULL DEFAULT '0',
     notes TEXT,
     created_by INTEGER NOT NULL,
     assigned_forklift_id INTEGER,
@@ -180,8 +183,8 @@ CREATE TABLE IF NOT EXISTS order_items (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     order_id INTEGER NOT NULL,
     package_id INTEGER NOT NULL,
-    price_per_kg REAL NOT NULL CHECK (price_per_kg >= 0),
-    line_total REAL NOT NULL CHECK (line_total >= 0),
+    price_per_kg TEXT NOT NULL,
+    line_total TEXT NOT NULL,
     handover_scanned INTEGER NOT NULL DEFAULT 0 CHECK (handover_scanned IN (0, 1)),
     UNIQUE (order_id, package_id),
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE,
@@ -250,11 +253,11 @@ CREATE TABLE IF NOT EXISTS invoices (
     issue_date TEXT NOT NULL,
     due_date TEXT NOT NULL,
     paid_date TEXT,
-    net_amount REAL NOT NULL DEFAULT 0 CHECK (net_amount >= 0),
+    net_amount TEXT NOT NULL DEFAULT '0',
     vat_rate REAL NOT NULL DEFAULT 27 CHECK (vat_rate >= 0),
     tax_type_code TEXT,
-    vat_amount REAL NOT NULL DEFAULT 0 CHECK (vat_amount >= 0),
-    gross_amount REAL NOT NULL DEFAULT 0 CHECK (gross_amount >= 0),
+    vat_amount TEXT NOT NULL DEFAULT '0',
+    gross_amount TEXT NOT NULL DEFAULT '0',
     currency TEXT NOT NULL DEFAULT 'EUR',
     exchange_rate REAL NOT NULL DEFAULT 400.0 CHECK (exchange_rate > 0),
     attachment_path TEXT,
@@ -274,8 +277,8 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     description TEXT NOT NULL,
     quantity REAL NOT NULL CHECK (quantity > 0),
     unit TEXT NOT NULL DEFAULT 'kg',
-    unit_price REAL NOT NULL CHECK (unit_price >= 0),
-    line_net REAL NOT NULL CHECK (line_net >= 0),
+    unit_price TEXT NOT NULL,
+    line_net TEXT NOT NULL,
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
 

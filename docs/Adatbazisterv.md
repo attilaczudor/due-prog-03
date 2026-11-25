@@ -350,6 +350,14 @@ soha nem írja le magától, mert annak eldöntése emberi felelősség.
 - **Harmadik normálforma (3NF):** Minden nem-kulcs attribútum kizárólag a saját elsődleges kulcsától függ:
   - A csomag tulajdonságai (`target_groups`, `garment_types`, `quality_grades`, `package_types`), szerepkörök (`roles`), devizák (`currencies`) és adókulcsok (`tax_types`) külön törzstáblákba vannak kiszervezve.
   - A raktárhely-foglaltság (`used_weight_kg`) és a készletértékelés (`StockValuation`) nem tárolt redundáns mező, hanem SQL aggregációval számított érték.
+  - **Pénzösszegek tárolása:** minden összeg (`net_amount`, `vat_amount`, `gross_amount`, `unit_price`,
+    `line_net`, `total_price`, `price_per_kg`, `line_total`, valamint a kódtörzsek kilónkénti árai) pontos
+    tizedes szövegként tárolódik, nem `REAL` lebegőpontos számként, így az összeg pontosan úgy olvasható
+    vissza, ahogy mentettük, és sok tétel összege sem csúszik el. A banki nyilvántartás eleve így tárolt.
+    Az egész számú (legkisebb pénzegység) tárolás helyett azért a szöveg, mert ahhoz minden olvasásnál és
+    írásnál ismerni kellene a deviza tizedesjegyeinek számát, és egyetlen téves lépték százszorosára
+    változtatná az összeget. Cserébe az összegeket nem SQL-ben, hanem Java oldalon kell összeadni, a
+    rendezéshez pedig `CAST(... AS REAL)` szükséges.
   - A `invoices` táblában lévő partneradatok **szándékos számviteli pillanatfelvételt** képeznek a kiállított számla megváltoztathatatlansága érdekében, miközben az élő partnerkapcsolat a `customer_id` külső kulcson keresztül megmarad.
   - Az `invoice_events` tábla szándékosan tárolja az állapotváltás előtti és utáni állapotot (`from_status`, `to_status`): ez naplóbejegyzés, amely a változás pillanatát rögzíti, ezért nem számítható újra a számla aktuális állapotából.
 
