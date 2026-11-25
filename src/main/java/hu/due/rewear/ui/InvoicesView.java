@@ -507,14 +507,14 @@ public final class InvoicesView extends JPanel implements NavigableView {
                     CurrencyDef.formatAmount(item.unitPrice(), currency, decimals),
                     CurrencyDef.formatAmount(item.lineNet(), currency, decimals)});
         }
-        JTable itemsTable = new JTable(items);
+        JTable itemsTable = BrutalistStyle.tableWithTooltips(items);
         BrutalistStyle.styleTable(itemsTable);
         itemsTable.setPreferredScrollableViewportSize(new Dimension(550, 145));
         itemsTable.getColumnModel().getColumn(0).setPreferredWidth(220);
         var history = BrutalistStyle.nonEditableTableModel();
         history.setColumnIdentifiers(new Object[]{i18n.t("invoice.history.when"), i18n.t("invoice.history.event"),
                 i18n.t("invoice.history.by"), i18n.t("invoice.history.note")});
-        JTable historyTable = new JTable(history);
+        JTable historyTable = BrutalistStyle.tableWithTooltips(history);
         BrutalistStyle.styleTable(historyTable);
         historyTable.setPreferredScrollableViewportSize(new Dimension(550, 90));
         var center = new JPanel(new BorderLayout(0, 8));

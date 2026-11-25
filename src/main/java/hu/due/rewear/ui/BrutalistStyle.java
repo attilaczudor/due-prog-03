@@ -192,6 +192,24 @@ public final class BrutalistStyle {
         ));
     }
 
+    /**
+     * A table whose cells carry their full value as a tooltip. Columns are often narrower than the text in
+     * them — long material names, invoice events — and this keeps the whole value reachable.
+     */
+    public static JTable tableWithTooltips(javax.swing.table.TableModel model) {
+        return new JTable(model) {
+            @Override
+            public java.awt.Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int row, int column) {
+                java.awt.Component component = super.prepareRenderer(renderer, row, column);
+                Object value = getValueAt(row, column);
+                if (component instanceof JComponent cell) {
+                    cell.setToolTipText(value == null || value.toString().isBlank() ? null : value.toString());
+                }
+                return component;
+            }
+        };
+    }
+
     public static void styleTable(JTable table) {
         table.setRowHeight(28);
         table.setFillsViewportHeight(true);

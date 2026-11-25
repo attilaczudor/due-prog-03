@@ -308,6 +308,35 @@ CREATE TABLE IF NOT EXISTS rota_shifts (
 );
 CREATE INDEX IF NOT EXISTS idx_rota_shifts_day ON rota_shifts(work_day);
 
+-- 14d. Stocktake: counting the shelves and recording what did not match
+CREATE TABLE IF NOT EXISTS stocktake_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    scope_zone TEXT,
+    scope_location_id INTEGER REFERENCES warehouse_locations(id) ON DELETE SET NULL,
+    status TEXT NOT NULL DEFAULT 'OPEN' CHECK (status IN ('OPEN', 'CLOSED', 'CANCELLED')),
+    note TEXT,
+    started_by INTEGER NOT NULL REFERENCES users(id),
+    started_at TEXT NOT NULL,
+    closed_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    closed_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS stocktake_counts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    session_id INTEGER NOT NULL REFERENCES stocktake_sessions(id) ON DELETE CASCADE,
+    package_id INTEGER NOT NULL REFERENCES inventory_packages(id) ON DELETE CASCADE,
+    outcome TEXT NOT NULL CHECK (outcome IN ('FOUND', 'MISPLACED', 'REWEIGHED', 'DAMAGED', 'UNEXPECTED')),
+    expected_location_id INTEGER REFERENCES warehouse_locations(id) ON DELETE SET NULL,
+    found_location_id INTEGER REFERENCES warehouse_locations(id) ON DELETE SET NULL,
+    expected_grams INTEGER NOT NULL,
+    counted_grams INTEGER,
+    note TEXT,
+    counted_by INTEGER NOT NULL REFERENCES users(id),
+    counted_at TEXT NOT NULL,
+    UNIQUE (session_id, package_id)
+);
+CREATE INDEX IF NOT EXISTS idx_stocktake_counts_session ON stocktake_counts(session_id);
+
 -- 15. User Email Mailboxes (External SMTP/IMAP & Internal Company Mail)
 CREATE TABLE IF NOT EXISTS emails (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

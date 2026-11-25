@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -643,6 +643,51 @@ them without driving a table selection, the way `MainFrame.performLogout()` alre
 
 The package intake pre-save preview (needs a prepared package), and backup, restore and receipt attachment,
 which open a native file chooser.
+
+---
+
+## Pass 13 — stocktake (25 November 2026)
+
+### Built
+
+- [x] **A stocktake session** over one shelf, one zone, or the whole warehouse. Only one runs at a time.
+- [x] **Counting.** Scanning a package records what was really found. On a single-shelf count the shelf you
+  are standing at is where the package *is*, so a package whose record says another shelf is **misplaced**
+  and the record is what gets corrected. A weight more than 100 g from the record is a **reweigh**; scales are
+  never exact, so anything closer counts as the same weight. Damage is marked as it is found.
+- [x] **Nothing changes while the session is open.** Closing applies everything in one transaction: misplaced
+  packages move to where they were found, reweighed ones take the counted weight, damaged ones are written
+  off — each with a stock movement, so the change can be traced afterwards.
+- [x] **Missing stock is reported, never written off.** Anything in scope that nobody counted is listed; what
+  happened to it is a decision for a person, not for the program.
+- [x] **A Stocktake screen** in the Operations group, open to the station manager (who counts the shelves in
+  practice) and the production leaders. 30 new translation keys.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **157 / 157** across 43 classes (+7 `StocktakeServiceTest`). Four
+mutation checks: ignoring the weight tolerance, writing off missing stock, not moving a misplaced package, and
+applying the damage write-off at count time instead of at close each failed a test.
+
+### Mistakes made and caught while building this
+
+- **The misplacement rule was backwards** in the first draft: it treated the package's recorded location as
+  where it physically was. Scanning at a shelf means the package is on that shelf.
+- **`ResultSet.wasNull()` was read after the wrong column.** It reports on the column just read, so the scope
+  of a session came back as null for a shelf count and as `0` — an invalid id that broke a foreign key — for a
+  zone count. All three failing tests came from this one line.
+- **The new module had no sidebar entry**, which left a blank black button where the Rota button should have
+  been. Found by looking at the rendered screen, not by a test.
+- **A borrowed label.** The scan box said "Scan QR to Collect", reused from order staging; it has its own
+  wording now.
+
+### Not done
+
+- **Quarantine.** Damaged stock is written off, which is the existing path. A real quarantine — stock held
+  aside but not yet written off — needs a package status of its own, and the status list is a SQLite `CHECK`
+  constraint, so adding one means rebuilding the inventory table. That is worth doing carefully rather than
+  quickly.
+- A session cannot be reopened once closed, and there is no printed count sheet.
 
 ---
 

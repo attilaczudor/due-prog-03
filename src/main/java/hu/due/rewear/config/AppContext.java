@@ -38,6 +38,7 @@ import hu.due.rewear.service.OnboardingService;
 import hu.due.rewear.service.PickListPdfExporter;
 import hu.due.rewear.service.PickListService;
 import hu.due.rewear.service.RotaService;
+import hu.due.rewear.service.StocktakeService;
 import hu.due.rewear.service.OrderService;
 import hu.due.rewear.service.PayrollService;
 import hu.due.rewear.service.PartnerStatementService;
@@ -124,6 +125,7 @@ public final class AppContext {
     private final OnboardingService onboardingService;
     private final PickListService pickListService;
     private final RotaService rotaService;
+    private final StocktakeService stocktakeService;
     private final PickListPdfExporter pickListPdfExporter;
 
     public AppContext() {
@@ -240,6 +242,7 @@ public final class AppContext {
         this.payrollService.initializeDepartments();
         this.pickListService = new PickListService(transportService, locationDao);
         this.rotaService = new RotaService(databaseManager, session, userDao);
+        this.stocktakeService = new StocktakeService(databaseManager, session, packageDao, movementDao);
         this.pickListPdfExporter = new PickListPdfExporter(i18n);
         this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao, invoiceDao);
         this.inventoryService.setNotificationService(notificationService);
@@ -448,6 +451,10 @@ public final class AppContext {
 
     public PickListPdfExporter getPickListPdfExporter() {
         return pickListPdfExporter;
+    }
+
+    public StocktakeService getStocktakeService() {
+        return stocktakeService;
     }
 
     public RotaService getRotaService() {

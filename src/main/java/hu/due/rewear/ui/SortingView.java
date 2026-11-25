@@ -430,18 +430,7 @@ final class SortingView extends JPanel implements NavigableView {
 
     private static final class DataTable<T> {
         private final DefaultTableModel model = BrutalistStyle.nonEditableTableModel();
-        // Columns are narrow and the text is long, so every cell carries its full value as a tooltip.
-        private final JTable table = new JTable(model) {
-            @Override
-            public java.awt.Component prepareRenderer(javax.swing.table.TableCellRenderer renderer, int row, int column) {
-                java.awt.Component component = super.prepareRenderer(renderer, row, column);
-                Object value = getValueAt(row, column);
-                if (component instanceof javax.swing.JComponent cell) {
-                    cell.setToolTipText(value == null || value.toString().isBlank() ? null : value.toString());
-                }
-                return component;
-            }
-        };
+        private final JTable table = BrutalistStyle.tableWithTooltips(model);
         private List<T> rows = List.of();
 
         void set(List<T> values, Function<T, Object[]> cells) {

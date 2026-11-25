@@ -877,3 +877,32 @@ rota.shift.OFF,Off,Szabadnap
 rota.summary.month,"{0} shifts planned this month","{0} beosztott műszak ebben a hónapban"
 rota.summary.week,"{0} shifts planned this week","{0} beosztott műszak ezen a héten"
 rota.summary.day,"{0} working, {1} off","{0} dolgozik, {1} szabadnapos"
+nav.stocktake,Stocktake,Leltár
+stocktake.scan,Scan QR to count,Leltározandó QR beolvasása
+stocktake.start,Start stocktake,Leltár indítása
+stocktake.count,Count,Rögzítés
+stocktake.close,Close and apply,Lezárás és könyvelés
+stocktake.counted,Counted,Megszámolt tételek
+stocktake.missing,Expected but not found,Hiányzó tételek
+stocktake.none_open,No stocktake is open.,Nincs nyitott leltár.
+stocktake.open_session,"Stocktake #{0} — {1}","#{0} leltár — {1}"
+stocktake.scope,What to count,Mit számolunk
+stocktake.scope.all,Whole warehouse,Teljes raktár
+stocktake.scope.zone,Zone,Zóna
+stocktake.scope.shelf,Shelf,Polc
+stocktake.damaged,Damaged,Sérült
+stocktake.counted_kg,Counted weight (kg),Mért súly (kg)
+stocktake.expected_kg,On record (kg),Nyilvántartás (kg)
+stocktake.expected_at,Recorded at,Nyilvántartás szerint
+stocktake.found_at,Found at,Megtalálva
+stocktake.difference,Difference,Eltérés
+stocktake.outcome.FOUND,Found,Megvan
+stocktake.outcome.MISPLACED,Wrong shelf,Rossz polcon
+stocktake.outcome.REWEIGHED,Weight differs,Súlyeltérés
+stocktake.outcome.DAMAGED,Damaged,Sérült
+stocktake.outcome.UNEXPECTED,Not in this count,Nem e leltár része
+stocktake.summary,"{0} counted, {1} still missing","{0} megszámolva, {1} hiányzik"
+stocktake.history,"No stocktake is open. Earlier sessions: {0}","Nincs nyitott leltár. Korábbi leltárak: {0}"
+stocktake.close_confirm,"Close this stocktake? Misplaced packages move to where they were found, weights are corrected and damaged packages are written off.","Lezárja a leltárt? A rossz polcon talált csomagok a tényleges helyükre kerülnek, a súlyok javítva lesznek, a sérült csomagok pedig leírásra kerülnek."
+stocktake.cancel_confirm,Abandon this stocktake? Nothing will be changed.,Elveti a leltárt? Semmi nem változik.
+stocktake.applied,"{0} moved, {1} reweighed, {2} written off, {3} missing","{0} áthelyezve, {1} újramérve, {2} leírva, {3} hiányzik"

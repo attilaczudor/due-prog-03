@@ -257,6 +257,17 @@ public final class InventoryPackageDao {
         }
     }
 
+    /** Corrects the recorded weight of a package, used when a stocktake reweighs it. */
+    public void updateWeight(Connection conn, long packageId, BigDecimal weightKg, LocalDateTime updatedAt) throws SQLException {
+        String sql = "UPDATE inventory_packages SET weight_kg = ?, updated_at = ? WHERE id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setBigDecimal(1, weightKg);
+            ps.setString(2, DaoDateUtil.format(updatedAt));
+            ps.setLong(3, packageId);
+            ps.executeUpdate();
+        }
+    }
+
     public void updateStatus(Connection conn, long packageId, PackageStatus newStatus, LocalDateTime updatedAt) throws SQLException {
         String sql = "UPDATE inventory_packages SET status = ?, updated_at = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {

@@ -36,7 +36,8 @@
 ## After the demo
 
 - [ ] Design payroll approval history, closed periods, corrections, and controlled export after the business rules are agreed.
-- [ ] Add stocktake sessions and explicit damage, quarantine, and reweighing workflows. Consider an S-shaped pick route once the physical layout is known.
+- [x] Add stocktake sessions with damage and reweighing. Quarantine is still open: it needs a package status of its own, which means rebuilding the inventory table.
+- [ ] Consider an S-shaped pick route once the physical layout is known. Consider an S-shaped pick route once the physical layout is known.
 - [ ] Move money from SQLite REAL to integer minor units (a migration touching many files).
 - [ ] Decide which roles may create invoices (from an order, manually, from a receipt) and gate that too; assign invoice numbers at issue instead of at draft creation.
 - [ ] Let a demo workspace become a company workspace without a backup restore; offer encrypted backups and clean-up of old `pre-restore-*` copies.

@@ -25,6 +25,7 @@ public enum AppModule {
     INVOICES("invoices", "nav.invoices", Category.MANAGEMENT, false),
     PAYROLL("payroll", "nav.payroll", Category.MANAGEMENT, false),
     ROTA("rota", "nav.rota", Category.MANAGEMENT, false),
+    STOCKTAKE("stocktake", "nav.stocktake", Category.OPERATIONS, false),
     NOTIFICATIONS("notifications", "nav.notifications", Category.COMMUNICATIONS, false),
     MESSAGES("messages", "nav.messages", Category.COMMUNICATIONS, false),
     EMAIL("email", "nav.email", Category.COMMUNICATIONS, false),
@@ -96,17 +97,17 @@ public enum AppModule {
             // Runs the sorting operation: the floor, its reference data and its rota, but no money.
             case PRODUCTION_LEAD -> this == TODO || this == SORTING || this == INTAKE || this == PUTAWAY
                     || this == STAGING || this == SCANNER || this == INVENTORY || this == LOCATIONS
-                    || this == DICTIONARIES || this == ROTA
+                    || this == DICTIONARIES || this == ROTA || this == STOCKTAKE
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             // Runs one shift: the same floor work and the rota, without the reference data.
             case SHIFT_LEAD -> this == TODO || this == SORTING || this == INTAKE || this == PUTAWAY
-                    || this == STAGING || this == SCANNER || this == INVENTORY || this == ROTA
+                    || this == STAGING || this == SCANNER || this == INVENTORY || this == ROTA || this == STOCKTAKE
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             // Payroll, the rota it is based on, and the worker records inside Payroll.
             case HR_PAYROLL -> this == TODO || this == PAYROLL || this == ROTA
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             case OPERATOR -> this == TODO || this == SORTING || this == INTAKE || this == SCANNER || this == INVENTORY
-                    || this == ROTA || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+                    || this == STOCKTAKE || this == ROTA || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             case SORTER, SORTING_HELPER -> this == TODO || this == SORTING || this == ROTA
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             // Serves the sorting floor: raw material in, finished packages out to the shelves.
