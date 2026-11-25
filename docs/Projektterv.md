@@ -39,7 +39,12 @@ A **ReWear WMS** egy többplatformos, asztali **Java 17 GUI alkalmazás**, amely
    - Elkülönített deviza-főkönyvek (`EUR`, `HUF`, `USD`, egyedi devizák), ország-alapú adótípusok (`HU 27%`, `EU B2B 0%`, `Export 0%`), Adminban szerkeszthető eladói cégprofil címmezőkkel és devizánkénti IBAN-okkal, többsoros számlák, 1-kattintásos **Jóváíró számla (`CN-YYYY-NNNN`)**, automatikus **`OVERDUE`** detektálás + `mailto:` felszólítás, hordozható **számlaarchívum és bizonylattár (`./data/invoices/ÉÉÉÉ/HH/`, `./data/receipts/ÉÉÉÉ/HH/`)**, és A4 **P&L + Készletértékelés PDF**.
 7. **Szuper Admin modul-alapú jogosultságkezelés (`Szerepkörök`):** A **18 menüpont** külön modulként szerepel (`AppModule`), amelyeket a `SUPER_ADMIN` szerepkörönként valós időben ki- és bekapcsolhat az adatbázisban tárolt mátrixból.
 8. **NAV- és banki integrációs demó:** Helyi NAV Online Számla 3.0 előnézet, számlánkénti iránnyal. Banki számlák és tranzakciók pontos, külön devizás egyenleggel.
-9. **CSV-alapú többnyelvűség (810 EN/HU kulcs) és Brutalist monokróm UX:** Egyetlen UTF-8 `translations.csv` fájlból töltődő kétnyelvű felület, kontrasztos világos/sötét monokróm megjelenés (`#FFFFFF`/`#000000`, `arc = 0`), manuális Frissítés gombok nélküli azonnali és 10 mp-es háttér-frissítés, háttérszálú `AsyncUiRunner`, valamint gyorsbillentyűk (`Cmd/Ctrl+1..9/0`, `F5`, `Esc`).
+9. **CSV-alapú többnyelvűség (847 EN/HU kulcs) és Brutalist monokróm UX:** Egyetlen UTF-8 `translations.csv` fájlból töltődő kétnyelvű felület, kontrasztos világos/sötét monokróm megjelenés (`#FFFFFF`/`#000000`, `arc = 0`), manuális Frissítés gombok nélküli azonnali és 10 mp-es háttér-frissítés, háttérszálú `AsyncUiRunner`, valamint gyorsbillentyűk (`Cmd/Ctrl+1..9/0`, `F5`, `Esc`).
+
+10. **Első indítás saját céggel vagy demó munkaterülettel:** Egy új telepítés üresen indul, és az első indításkor a tulajdonos választ: saját cég (egyetlen, általa megadott szuper-adminisztrátori fiók, nyilvános vagy gyakori jelszavak tiltásával, opcionális szokásos ruházati kódtörzsekkel és kezdő polcrenddel), demó munkaterület (mintaraktár a nyilvánosan ismert demó belépőkkel) vagy korábbi mentés visszaállítása. Az alkalmazás indításkor már használatban lévő adatbázist nem tölt fel mintaadattal, és a demó belépő gombok csak demó munkaterületen jelennek meg.
+11. **Teljes mentés és visszaállítás:** Az Adminban készített `.zip` az SQLite-pillanatképet és a számla-, bizonylat- és levélcsatolmány-mappákat is tartalmazza SHA-256 ellenőrző jegyzékkel. A visszaállítás először mindent átmeneti mappában ellenőriz, a régi mappákat félreteszi (nem törli), az adatbázist utoljára cseréli, hiba esetén visszavonja a mozgatásokat. A levélcsatolmányok saját, dátum szerinti mappában élnek, típus- és fájlfejléc-ellenőrzéssel.
+12. **Számla-életciklus, előzmények és szedési lista:** A számla állapotváltásait egyetlen szabályrendszer korlátozza (kiállított számla nem lesz újra piszkozat, a sztornó csak jóváíró számlával lehetséges, a jóváíró számla végleges), minden váltás naplózott a felhasználóval és az idővel, az előzmények a számla részletei között láthatók, a műveletekhez az `INVOICES` modul jogosultsága szükséges a szolgáltatásban is. Az Összekészítés nézet **Szedési lista** gombja bejárási sorrendű (zóna, sor, polc), haladásjelzős, nyomtatható listát ad egy vagy több rendelésre.
+13. **Egységes üzleti idő és ellenőrzött build:** Minden üzleti dátum a raktár budapesti idejét követi a gép időzónájától függetlenül, egy építési őrteszt tiltja a közvetlen rendszeróra-hívásokat. A projekt Maven wrapperrel (`./mvnw clean verify`) épül Maven-telepítés nélkül, és a GitHub Actions minden változtatásra lefuttatja Ubuntun és macOS-en.
 
 ---
 
@@ -60,7 +65,7 @@ A hitelesítés BCrypt jelszó-hash-eléssel történik. Az alkalmazás **7 szer
 | Értesítések, Üzenetek és E-mail (`NOTIFICATIONS`, `MESSAGES`, `EMAIL`) | Igen | Igen | Igen | Belső mail | Belső mail | Belső mail | Belső mail |
 | Adminisztráció (`ADMIN`) | Igen | Igen | Nem | Nem | Nem | Nem | Nem |
 
-A Szerepkörök és az E-mail beállítások adminisztrációs aloldalai a Szuperadminhoz tartoznak. Az Állomásvezető meglévő fiókja megtartja az `OPERATOR` szerepkódot és a kijelölt állomást. A két targoncás munkafolyamaton belüli jogot a feladathoz rendelt személy határozza meg.
+A számla állapotváltása és a jóváíró számla kiállítása a szolgáltatásban is csak aktív felhasználónak, az `INVOICES` modult használó szerepkörrel engedélyezett, így a mátrix módosítása azonnal érvényes. A Szerepkörök és az E-mail beállítások adminisztrációs aloldalai a Szuperadminhoz tartoznak. Az Állomásvezető meglévő fiókja megtartja az `OPERATOR` szerepkódot és a kijelölt állomást. A két targoncás munkafolyamaton belüli jogot a feladathoz rendelt személy határozza meg.
 
 ---
 
@@ -74,14 +79,14 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 |---|---|---|
 | Nyelv és futtatás | Java 17 LTS, Apache Maven (NetBeans-kompatibilis) | Java rekordok, szabványos build, futtatható fat `.jar` (`maven-shade-plugin`), platformfüggetlen indító szkriptek (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) |
 | Grafikus felület (GUI) | Java Swing + FlatLaf 3.5.4 + `SwingWorker` | Egyedi Brutalist monokróm világos/sötét téma, vektoros ikonok, összecsukható fő- és másodlagos oldalsáv (`SectionNavigation`), kereshető címzettválasztó és háttérszálú I/O (`AsyncUiRunner`) |
-| Adatbázis-kezelés | Beágyazott SQLite + `sqlite-jdbc` | **41 táblás 3NF relációs séma**, **23 deklarált index**, külső kulcsok, atomi tranzakciók, automatikus séma-migráció és demo seed |
+| Adatbázis-kezelés | Beágyazott SQLite + `sqlite-jdbc` | **42 táblás 3NF relációs séma**, **24 deklarált index**, külső kulcsok, atomi tranzakciók, automatikus séma-migráció és explicit első indítási választás (saját cég vagy demó) |
 | Biztonság & RBAC | `jBCrypt` + dinamikus `role_module_permissions` | Sóval ellátott BCrypt jelszó-hash-elés, 7 szerepkör, adatbázis-vezérelt modul-jogosultsági mátrix |
 | QR-kód kezelés | Google ZXing (`core` + `javase`) | Valós idejű QR generálás, PNG mentés, QR dekódolás képfájlból, szkenneléses komissiózás és átadás-ellenőrzés |
 | Nyomtatás és grafika | Java 2D (`Graphics2D`) + Java Print API (`PrinterJob`, `Printable`) | Vektoros hőcímke- és A4 dokumentum-rajzolás, mentés előtti előnézet, fizikai nyomtatás |
 | PDF generálás | OpenPDF 2.0.3 | Hőcímke/A4 4-es PDF címkék, többdevizás A4 PDF számlák/jóváírások, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok |
 | Adatvizualizáció | XChart 3.8.8 | Dinamikus monokróm kör- és oszlopdiagramok a készlet súlyeloszlásáról |
-| Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (810 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum és bizonylattár, DB backup/restore |
-| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **62 automatizált egység- és integrációs teszt** 24 tesztosztályban |
+| Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (847 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
+| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **131 automatizált egység- és integrációs teszt** 36 tesztosztályban, Maven wrapper (`./mvnw`), GitHub Actions CI (Ubuntu és macOS) |
 
 ---
 
@@ -97,13 +102,26 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 | **Fázis 14 (v2.5)** | Külön `Betárolás` / `Összekészítés` modulok, élő oldalsáv-jelvények, manuális Frissítés gombok nélküli azonnali/automatikus frissítés, összecsukható e-mail mappasáv + gyorskereséses To/CC választó, Szuper Admin **Szerepkörök és modulok** jogosultsági mátrix | Kész |
 | **Válogatástól a kiszállításig** | Rugalmas csapatok, alapanyagigény és napi teljesítmény, helyi webshopimport, ütemezett rendelés és csomagonként ellenőrzött kiadás | Kész |
 | **Bérszámfejtési előkészítés** | Hatályos díjak, részlegváltás egy munkanapon belül, jóváhagyott bónusz és napi bruttó tervezet | Kész |
+| **Ellenőrzés és megbízhatóság (2026. 11. 25.)** | Teljes kód- és hibaellenőrzés, reprodukálható build (Maven wrapper), biztonságosabb visszaállítás (integritás-ellenőrzés, atomi csere), levélcsatolmány-tár, egységes budapesti üzleti idő őrtesztettel | Kész |
+| **Üzemszerű használat előkészítése (2026. 11. 25.)** | Teljes `.zip` mentés és visszaállítás, explicit első indítás (saját cég vagy demó), a beégetett alapértelmezett fiókok és mintaadat-utántöltés megszüntetése | Kész |
+| **Pénzügyi és raktári finomítás (2026. 11. 25.)** | Számla-életciklus és előzmények, jóváíró számla szerkezeti kapcsolata, pénzügyi műveletek jogosultsága, bejárási sorrendű szedési lista, CI | Kész |
 
 ---
 
 ## 5. Kockázatok és kezelésük
 
-- **Külső adatbázis-szerver vagy Java telepítés hiánya:** Beágyazott SQLite használatával és a mellékelt platformfüggetlen indító szkriptekkel (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) kiküszöbölve — a futtatható `.jar` indításkor automatikusan létrehozza vagy migrálja a 41 táblás sémát.
+- **Külső adatbázis-szerver vagy Java telepítés hiánya:** Beágyazott SQLite használatával és a mellékelt platformfüggetlen indító szkriptekkel (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) kiküszöbölve — a futtatható `.jar` indításkor automatikusan létrehozza vagy migrálja a 42 táblás sémát.
 - **Fizikai QR szkenner vagy hőnyomtató hiánya:** A rendszer egyszerre támogatja a valódi USB/Bluetooth HID szkennereket és OS nyomtatókat, valamint a képfájlból való QR-olvasást, demó gyors-szkennelést és PDF/PNG exportot.
 - **Kódütközés vagy téves csomagrögzítés:** Minden csomag ütközésmentes 2 jegyű hexadecimális végződést (`00`–`FF`) kap, és a kötelező mentés előtti előnézet megakadályozza a hibás csomagok adatbázisba írását.
 - **Jogosultsági tévedés vagy adminisztrátori kizáródás:** A `SUPER_ADMIN` szerepkör nem zárható ki egyetlen modulból sem, az `Áttekintés` kezdőoldal pedig minden szerepkörnek aktív marad; minden más modul jogosultsága azonnali SQLite perzisztenciával kapcsolható.
 - **UI fagyás nagy PDF export vagy háttérlekérdezések közben:** Az `AsyncUiRunner` (`SwingWorker`) a háttérszálra viszi a 250–300 DPI PDF generálást, CSV exportot, készletszűrést és az oldalsáv-jelvények számlálóit, míg a lusta nézetek első megnyitáskor még kirajzolás előtt frissülnek.
+- **Adatvesztés visszaállításkor vagy költözéskor:** A teljes mentés a dokumentumokat is tartalmazza, a visszaállítás előbb mindent ellenőriz, a régi mappákat félreteszi, hiba esetén visszavon; így egy sérült vagy meghamisított mentés nem ír felül élő adatot.
+- **Alapértelmezett belépők éles adatbázison:** Üres telepítés nem hoz létre fiókot magától. A saját cég fiókját a tulajdonos adja meg, nyilvános jelszó nem fogadható el, és a program indításkor sem építi újra a demó fiókokat, sem tölt fel mintaadatot használatban lévő adatbázisba.
+- **Időzóna-eltérésből adódó téves napok:** Minden üzleti dátum egy budapesti órából készül; az automatikus teszt a gép időzónáját Los Angelesre állítja, és az építés megbukik közvetlen rendszeróra-hívásra.
+- **Pénzügyi bizonylat utólagos módosítása vagy jogosulatlan művelet:** A kiállított számla nem szerkeszthető vissza, a javítás jóváíró számlával történik, minden váltás naplózott, a műveleteket a szolgáltatás a szerepkör-mátrix alapján engedi.
+
+### Ismert korlátok
+- A mentések nincsenek titkosítva, tárolásukkor ugyanolyan védelem szükséges, mint az élő adatmappánál; a visszaállítás után maradó `pre-restore-*` másolatokat kézzel kell törölni.
+- A NAV, a banki, a webshop és a külső e-mail kapcsolat demó/szimuláció. A pénzösszegek SQLite `REAL` típusban, tárolás előtt kerekítve szerepelnek; az egész számú (legkisebb pénzegység) tárolásra áttérés még nyitott.
+- A demó munkaterületből nem lehet saját cég munkaterületet csinálni, csak mentés visszaállításával. A számlaszám a piszkozat létrehozásakor készül, nem a kiállításkor. Egy nagyon régi (partnertípus nélküli) adatbázis frissítése még mintapartnereket vehet fel.
+- A szedési lista bejárási sorrendje növekvő zóna–sor–polc sorrend, az épület fizikai rajzát nem ismeri. Leltárfolyamat, sérült és karanténos áru és újramérés még nincs.

@@ -2,7 +2,7 @@
 
 **2026-11-24 · v2.5 · Baseline commit `699b245`**
 
-This is the audit of the November 24 baseline. See the [November 25 handover](HANDOVER.md) for the current workflow and the [task board](TASKS.md) for open work.
+This is the audit of the November 24 baseline. Later passes are recorded in the [optimization plan](Optimization-Plan.md). See the [November 25 handover](HANDOVER.md) for the current workflow and the [task board](TASKS.md) for open work.
 
 ReWear’s strongest workflow is the traceable movement of a physical package from sorting station to shelf, dispatch dock and customer. The handoff between operator, forklift driver and manager gives the university demo a clear story. The desktop architecture is appropriate for that demo. SQLite keeps setup small, and the separation between Swing views, services and DAOs makes the core workflows testable without hardware.
 

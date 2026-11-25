@@ -465,6 +465,46 @@ test.
 
 ---
 
+## Pass 9 — Hungarian reports and todo files (25 November 2026)
+
+The three Hungarian reports and the task board were brought up to date and checked against the code, not
+just renumbered.
+
+### Method
+
+A script compared `schema.sql` (plus the columns added by migrations) with `docs/Adatbazisterv.md`: every
+table is documented, every column of the checked tables appears, every identifier in the report exists in the
+schema, the logical groups add up to 42, and the index count matches. The Programterv test table is generated
+from the surefire reports (36 classes, 131 tests, matching the build).
+
+### Errors in the reports that predate this work (found by that check)
+
+- The roles table listed 5 of the 7 roles (`SORTER` and `SORTING_HELPER` were missing).
+- `chat_rooms.room_type` was documented as `GROUP`/`DIRECT`; the schema says `ROOM`/`DIRECT`.
+- `chat_room_members` was documented with `last_read_message_id` and `joined_at`; the schema has only `last_read_at`.
+- `user_todos` was documented with priority `NORMAL` and a `completed_at` column; the schema has `MEDIUM`, no
+  `completed_at`, and an undocumented `due_date`.
+- `emails.is_external` was undocumented.
+
+### Updated
+
+- **Adatbázisterv:** 42 tables, 24 indexes, `invoice_events`, `invoices.credit_for_invoice_id`, the corrections
+  above, the full backup, the mail attachment vault and the time handling.
+- **Programterv:** counts, architecture diagram, design patterns, use cases (new UC-13), an invoice state
+  diagram, UML additions, two new sequence diagrams (first launch, staged restore) and the regenerated test table.
+- **Projektterv:** counts, four new feature items, three new phase rows, four new risks and a list of known limits.
+- **`docs/TASKS.md`**, the private `PHASES_AND_TASKS.md` and `HANDOVER.md`: completed work, new next steps,
+  the long-term list.
+
+### Not done
+
+- The new Mermaid diagrams were reviewed by eye but not rendered; no Mermaid renderer is installed here.
+- The Google Docs and Slides, the 300-DPI diagram PNGs and the screenshots are still to be made when requested.
+- The private `PRD.md` and the assignment brief still describe the v2.5 baseline (697 keys, 26 tables, 59 tests).
+- A headless run of the full build (the CI setting) passed with 131 run and 1 skipped.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
