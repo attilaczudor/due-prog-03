@@ -33,6 +33,38 @@
 - [ ] Rehearse the [handover walkthrough](HANDOVER.md#demo-walkthrough) in a fresh portable installation, choosing the demo workspace at first launch. Include a shortage, a rejected or duplicate scan, a shared helper, and a split payroll day. Test on the intended scanner and printer when available.
 - [ ] When requested, assemble the university submission from the three Hungarian Markdown reports (now current), the runnable bundle, and a ten-minute defense deck. The diagrams still need rendering to PNG. Keep sample data fictional and rehearse from a clean demo database.
 
+## Roadmap from the 25 November research
+
+The full reasoning, evidence and per-role detail is in [the research report](../reports/Warehouse%20system%20improvements%20by%20role.md).
+Its headline finding: the application sets and bonuses against kilograms processed, but premium "cream" grade is
+roughly a tenth of sorted weight and over half of revenue — grade mix, not throughput, is the profit lever.
+
+Build in this order:
+
+- [ ] **Exact-decimal weights.** Smallest of the five and a precondition for three of the others. Money was fixed
+      the same way; weight carries an EPR penalty of half the fee deficiency, a 100 g stocktake tolerance and
+      contractual bale tolerances of a few percent.
+- [ ] **A real NAV Online Számla integration** replacing the demonstration. Immediate XML submission on issue, a
+      per-invoice reporting state machine with the transaction id stored as evidence, retry on outage, an operator
+      queue for errors, and technical annulment modelled apart from a commercial credit note. Penalty up to
+      HUF 1,000,000 per invoice; fifteen warnings became blocking errors on 15 September 2025.
+- [ ] **A purchase lot and intake assessment record.** The schema keystone: supplier, country of origin, collection
+      channel, purchase price per kilogram, gross and net weight, customs classification, and the named human
+      judgement of whether material is waste or fit for re-use at collection. Retires the free-text collection area.
+- [ ] **Grade-yield reporting and a target that uses it.** Yield by grade per intake lot, team, shift and sorter,
+      with purchase and sale prices as editable inputs. Learn the site's own baseline rather than shipping a target
+      from the literature.
+- [ ] **Shift handover record with 48-hour escalation.** The cheapest high-value item: six structured fields at
+      shift close, escalation through the notification infrastructure that already exists.
+- [ ] *Conditional swap:* if the operation ships outside the EU, the Article 22d(9) bale record and export document
+      pack displace the handover record — 21 May 2027 is a hard date and a handover sheet is not.
+- [ ] A handheld client is the right sixth item, not the first: it brings the whole offline-synchronisation problem
+      with it, and its evidence base is a mechanism and a preference survey rather than a measured cost.
+
+Two questions for an accountant before any further invoicing work: whether exported or re-used placements can be
+deducted from the EPR base (the most commercially significant open question in the research), and the second-hand
+margin scheme (Áfa tv. §§ 213–233), which no source covered and which may change invoice content.
+
 ## After the demo
 
 - [ ] Design payroll approval history, closed periods, corrections, and controlled export after the business rules are agreed.
