@@ -158,7 +158,8 @@ public final class TransportView extends JPanel implements NavigableView {
      * Opens the pick list for the selected rows' orders, or for everything this user may see when nothing
      * is selected. A forklift driver only ever sees the orders assigned to them.
      */
-    private void showPickList() {
+    /** Package-private so a UI test can open the pick list without driving the table selection. */
+    void showPickList() {
         I18nManager i18n = ctx.getI18n();
         var selected = new java.util.LinkedHashSet<Long>();
         for (int viewRow : stagingTable.getSelectedRows()) {

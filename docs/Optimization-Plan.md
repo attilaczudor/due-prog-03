@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **147 across 41** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -620,11 +620,29 @@ rendered.
   dock. Two tests had assumed that order was unassigned; one of them was relying on a shortcut that only
   applies to unassigned orders, which is now stated in the test.
 
-### Not covered
+### Dialogs
 
-The walkthrough opens screens, not dialogs. The invoice details dialog (history table, disabled buttons), the
-pick list preview, the package intake pre-save preview and the backup and restore dialogs are still only
-compile-verified. Driving a modal dialog needs a different harness.
+A modal dialog blocks the thread that opens it, so `DialogWalkthroughTest` inspects it from a Swing timer that
+fires inside the dialog's own event pump, then closes it. It checks what a person would actually see:
+
+- The invoice details dialog lists its history (the table is told apart from the line items by its column
+  headers, so the two cannot be confused) and offers only the status changes the lifecycle allows — never back
+  to draft, never straight to cancelled.
+- With the Invoices module revoked, the same dialog comes up with Apply and Credit Note turned off while Close
+  still works.
+- The delivery driver's pick list preview opens with their own order in it.
+
+Three mutation checks: forcing the buttons on, emptying the history, and offering every status each failed a
+test. The first attempt at the history check did **not** fail when the history was emptied, because it counted
+rows in any table and the line items have rows; identifying the table by its columns fixed that.
+
+`InvoicesView.openInvoiceDetails` and `TransportView.showPickList` became package-private so the test can open
+them without driving a table selection, the way `MainFrame.performLogout()` already is.
+
+### Still not covered
+
+The package intake pre-save preview (needs a prepared package), and backup, restore and receipt attachment,
+which open a native file chooser.
 
 ---
 

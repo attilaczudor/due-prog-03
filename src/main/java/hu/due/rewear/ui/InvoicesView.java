@@ -472,7 +472,8 @@ public final class InvoicesView extends JPanel implements NavigableView {
         if (selected != null) openInvoiceDetails(selected);
     }
 
-    private void openInvoiceDetails(Invoice selected) {
+    /** Package-private so a UI test can open the details dialog without driving the table selection. */
+    void openInvoiceDetails(Invoice selected) {
         var i18n = ctx.getI18n();
         var dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
                 i18n.t("invoice.details") + " — " + selected.invoiceNumber(), Dialog.ModalityType.APPLICATION_MODAL);
