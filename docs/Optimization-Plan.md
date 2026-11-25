@@ -110,6 +110,8 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
+Pass 4 raised the totals to **103 tests across 31 classes** (details in the Pass 4 section).
+
 ## Phase 2 — Improvements
 
 - [x] **I1 · Badge query budget.** The per-tick badge work now uses SQL filters and one `COUNT(*)`
@@ -237,7 +239,50 @@ file handling, backup and restore, stock reservation, credit notes and time hand
 
 Deferred with the rest of the submission documents, but the figures are now:
 **811** translation keys (reports say 810), **164** main Java sources (Programterv says 161),
-**30** test classes (says 24), **94** tests (says 62).
+**31** test classes (says 24), **103** tests (says 62), 165 main sources. Translation keys stay at 811.
+
+---
+
+## Pass 4 — full backup bundle (25 November 2026)
+
+### Built
+
+- [x] **Full backup (`.zip`).** `BackupService.backupBundle` writes the `VACUUM INTO` snapshot plus every
+  file under `invoices/`, `receipts/` and `mail-attachments/`, with `manifest.txt` listing each entry's
+  SHA-256 and size. The zip is staged beside the destination and moved into place, so a failed backup
+  never appears under its final name. Scratch files (`.rewear-*`, `*.tmp`) and symlinks are skipped, and a
+  destination inside one of the document folders is refused (the backup would contain itself).
+- [x] **Staged restore (`restoreBundle`).** The bundle is verified and unpacked into a hidden staging folder
+  first. Checks, all before anything live changes: manifest present and well formed; every entry listed
+  and every listed entry present; names confined to `database.db` and `files/<known folder>/...`
+  (no `..`, empty segments, backslashes, control characters or absolute paths); each file's size and
+  SHA-256 verified while unpacking, with the read capped one byte past the declared size; enough free
+  disk for the declared total; then the usual database integrity check.
+- [x] **Swap with rollback.** Current document folders are moved aside to `pre-restore-<time>-files/`
+  (never deleted), the staged folders move in, then the database is swapped last through the existing
+  `restoreDatabase`. Any failure undoes the folder moves newest-first.
+- [x] **UI.** Admin → "Full Backup (.zip)" and "Restore Backup (.zip / .db)". A `.db` from before this pass
+  still restores, database only. The confirmation text says which parts each kind restores. No new
+  translation keys (existing values reworded), so the count stays 811.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **103 / 103** across 31 classes (+9 in `BackupBundleTest`). Two
+mutation checks confirmed the tests can fail: removing the checksum and name checks broke the tamper and
+traversal tests, and removing the rollback call broke the post-swap failure test.
+
+### Known limits
+
+- Backups are not encrypted; the zip holds invoices, mail and customer data and should be stored as
+  carefully as the live data folder.
+- `pre-restore-*` copies (database and documents) accumulate. Nothing prunes them yet.
+- The database snapshot is taken first, then the folders are read. A document saved in between can be
+  in the zip without a row, which is harmless. A file deleted while the zip is being written fails the
+  backup instead of being skipped. The backup does not cross-check rows against files, so a row whose
+  file was already missing before the backup stays missing after a restore.
+- Restore is meant for an idle application on a single workstation; it does not coordinate with other
+  running instances.
+- `AdminView` button flow is verified by compiling and reading only, not by a UI test.
 
 ---
 
@@ -247,10 +292,7 @@ These remain open. They are product work, not cleanup. Passes 2 and 3 only prepa
 
 - [ ] Picking by order and shelf, with aisle-sorted pick lists and scanned/total progress.
 - [ ] Stocktake sessions plus explicit damage, quarantine and reweighing operations.
-- [ ] Backup and restore as one validated bundle (SQLite + invoice PDFs + receipts + mail
-      attachments). Pass 2 made the SQLite half safe (integrity-checked, atomic swap) and pass 3
-      gave attachments one directory to include; the bundle itself and restoring while the app is
-      idle remain open.
+- [x] Backup and restore as one validated bundle — done in pass 4, see below.
 - [ ] Separate demo seeding from real first-run onboarding.
 - [ ] Explicit draft / issue / correction steps in finance.
 - [ ] Measure scan-to-feedback and refresh latency under representative data volumes.

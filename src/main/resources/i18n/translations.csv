@@ -211,9 +211,9 @@ admin.user.reset_pw,Reset Password (Optional),Jelszó visszaállítása (opcion�
 admin.user.edit_hint,Double-click a user or press Enter to edit.,Szerkesztés dupla kattintással vagy az Enter billentyűvel.
 admin.user.edit_denied,You do not have permission to edit this account.,Ehhez a fiókhoz nincs szerkesztési jogosultsága.
 admin.user.cannot_disable_self,You cannot deactivate your own active admin account.,Saját aktív admin fiókját nem inaktiválhatja.
-admin.db.backup,Backup Database (.db),Adatbázis mentése (.db)
-admin.db.restore,Restore Database (.db),Adatbázis visszaállítása (.db)
-admin.db.restore_confirm,Replace the active database with this backup file? A safety copy of current data will be saved first.,Lecseréli az aktív adatbázist erre a mentésre? A jelenlegi adatról biztonsági mentés készül.
+admin.db.backup,Full Backup (.zip),Teljes mentés (.zip)
+admin.db.restore,Restore Backup (.zip / .db),Mentés visszaállítása (.zip / .db)
+admin.db.restore_confirm,"Replace the current data with this backup? A .zip restores the database and all invoice, receipt and mail files; a .db restores the database only. The current data is kept aside first.","Lecseréli a jelenlegi adatot erre a mentésre? A .zip az adatbázist és minden számla-, nyugta- és levélfájlt visszaállítja; a .db csak az adatbázist. A jelenlegi adat előbb félre kerül."
 admin.db.restored,Database restored successfully. You will now be signed out so the restored data can load.,"Adatbázis sikeresen visszaállítva. Most kijelentkeztetjük, hogy a visszaállított adatok betöltődjenek."
 admin.i18n.export,Export translations.csv,translations.csv exportálása
 admin.i18n.reload,Load External translations.csv,Külső translations.csv betöltése

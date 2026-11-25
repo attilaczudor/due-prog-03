@@ -8,6 +8,7 @@ import hu.due.rewear.model.Role;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.User;
+import hu.due.rewear.service.BackupService;
 import hu.due.rewear.util.BusinessClock;
 
 import javax.swing.AbstractAction;
@@ -485,13 +486,13 @@ public final class AdminView extends JPanel implements NavigableView {
     private void handleBackupDb() {
         I18nManager i18n = ctx.getI18n();
         JFileChooser chooser = new JFileChooser();
-        chooser.setFileFilter(new FileNameExtensionFilter("SQLite Database (*.db)", "db"));
-        chooser.setSelectedFile(new File("rewear-backup-" + FILE_TS.format(BusinessClock.now()) + ".db"));
+        chooser.setFileFilter(new FileNameExtensionFilter("ReWear backup (*.zip)", "zip"));
+        chooser.setSelectedFile(new File("rewear-backup-" + FILE_TS.format(BusinessClock.now()) + ".zip"));
         if (chooser.showSaveDialog(this) != JFileChooser.APPROVE_OPTION) return;
         File file = chooser.getSelectedFile();
-        Path target = file.getName().toLowerCase().endsWith(".db") ? file.toPath() : Path.of(file.getAbsolutePath() + ".db");
+        Path target = file.getName().toLowerCase().endsWith(".zip") ? file.toPath() : Path.of(file.getAbsolutePath() + ".zip");
         try {
-            ctx.getBackupService().backupDatabase(target);
+            ctx.getBackupService().backupBundle(target);
             JOptionPane.showMessageDialog(this, i18n.t("print.exported", target.toAbsolutePath()),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
@@ -502,7 +503,7 @@ public final class AdminView extends JPanel implements NavigableView {
     private void handleRestoreDb() {
         I18nManager i18n = ctx.getI18n();
         JFileChooser chooser = new JFileChooser();
-        chooser.setFileFilter(new FileNameExtensionFilter("SQLite Database (*.db)", "db"));
+        chooser.setFileFilter(new FileNameExtensionFilter("ReWear backup (*.zip, *.db)", "zip", "db"));
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
 
         if (JOptionPane.showConfirmDialog(this, i18n.t("admin.db.restore_confirm"),
@@ -510,7 +511,14 @@ public final class AdminView extends JPanel implements NavigableView {
             return;
         }
         try {
-            ctx.getBackupService().restoreDatabase(chooser.getSelectedFile().toPath());
+            Path chosen = chooser.getSelectedFile().toPath();
+            // A .zip is a full backup (database and documents); a bare .db from an older version
+            // restores the database only and leaves the document folders as they are.
+            if (BackupService.isBundle(chosen)) {
+                ctx.getBackupService().restoreBundle(chosen);
+            } else {
+                ctx.getBackupService().restoreDatabase(chosen);
+            }
             new SchemaInitializer(ctx.getDatabaseManager()).initialize();
             JOptionPane.showMessageDialog(this, i18n.t("admin.db.restored"),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
