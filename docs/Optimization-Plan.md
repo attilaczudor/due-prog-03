@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -238,8 +238,8 @@ file handling, backup and restore, stock reservation, credit notes and time hand
 ### Documentation numbers to carry into the Hungarian reports
 
 Deferred with the rest of the submission documents, but the figures are now:
-**837** translation keys (reports say 810), **170** main Java sources (Programterv says 161),
-**34** test classes (says 24), **120** tests (says 62), **170** main sources, **837** translation keys (reports say 810; passes 5 and 6 added 26).
+**837** translation keys (reports say 810), **172** main Java sources (Programterv says 161), **42** tables and **24** indexes (reports say 41 and 23),
+**35** test classes (says 24), **127** tests (says 62), **172** main sources, **837** translation keys (reports say 810; passes 5 and 6 added 26), **42** tables, **24** indexes.
 
 ---
 
@@ -387,6 +387,58 @@ text; the test now uses `2` and `10`, and the mutation fails as it should.
 
 ---
 
+## Pass 7 — invoice lifecycle (25 November 2026)
+
+### What was wrong
+
+`InvoiceService.changeStatus` accepted any move between any two statuses, and the invoice dialog offered
+all five in a drop-down. In practice that allowed:
+
+- Setting an **issued invoice back to DRAFT**. A draft's lines and amounts are regenerated from its order,
+  so saving the order again would silently rewrite figures the customer had already received.
+- **Cancelling by hand**, which skipped the credit note, so a cancelled invoice had nothing reversing it
+  in the ledger.
+- Reopening a **cancelled** invoice, changing a **credit note's** status, and **withdrawing the payment**
+  of an invoice a credit note had already reversed (leaving the credit note's cash movement unmatched).
+- No record of who did any of it. Duplicate credit-note detection also read the first line of an item's
+  text instead of a real link.
+
+### Built
+
+- [x] **`InvoiceLifecycle`.** The only hand moves: DRAFT to ISSUED, ISSUED or OVERDUE to PAID, PAID back to
+  ISSUED. Never back to DRAFT, never to CANCELLED (only a credit note does that), OVERDUE is set by the
+  due date, CANCELLED and credit notes are final, and a PAID invoice with a credit note stays paid.
+  Refusals say what to do instead (for example "correct it with a credit note").
+- [x] **`changeStatus(id, target, userId)`** enforces it in one transaction and records an event. Issuing a
+  draft stamps today as the issue date, keeps the payment terms (days between issue and due), and refreshes
+  the archived PDF; the archive of an already issued invoice is never rewritten. The old two-argument form
+  is gone, so no caller can skip the user.
+- [x] **Audit trail.** New table `invoice_events` (issued, paid, payment withdrawn, credit note issued, credit
+  note for) with the acting user and time; `InvoiceService.history(id)`.
+- [x] **Structured credit-note link.** New column `invoices.credit_for_invoice_id`, set when a credit note is
+  issued and used by the duplicate check. Older credit notes are linked once on startup by reading their
+  `CREDIT NOTE [Ref: ...]` prefix; the old text check remains as a fallback.
+- [x] **UI.** The status drop-down lists only the current state and the moves allowed from it, and the
+  Apply button is disabled when there are none.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **127 / 127** across 35 classes (+7 `InvoiceLifecycleTest`, including a
+test of every status against every target). Three mutation checks all failed as they should: disabling the
+guard (4 failures), allowing withdrawal after a credit note, and skipping the legacy backfill.
+
+### Not done
+
+- There is no role check in the service: any signed-in user who can open the invoice dialog can mark paid
+  or issue a credit note. The screen's visibility is the only gate.
+- The history is stored and tested but not shown anywhere in the UI yet.
+- Invoice numbers are still assigned when a draft is created, not when it is issued, so drafts issued out
+  of order produce numbers that do not follow issue dates; a draft that is abandoned leaves a gap.
+- The dialog change was checked by compiling only, not by clicking through it.
+- Money is still stored as SQLite REAL (rounded before storage); moving to integer minor units remains open.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
@@ -395,7 +447,7 @@ These remain open. They are product work, not cleanup. Passes 2 and 3 only prepa
 - [ ] Stocktake sessions plus explicit damage, quarantine and reweighing operations.
 - [x] Backup and restore as one validated bundle — done in pass 4, see below.
 - [x] Separate demo seeding from real first-run onboarding — done in pass 5, see below.
-- [ ] Explicit draft / issue / correction steps in finance.
+- [x] Explicit draft / issue / correction steps in finance — done in pass 7, see below.
 - [ ] Measure scan-to-feedback and refresh latency under representative data volumes.
 
 ---

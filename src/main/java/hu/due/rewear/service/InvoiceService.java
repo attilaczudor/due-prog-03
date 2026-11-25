@@ -15,6 +15,7 @@ import hu.due.rewear.model.FinancialSummary;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
+import hu.due.rewear.model.InvoiceEvent;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
@@ -38,6 +39,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Set;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Locale;
@@ -427,6 +429,11 @@ public final class InvoiceService {
 
     private Invoice saveWithDocuments(DatabaseManager.SqlFunction<Long> save, boolean refreshDraft,
                                       ReceiptVaultService receipts, Path attachment) {
+        return saveWithDocuments(save, refreshDraft, receipts, attachment, false);
+    }
+
+    private Invoice saveWithDocuments(DatabaseManager.SqlFunction<Long> save, boolean refreshDraft,
+                                      ReceiptVaultService receipts, Path attachment, boolean rewritePdf) {
         var files = new StoredDocuments();
         Invoice result;
         try {
@@ -441,7 +448,8 @@ public final class InvoiceService {
                         }
                     }
                     String previous = invoiceDao.findArchivedPdfPath(conn, id);
-                    if (archive.resolve(previous).isEmpty() || (refreshDraft && invoice.status() == InvoiceStatus.DRAFT)) {
+                    if (archive.resolve(previous).isEmpty() || rewritePdf
+                            || (refreshDraft && invoice.status() == InvoiceStatus.DRAFT)) {
                         files.pdf = archive.store(invoice, invoiceDao.findItemsByInvoiceId(conn, id));
                         invoiceDao.setArchivedPdfPath(conn, id, files.pdf);
                         files.previousPdf = previous;
@@ -498,8 +506,8 @@ public final class InvoiceService {
             if (orig.status() == InvoiceStatus.CANCELLED) {
                 throw new IllegalStateException("Invoice " + orig.invoiceNumber() + " is already cancelled.");
             }
-            String refPrefix = "CREDIT NOTE [Ref: " + orig.invoiceNumber() + "] — ";
-            if (invoiceDao.hasCreditNote(conn, refPrefix)) {
+            String refPrefix = creditNoteReference(orig);
+            if (invoiceDao.hasCreditNoteFor(conn, originalInvoiceId, refPrefix)) {
                 throw new IllegalStateException("Invoice " + orig.invoiceNumber() + " already has a credit note.");
             }
             List<InvoiceItem> origItems = invoiceDao.findItemsByInvoiceId(conn, originalInvoiceId);
@@ -521,6 +529,11 @@ public final class InvoiceService {
                     orig.netAmount(), orig.vatRate(), orig.effectiveTaxTypeCode(),
                     orig.vatAmount(), orig.grossAmount(), orig.effectiveCurrencyCode(),
                     orig.exchangeRate(), userId, BusinessClock.now());
+            invoiceDao.setCreditFor(conn, id, originalInvoiceId);
+            invoiceDao.insertEvent(conn, originalInvoiceId, "CREDIT_NOTE_ISSUED", orig.status(),
+                    wasPaid ? orig.status() : InvoiceStatus.CANCELLED, cnNo, userId, BusinessClock.now());
+            invoiceDao.insertEvent(conn, id, "CREDIT_NOTE_FOR", null, cnStatus, orig.invoiceNumber(), userId,
+                    BusinessClock.now());
             if (origItems.isEmpty()) {
                 invoiceDao.insertItem(conn, id, refPrefix + orig.category().name(),
                         BigDecimal.ONE, "db", orig.netAmount(), orig.netAmount());
@@ -536,15 +549,55 @@ public final class InvoiceService {
         return created;
     }
 
-    public Invoice changeStatus(long invoiceId, InvoiceStatus targetStatus) {
-        Invoice existing = invoiceDao.findById(invoiceId)
-                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invoiceId));
-        LocalDate paidDate = targetStatus == InvoiceStatus.PAID
-                ? (existing.paidDate() != null ? existing.paidDate() : BusinessClock.today())
-                : null;
-        invoiceDao.updateStatus(invoiceId, targetStatus, paidDate);
-        LOG.info("Invoice {} status changed {} -> {}", existing.invoiceNumber(), existing.status(), targetStatus);
-        return invoiceDao.findById(invoiceId).orElseThrow();
+    /**
+     * Moves an invoice along its lifecycle (see {@link InvoiceLifecycle}) and records who did it.
+     * <p>
+     * Issuing a draft sets its issue date to today and keeps its payment terms (the number of days between
+     * issue and due date), then refreshes the archived PDF so the stored document shows the real issue date.
+     */
+    public Invoice changeStatus(long invoiceId, InvoiceStatus targetStatus, long userId) {
+        // Only a draft's stored PDF is rewritten (to carry its real issue date); an issued invoice's archive is never touched.
+        boolean wasDraft = invoiceDao.findById(invoiceId).map(i -> i.status() == InvoiceStatus.DRAFT).orElse(false);
+        Invoice changed = saveWithDocuments(conn -> {
+            Invoice existing = invoiceDao.findById(conn, invoiceId)
+                    .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + invoiceId));
+            boolean reversed = invoiceDao.hasCreditNoteFor(conn, invoiceId, creditNoteReference(existing));
+            InvoiceLifecycle.require(existing, targetStatus, reversed);
+
+            LocalDate today = BusinessClock.today();
+            LocalDate paidDate = targetStatus == InvoiceStatus.PAID
+                    ? (existing.paidDate() != null ? existing.paidDate() : today)
+                    : null;
+            String event = targetStatus == InvoiceStatus.PAID ? "PAID"
+                    : targetStatus == InvoiceStatus.ISSUED && existing.status() == InvoiceStatus.PAID ? "PAYMENT_WITHDRAWN"
+                    : "ISSUED";
+            if (existing.status() == InvoiceStatus.DRAFT) {
+                long termDays = Math.max(0, java.time.temporal.ChronoUnit.DAYS.between(existing.issueDate(), existing.dueDate()));
+                invoiceDao.updateIssueDates(conn, invoiceId, today, today.plusDays(termDays));
+            }
+            invoiceDao.updateStatus(conn, invoiceId, targetStatus, paidDate);
+            invoiceDao.insertEvent(conn, invoiceId, event, existing.status(), targetStatus, null, userId,
+                    BusinessClock.now());
+            return invoiceId;
+        }, false, null, null, wasDraft);
+        LOG.info("Invoice {} status changed to {} by user {}", changed.invoiceNumber(), targetStatus, userId);
+        return changed;
+    }
+
+    /** The invoice's lifecycle events, oldest first. */
+    public List<InvoiceEvent> history(long invoiceId) {
+        return invoiceDao.findEvents(invoiceId);
+    }
+
+    /** Statuses the invoice may be moved to by hand right now, current one excluded. */
+    public Set<InvoiceStatus> allowedStatusChanges(Invoice invoice) {
+        boolean reversed = db.executeInTransaction(conn ->
+                invoiceDao.hasCreditNoteFor(conn, invoice.id(), creditNoteReference(invoice)));
+        return InvoiceLifecycle.allowedTargets(invoice, reversed);
+    }
+
+    private static String creditNoteReference(Invoice original) {
+        return "CREDIT NOTE [Ref: " + original.invoiceNumber() + "] — ";
     }
 
     /** Automatically flags all past-due {@code ISSUED} invoices as {@code OVERDUE} relative to today. */

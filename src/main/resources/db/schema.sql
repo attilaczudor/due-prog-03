@@ -258,6 +258,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     exchange_rate REAL NOT NULL DEFAULT 400.0 CHECK (exchange_rate > 0),
     attachment_path TEXT,
     archived_pdf_path TEXT,
+    credit_for_invoice_id INTEGER REFERENCES invoices(id) ON DELETE SET NULL,
     created_by INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
@@ -276,6 +277,21 @@ CREATE TABLE IF NOT EXISTS invoice_items (
     line_net REAL NOT NULL CHECK (line_net >= 0),
     FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
 );
+
+-- 14b. Invoice lifecycle audit trail: who issued, marked paid, un-paid or reversed an invoice, and when
+CREATE TABLE IF NOT EXISTS invoice_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    invoice_id INTEGER NOT NULL,
+    event_type TEXT NOT NULL,
+    from_status TEXT,
+    to_status TEXT,
+    note TEXT,
+    user_id INTEGER,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (invoice_id) REFERENCES invoices(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_invoice_events_invoice ON invoice_events(invoice_id);
 
 -- 15. User Email Mailboxes (External SMTP/IMAP & Internal Company Mail)
 CREATE TABLE IF NOT EXISTS emails (

@@ -117,6 +117,8 @@ public final class SchemaInitializer {
         addColumnIfMissing(conn, "invoices", "tax_type_code", "TEXT");
         addColumnIfMissing(conn, "invoices", "attachment_path", "TEXT");
         addColumnIfMissing(conn, "invoices", "archived_pdf_path", "TEXT");
+        addColumnIfMissing(conn, "invoices", "credit_for_invoice_id", "INTEGER REFERENCES invoices(id) ON DELETE SET NULL");
+        linkLegacyCreditNotes(conn);
 
         // 4. Infer country_code for existing non-Hungarian customers & backfill tax_type_code on existing invoices
         if (addedPartnerCountry) {
@@ -191,6 +193,25 @@ public final class SchemaInitializer {
                     ps.executeUpdate();
                 }
             }
+        }
+    }
+
+    /**
+     * Credit notes written before invoices carried a structured link identified their original only by a
+     * "CREDIT NOTE [Ref: INV-...] — " prefix on the first line. Resolve that once into the real link so
+     * the duplicate check no longer depends on parsing text. Idempotent and cheap on later starts.
+     */
+    private void linkLegacyCreditNotes(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement()) {
+            stmt.execute("""
+                    UPDATE invoices SET credit_for_invoice_id = (
+                        SELECT orig.id FROM invoice_items li
+                        JOIN invoices orig ON orig.invoice_number =
+                             substr(li.description, 19, instr(li.description, ']') - 19)
+                        WHERE li.invoice_id = invoices.id AND instr(li.description, 'CREDIT NOTE [Ref: ') = 1
+                        LIMIT 1)
+                    WHERE category = 'CREDIT_NOTE' AND credit_for_invoice_id IS NULL
+                    """);
         }
     }
 

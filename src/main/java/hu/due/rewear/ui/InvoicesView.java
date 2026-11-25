@@ -513,9 +513,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
         body.add(new JScrollPane(itemsTable), BorderLayout.CENTER);
 
         var status = new JComboBox<StatusChoice>();
-        for (InvoiceStatus value : InvoiceStatus.values()) {
-            status.addItem(new StatusChoice(value, i18n.t("status.invoice." + value.name())));
-        }
         var apply = new JButton(i18n.t("invoice.status_update"));
         var preview = new JButton(i18n.t("invoice.preview_btn"));
         var reminder = new JButton(i18n.t("invoice.reminder.btn"));
@@ -546,7 +543,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
         java.util.function.Supplier<Invoice> find = () -> ctx.getInvoiceDao().findById(selected.id()).orElse(selected);
         Runnable refreshActions = () -> {
             Invoice invoice = find.get();
-            status.setSelectedIndex(invoice.status().ordinal());
+            // Offer only the moves the invoice lifecycle allows from here, plus the current state as the resting choice.
+            status.removeAllItems();
+            StatusChoice current = new StatusChoice(invoice.status(), i18n.t("status.invoice." + invoice.status().name()));
+            status.addItem(current);
+            var allowed = ctx.getInvoiceService().allowedStatusChanges(invoice);
+            for (InvoiceStatus value : InvoiceStatus.values()) {
+                if (allowed.contains(value)) {
+                    status.addItem(new StatusChoice(value, i18n.t("status.invoice." + value.name())));
+                }
+            }
+            status.setSelectedItem(current);
+            status.setEnabled(!allowed.isEmpty());
+            apply.setEnabled(!allowed.isEmpty());
             reminder.setEnabled(invoice.direction() == InvoiceDirection.OUTGOING
                     && (invoice.status() == InvoiceStatus.ISSUED || invoice.status() == InvoiceStatus.OVERDUE));
             credit.setEnabled(invoice.category() != InvoiceCategory.CREDIT_NOTE
@@ -694,7 +703,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
     private void handleStatusUpdate(Window owner, Invoice inv, InvoiceStatus status) {
         if (inv.status() == status) return;
         try {
-            ctx.getInvoiceService().changeStatus(inv.id(), status);
+            ctx.getInvoiceService().changeStatus(inv.id(), status, ctx.getSession().requireCurrentUser().id());
             refreshDataSelecting(inv.id());
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(owner, ex.getMessage(),

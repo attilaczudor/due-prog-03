@@ -201,11 +201,11 @@ class InvoiceAndReversibleOrderTest {
         assertEquals(InvoiceStatus.ISSUED, expense.status());
 
         // Mark paid then revert back to ISSUED
-        Invoice paid = ctx.getInvoiceService().changeStatus(expense.id(), InvoiceStatus.PAID);
+        Invoice paid = ctx.getInvoiceService().changeStatus(expense.id(), InvoiceStatus.PAID, userId);
         assertEquals(InvoiceStatus.PAID, paid.status());
         assertNotNull(paid.paidDate());
 
-        Invoice reverted = ctx.getInvoiceService().changeStatus(expense.id(), InvoiceStatus.ISSUED);
+        Invoice reverted = ctx.getInvoiceService().changeStatus(expense.id(), InvoiceStatus.ISSUED, userId);
         assertEquals(InvoiceStatus.ISSUED, reverted.status());
         assertNull(reverted.paidDate());
 

@@ -4,6 +4,7 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.Invoice;
 import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
+import hu.due.rewear.model.InvoiceEvent;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.util.BusinessClock;
@@ -171,6 +172,78 @@ public final class InvoiceDao {
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
+        }
+    }
+
+    /** True when a credit note already reverses this invoice, by structured link or by the legacy text prefix. */
+    public boolean hasCreditNoteFor(Connection conn, long originalInvoiceId, String legacyReferencePrefix) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "SELECT 1 FROM invoices WHERE category = 'CREDIT_NOTE' AND credit_for_invoice_id = ? LIMIT 1")) {
+            ps.setLong(1, originalInvoiceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return true;
+                }
+            }
+        }
+        return hasCreditNote(conn, legacyReferencePrefix);
+    }
+
+    public void setCreditFor(Connection conn, long creditNoteId, long originalInvoiceId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("UPDATE invoices SET credit_for_invoice_id = ? WHERE id = ?")) {
+            ps.setLong(1, originalInvoiceId);
+            ps.setLong(2, creditNoteId);
+            ps.executeUpdate();
+        }
+    }
+
+    public void updateIssueDates(Connection conn, long invoiceId, LocalDate issueDate, LocalDate dueDate) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("UPDATE invoices SET issue_date = ?, due_date = ? WHERE id = ?")) {
+            ps.setString(1, issueDate.toString());
+            ps.setString(2, dueDate.toString());
+            ps.setLong(3, invoiceId);
+            ps.executeUpdate();
+        }
+    }
+
+    public void insertEvent(Connection conn, long invoiceId, String eventType, InvoiceStatus from, InvoiceStatus to,
+                            String note, long userId, LocalDateTime at) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                INSERT INTO invoice_events (invoice_id, event_type, from_status, to_status, note, user_id, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """)) {
+            ps.setLong(1, invoiceId);
+            ps.setString(2, eventType);
+            ps.setString(3, from == null ? null : from.name());
+            ps.setString(4, to == null ? null : to.name());
+            ps.setString(5, note);
+            ps.setLong(6, userId);
+            ps.setString(7, DaoDateUtil.format(at));
+            ps.executeUpdate();
+        }
+    }
+
+    /** The invoice's lifecycle events, oldest first. */
+    public List<InvoiceEvent> findEvents(long invoiceId) {
+        String sql = """
+                SELECT e.id, e.invoice_id, e.event_type, e.from_status, e.to_status, e.note, u.full_name, e.created_at
+                FROM invoice_events e LEFT JOIN users u ON u.id = e.user_id
+                WHERE e.invoice_id = ? ORDER BY e.id
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, invoiceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<InvoiceEvent> events = new ArrayList<>();
+                while (rs.next()) {
+                    events.add(new InvoiceEvent(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4),
+                            rs.getString(5), rs.getString(6), rs.getString(7),
+                            LocalDateTime.parse(rs.getString(8).replace(' ', 'T'))));
+                }
+                return events;
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to load invoice events: " + invoiceId, e);
         }
     }
 
