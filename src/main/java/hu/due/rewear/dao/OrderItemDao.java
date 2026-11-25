@@ -25,6 +25,14 @@ public final class OrderItemDao {
     }
 
     public List<OrderItem> findByOrderId(long orderId) {
+        try (Connection conn = db.getConnection()) {
+            return findByOrderId(conn, orderId);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to list items for order: " + orderId, e);
+        }
+    }
+
+    public List<OrderItem> findByOrderId(Connection conn, long orderId) throws SQLException {
         String sql = """
                 SELECT oi.id, oi.order_id, oi.package_id, ip.qr_code,
                        (tg.name_en || ' | ' || gt.name_en || ' | ' || qg.name_en || ' | ' || pt.name_en) AS summary_en,
@@ -41,8 +49,7 @@ public final class OrderItemDao {
                 WHERE oi.order_id = ?
                 ORDER BY oi.id
                 """;
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, orderId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<OrderItem> list = new ArrayList<>();
@@ -63,8 +70,14 @@ public final class OrderItemDao {
                 }
                 return list;
             }
-        } catch (SQLException e) {
-            throw new DaoException("Failed to list items for order: " + orderId, e);
+        }
+    }
+
+    public void clearHandoverScans(Connection conn, long orderId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(
+                "UPDATE order_items SET handover_scanned = 0 WHERE order_id = ? AND handover_scanned = 1")) {
+            ps.setLong(1, orderId);
+            ps.executeUpdate();
         }
     }
 

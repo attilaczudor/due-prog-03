@@ -21,19 +21,13 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSlider;
-import javax.swing.JTextArea;
-import javax.swing.JTextField;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Color;
-import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
 import java.awt.RenderingHints;
 import java.awt.Window;
 import java.awt.event.ComponentAdapter;
@@ -45,9 +39,6 @@ import java.awt.print.Printable;
 import java.awt.print.PrinterException;
 import java.awt.print.PrinterJob;
 import java.io.File;
-import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
@@ -431,100 +422,25 @@ public final class DocumentPreviewDialog extends JDialog {
             return;
         }
 
-        // Export each selected document cleanly into ./exports/ off the EDT so 250 DPI PDF renders stay responsive
-        Path exportDir = AppPaths.resolveAppBaseDir().resolve("exports");
+        Path exportDir = AppPaths.exportsDir();
         List<DocumentPageSource> snapshot = List.copyOf(selected);
+        StringBuilder body = new StringBuilder("ReWear WMS — ").append(defaultSubject).append("\n\n");
+        for (DocumentPageSource source : snapshot) {
+            body.append("- ").append(source.getDisplayTitle()).append('\n');
+        }
         AsyncUiRunner.run(this,
                 () -> {
                     Files.createDirectories(exportDir);
-                    List<Path> exported = new ArrayList<>();
-                    for (DocumentPageSource src : snapshot) {
-                        Path out = exportDir.resolve(src.getDefaultFileName());
-                        InvoicePdfExporter.exportCombined(List.of(src), out);
-                        exported.add(out);
-                    }
-                    return exported;
+                    Path batch = Files.createTempDirectory(exportDir, "mail-");
+                    String filename = snapshot.size() == 1 ? snapshot.get(0).getDefaultFileName()
+                            : i18n.t("docpreview.email.bundle_filename") + ".pdf";
+                    Path pdf = batch.resolve(filename).toAbsolutePath();
+                    InvoicePdfExporter.exportCombined(snapshot, pdf);
+                    return pdf;
                 },
-                exportedFiles -> showEmailComposerDialog(snapshot, exportDir, exportedFiles),
+                pdf -> EmailComposeDialog.show(this, ctx, defaultEmail, "", defaultSubject, body.toString(), pdf, () -> { }),
                 ex -> JOptionPane.showMessageDialog(this, ex.getMessage(),
                         i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
-    }
-
-    private void showEmailComposerDialog(List<DocumentPageSource> selected, Path exportDir, List<Path> exportedFiles) {
-        I18nManager i18n = ctx.getI18n();
-
-        JTextField toField = new JTextField(defaultEmail, 28);
-        JTextField subjectField = new JTextField(defaultSubject, 28);
-        StringBuilder defaultBody = new StringBuilder();
-        defaultBody.append("ReWear WMS — ").append(defaultSubject).append("\n\n");
-        for (DocumentPageSource src : selected) {
-            defaultBody.append("- ").append(src.getDisplayTitle()).append("\n");
-        }
-        JTextArea bodyArea = new JTextArea(defaultBody.toString(), 5, 28);
-        bodyArea.setLineWrap(true);
-        bodyArea.setWrapStyleWord(true);
-
-        StringBuilder fileList = new StringBuilder();
-        for (Path p : exportedFiles) {
-            fileList.append(p.getFileName()).append("  ");
-        }
-
-        JPanel form = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(5, 4, 5, 6);
-        gbc.anchor = GridBagConstraints.WEST;
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-
-        gbc.gridx = 0; gbc.gridy = 0; gbc.weightx = 0;
-        form.add(new JLabel(i18n.t("docpreview.email.to") + ":"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        form.add(toField, gbc);
-
-        gbc.gridx = 0; gbc.gridy = 1; gbc.weightx = 0;
-        form.add(new JLabel(i18n.t("docpreview.email.subject") + ":"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        form.add(subjectField, gbc);
-
-        gbc.gridx = 0; gbc.gridy = 2; gbc.weightx = 0; gbc.anchor = GridBagConstraints.NORTHWEST;
-        form.add(new JLabel(i18n.t("docpreview.email.body") + ":"), gbc);
-        gbc.gridx = 1; gbc.weightx = 1;
-        form.add(new JScrollPane(bodyArea), gbc);
-
-        gbc.gridx = 0; gbc.gridy = 3; gbc.gridwidth = 2;
-        form.add(new JLabel(i18n.t("docpreview.email.attachments") + " " + fileList), gbc);
-
-        int res = JOptionPane.showConfirmDialog(this, form, i18n.t("docpreview.email.title"),
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE);
-        if (res != JOptionPane.OK_OPTION) {
-            return;
-        }
-
-        try {
-            if (Desktop.isDesktopSupported()) {
-                Desktop desktop = Desktop.getDesktop();
-                if (desktop.isSupported(Desktop.Action.MAIL)) {
-                    String to = encodeMailto(toField.getText().trim());
-                    String subj = encodeMailto(subjectField.getText().trim());
-                    String body = encodeMailto(bodyArea.getText().trim());
-                    URI mailto = new URI("mailto:" + to + "?subject=" + subj + "&body=" + body);
-                    desktop.mail(mailto);
-                }
-                if (desktop.isSupported(Desktop.Action.OPEN)) {
-                    desktop.open(exportDir.toFile());
-                }
-            }
-            JOptionPane.showMessageDialog(this,
-                    i18n.t("docpreview.email.opened", exportDir.toAbsolutePath()),
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this,
-                    i18n.t("docpreview.email.opened", exportDir.toAbsolutePath()) + "\n(" + ex.getMessage() + ")",
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-        }
-    }
-
-    private static String encodeMailto(String s) {
-        return URLEncoder.encode(s == null ? "" : s, StandardCharsets.UTF_8).replace("+", "%20");
     }
 
     private final class A4Canvas extends JPanel {

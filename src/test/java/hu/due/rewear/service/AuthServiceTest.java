@@ -15,6 +15,7 @@ import java.nio.file.Path;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AuthServiceTest {
@@ -114,7 +115,6 @@ class AuthServiceTest {
                 "superadmin",
                 "Czudor",
                 "Attila",
-                "attila@rewear.hu",
                 "+36 30 555 0199",
                 fakePng,
                 operatorRoleId
@@ -124,10 +124,10 @@ class AuthServiceTest {
         assertEquals("Czudor", updated.safeLastName());
         assertEquals("Attila", updated.safeFirstName());
         assertEquals("Czudor Attila", updated.fullName());
-        assertEquals("attila@rewear.hu", updated.email());
+        assertEquals(superLogin.user().email(), updated.email());
         assertEquals("+36 30 555 0199", updated.phone());
         assertEquals(fakePng.length, updated.avatarPng().length);
-        assertEquals("attila@rewear.hu", session.requireCurrentUser().email());
+        assertEquals(superLogin.user().email(), session.requireCurrentUser().email());
 
         // Verify separate Admin account has its own non-SuperAdmin identity and can change handle safely
         authService.logout();
@@ -145,12 +145,46 @@ class AuthServiceTest {
                 "@gabor.szabo",
                 "Szabó",
                 "Gábor",
-                "gabor@rewear.hu",
                 null,
                 null,
                 null
         );
         assertEquals("gabor.szabo", renamedAdmin.username());
+        assertEquals(adminLogin.user().email(), renamedAdmin.email());
         assertEquals("gabor.szabo", session.requireCurrentUser().username());
+    }
+
+    @Test
+    void managedUserEditsEnforceEmailAndPasswordPermissions() {
+        var operator = userDao.findByUsername("operator").orElseThrow();
+        var superAdmin = userDao.findByUsername("superadmin").orElseThrow();
+        var operatorRole = roleDao.findByCode(RoleCode.OPERATOR).orElseThrow();
+        var superAdminRole = roleDao.findByCode(RoleCode.SUPER_ADMIN).orElseThrow();
+
+        session.login(operator);
+        assertThrows(IllegalArgumentException.class, () -> authService.updateManagedUser(
+                operator.id(), "Changed", "Name", operatorRole, true, null, null, "newPassword".toCharArray()));
+
+        session.login(userDao.findByUsername("admin").orElseThrow());
+        assertThrows(IllegalArgumentException.class, () -> authService.updateManagedUser(
+                operator.id(), "Changed", "Name", operatorRole, true, null, "alternate@example.test", new char[0]));
+        assertThrows(IllegalArgumentException.class, () -> authService.updateManagedUser(
+                superAdmin.id(), superAdmin.safeLastName(), superAdmin.safeFirstName(), superAdminRole, true,
+                null, null, "newPassword".toCharArray()));
+
+        session.login(superAdmin);
+        assertThrows(IllegalArgumentException.class, () -> authService.updateManagedUser(
+                operator.id(), "Changed", "Name", operatorRole, true, null, "alternate@example.test",
+                "short".toCharArray()));
+        var unchanged = userDao.findById(operator.id()).orElseThrow();
+        assertEquals(operator.email(), unchanged.email());
+        assertEquals(operator.fullName(), unchanged.fullName());
+        assertEquals(operator.passwordHash(), unchanged.passwordHash());
+
+        authService.updateManagedUser(operator.id(), operator.safeLastName(), operator.safeFirstName(),
+                operatorRole, true, operator.assignedStationId(), "alternate@example.test",
+                "newPassword".toCharArray());
+        assertEquals("alternate@example.test", userDao.findById(operator.id()).orElseThrow().email());
+        assertTrue(authService.login("operator", "newPassword".toCharArray()).isSuccess());
     }
 }

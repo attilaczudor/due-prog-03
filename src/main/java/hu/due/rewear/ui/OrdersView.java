@@ -7,8 +7,6 @@ import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.InventoryPackage;
-import hu.due.rewear.model.Invoice;
-import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
@@ -43,6 +41,7 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.math.BigDecimal;
 import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
@@ -60,6 +59,8 @@ public final class OrdersView extends JPanel implements NavigableView {
 
     // Top bar
     private final JButton newOrderBtn = new JButton();
+    private final JButton importWebshopBtn = new JButton();
+    private final JButton requestedProductsBtn = new JButton();
 
     // Left: Orders list
     private final DefaultTableModel ordersModel = BrutalistStyle.nonEditableTableModel();
@@ -119,6 +120,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     private void buildUi() {
         JPanel topBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         topBar.add(newOrderBtn);
+        topBar.add(importWebshopBtn);
         add(topBar, BorderLayout.NORTH);
 
         // Left Orders Table
@@ -145,6 +147,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         scanBarPanel.add(scanQrField);
         scanBarPanel.add(scanAddBtn);
         scanBarPanel.add(pickStockBtn);
+        scanBarPanel.add(requestedProductsBtn);
         scanBarPanel.add(editPriceBtn);
         scanBarPanel.add(removeItemBtn);
 
@@ -179,6 +182,14 @@ public final class OrdersView extends JPanel implements NavigableView {
 
     private void wireEvents() {
         newOrderBtn.addActionListener(e -> handleNewOrder());
+        importWebshopBtn.addActionListener(e -> importWebshopOrder());
+        requestedProductsBtn.addActionListener(e -> {
+            Order order = getSelectedOrder();
+            if (order == null || order.deliveryDate() == null) return;
+            var dialog = new OrderDemandDialog(SwingUtilities.getWindowAncestor(this), ctx, order);
+            dialog.setVisible(true);
+            refreshDataSelecting(order.id());
+        });
 
         ordersTable.getSelectionModel().addListSelectionListener(e -> {
             if (!e.getValueIsAdjusting()) {
@@ -213,7 +224,7 @@ public final class OrdersView extends JPanel implements NavigableView {
     }
 
     private Order getSelectedOrder() {
-        int r = ordersTable.getSelectedRow();
+        int r = TableSorting.selectedModelRow(ordersTable);
         return (r >= 0 && r < orders.size()) ? orders.get(r) : null;
     }
 
@@ -334,6 +345,9 @@ public final class OrdersView extends JPanel implements NavigableView {
         gbc.gridx = 0; gbc.gridy = 1; form.add(new JLabel(i18n.t("currency.label") + ":"), gbc);
         gbc.gridx = 1; form.add(currencyCombo, gbc);
 
+        var delivery = new JTextField(java.time.LocalDate.now().toString(), 11);
+        BrutalistStyle.addFormRow(form, gbc, 2, i18n.t("orders.delivery_date.format"), delivery);
+
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("orders.new_order"),
                 JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
             return;
@@ -344,12 +358,28 @@ public final class OrdersView extends JPanel implements NavigableView {
                 ? currencyCombo.getSelectedItem().toString() : chosen.effectiveCurrencyCode();
 
         try {
-            Order created = ctx.getOrderService().createOrder(
-                    chosen.id(), chosenCur, null, ctx.getSession().requireCurrentUser().id());
+            Order created = ctx.getOrderService().createScheduledOrder(chosen.id(), chosenCur,
+                    java.time.LocalDate.parse(delivery.getText().strip()), ctx.getSession().requireCurrentUser().id());
             refreshDataSelecting(created.id());
+            requestedProductsBtn.doClick(0);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
+    }
+
+    private void importWebshopOrder() {
+        var i18n = ctx.getI18n();
+        var chooser = new javax.swing.JFileChooser();
+        chooser.setDialogTitle(i18n.t("orders.webshop.import"));
+        chooser.setFileFilter(new javax.swing.filechooser.FileNameExtensionFilter(i18n.t("orders.webshop.format"), "properties"));
+        if (chooser.showOpenDialog(this) != javax.swing.JFileChooser.APPROVE_OPTION) return;
+        var path = chooser.getSelectedFile().toPath();
+        long actor = ctx.getSession().requireCurrentUser().id();
+        AsyncUiRunner.run(this, () -> hu.due.rewear.service.WebshopOrderFile.importOrder(
+                path, ctx.getDictionaryDao(), ctx.getOrderService(), actor), order -> {
+            refreshDataSelecting(order.id());
+            requestedProductsBtn.doClick(0);
+        }, error -> JOptionPane.showMessageDialog(this, error.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE));
     }
 
     private void handleChangeOrderCurrency() {
@@ -453,7 +483,7 @@ public final class OrdersView extends JPanel implements NavigableView {
 
     private void handleEditItemPrice() {
         Order order = getSelectedOrder();
-        int row = itemsTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(itemsTable);
         if (order == null || row < 0 || row >= currentItems.size()) {
             return;
         }
@@ -486,7 +516,7 @@ public final class OrdersView extends JPanel implements NavigableView {
 
     private void handleRemoveItem() {
         Order order = getSelectedOrder();
-        int row = itemsTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(itemsTable);
         if (order == null || row < 0 || row >= currentItems.size()) return;
 
         try {
@@ -508,7 +538,11 @@ public final class OrdersView extends JPanel implements NavigableView {
             return;
         }
         I18nManager i18n = ctx.getI18n();
-        if (order.status() == OrderStatus.SHIPPED && target != OrderStatus.SHIPPED) {
+        if (target == OrderStatus.SHIPPED) {
+            handleCustomerHandover();
+            return;
+        }
+        if (order.status() == OrderStatus.SHIPPED) {
             if (JOptionPane.showConfirmDialog(this, i18n.t("orders.status.revert_confirm"),
                     i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
                 syncStatusDropdown(order.status());
@@ -542,19 +576,17 @@ public final class OrdersView extends JPanel implements NavigableView {
             Customer customer = ctx.getCustomerDao().findById(order.customerId()).orElse(null);
             List<OrderItem> items = ctx.getOrderItemDao().findByOrderId(order.id());
 
-            // Auto-resolves customer country default VAT (HU 27%, EU international 0%, non-EU 0%)
-            Invoice inv = ctx.getInvoiceService().ensureInvoiceForOrder(
-                    order.id(), ctx.getSession().requireCurrentUser().id());
-            List<InvoiceItem> invItems = ctx.getInvoiceService().findItems(inv.id());
-
-            DocumentPageSource deliveryNoteDoc = ctx.getDeliveryNotePdfExporter().createPageSource(order, customer, items);
-            DocumentPageSource invoiceDoc = ctx.getInvoicePdfExporter().createPageSource(inv, invItems);
+            List<DocumentPageSource> documents = new ArrayList<>();
+            documents.add(ctx.getDeliveryNotePdfExporter().createPageSource(order, customer, items));
+            ctx.getInvoiceDao().findByOrderId(order.id()).ifPresent(invoice ->
+                    documents.add(ctx.getInvoicePdfExporter().createPageSource(
+                            invoice, ctx.getInvoiceService().findItems(invoice.id()))));
 
             java.awt.Window owner = javax.swing.SwingUtilities.getWindowAncestor(this);
             DocumentPreviewDialog.showDocuments(
                     owner,
                     ctx,
-                    List.of(deliveryNoteDoc, invoiceDoc),
+                    documents,
                     customer != null ? customer.email() : "",
                     order.orderNumber() + " — " + i18n.t("orders.documents.preview")
             );
@@ -609,18 +641,15 @@ public final class OrdersView extends JPanel implements NavigableView {
         syncingCurrencyCombo = false;
         syncStatusDropdown(order.status());
 
-        itemsModel.setColumnIdentifiers(new Object[]{
-                i18n.t("intake.generated_code").toUpperCase(),
-                i18n.t("intake.garment_type").toUpperCase(),
-                "KG",
-                cur + "/KG",
-                cur
-        });
+        itemsTable.getColumnModel().getColumn(3).setHeaderValue(cur + "/KG");
+        itemsTable.getColumnModel().getColumn(4).setHeaderValue(cur);
+        itemsTable.getTableHeader().repaint();
 
         String assignInfo = (order.assignedForkliftName() != null ? "   |   " + i18n.t("role.FORKLIFT") + ": " + order.assignedForkliftName() : "")
                 + (order.dispatchLocationCode() != null ? " (" + order.dispatchLocationCode() + ")" : "")
                 + (order.isCustomerArrived() ? "   |   [ " + i18n.t("orders.customer_arrived.badge").toUpperCase(Locale.ROOT) + " ]" : "");
-        orderMetaLabel.setText(
+        String deliveryDate = order.deliveryDate() == null ? "" : i18n.t("orders.delivery_date") + "  " + order.deliveryDate() + "   |   ";
+        orderMetaLabel.setText(deliveryDate +
                 i18n.t("orders.total_weight") + ": " + FormatUtil.stripZeros(order.totalWeightKg()) + " kg   |   "
                         + i18n.t("orders.total_price") + ": " + CurrencyDef.formatAmount(order.totalPrice(), cur, dec)
                         + assignInfo
@@ -642,15 +671,17 @@ public final class OrdersView extends JPanel implements NavigableView {
     }
 
     private void setEditButtonsEnabled(boolean editable, boolean hasOrder) {
+        Order order = hasOrder ? getSelectedOrder() : null;
         scanQrField.setEnabled(editable);
         scanAddBtn.setEnabled(editable);
         pickStockBtn.setEnabled(editable);
         editPriceBtn.setEnabled(editable);
         removeItemBtn.setEnabled(editable);
         orderCurrencyCombo.setEnabled(editable);
-        assignForkliftBtn.setEnabled(editable);
+        assignForkliftBtn.setEnabled(editable && order != null && (order.deliveryDate() == null || order.status() == OrderStatus.DRAFT));
         customerArrivedBtn.setEnabled(editable);
-        handoverScanBtn.setEnabled(editable);
+        handoverScanBtn.setEnabled(editable && order != null && order.isCustomerArrived());
+        requestedProductsBtn.setEnabled(order != null && order.deliveryDate() != null);
         statusDropdown.setEnabled(hasOrder);
         applyStatusBtn.setEnabled(hasOrder);
         previewDocsBtn.setEnabled(hasOrder);
@@ -660,7 +691,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         refreshData();
         for (int i = 0; i < orders.size(); i++) {
             if (orders.get(i).id() == orderId) {
-                ordersTable.setRowSelectionInterval(i, i);
+                TableSorting.selectModelRow(ordersTable, i);
                 break;
             }
         }
@@ -677,6 +708,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(detailHeaderPanel, 12, 14);
         BrutalistStyle.applyBoxCard(scanBarPanel, 8, 10);
         BrutalistStyle.stylePrimaryButton(newOrderBtn);
+        BrutalistStyle.styleSecondaryButtons(importWebshopBtn, requestedProductsBtn);
         BrutalistStyle.stylePrimaryButton(handoverScanBtn);
         BrutalistStyle.stylePrimaryButton(previewDocsBtn);
         BrutalistStyle.styleSecondaryButtons(scanAddBtn, pickStockBtn, editPriceBtn, removeItemBtn,
@@ -715,6 +747,7 @@ public final class OrdersView extends JPanel implements NavigableView {
                     o.orderNumber(),
                     o.customerName(),
                     i18n.t("status.order." + o.status().name()).toUpperCase(),
+                    o.deliveryDate(),
                     FormatUtil.stripZeros(o.totalWeightKg()) + " kg",
                     CurrencyDef.formatAmount(o.totalPrice(), o.effectiveCurrencyCode(), o.currencyDecimals())
             });
@@ -723,7 +756,7 @@ public final class OrdersView extends JPanel implements NavigableView {
             }
         }
         if (selectRow >= 0) {
-            ordersTable.setRowSelectionInterval(selectRow, selectRow);
+            TableSorting.selectModelRow(ordersTable, selectRow);
         } else if (!orders.isEmpty()) {
             ordersTable.setRowSelectionInterval(0, 0);
         }
@@ -734,6 +767,8 @@ public final class OrdersView extends JPanel implements NavigableView {
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
         newOrderBtn.setText("+ " + i18n.t("orders.new_order").toUpperCase());
+        importWebshopBtn.setText(i18n.t("orders.webshop.import"));
+        requestedProductsBtn.setText(i18n.t("orders.requested_products.short"));
         scanLabel.setText(i18n.t("orders.add_by_scan").toUpperCase() + ":");
         scanQrField.putClientProperty("JTextField.placeholderText", i18n.t("orders.scan_placeholder"));
         scanAddBtn.setText(i18n.t("common.add").toUpperCase());
@@ -757,6 +792,7 @@ public final class OrdersView extends JPanel implements NavigableView {
                 i18n.t("orders.order_number").toUpperCase(),
                 i18n.t("orders.customer").toUpperCase(),
                 i18n.t("common.status").toUpperCase(),
+                i18n.t("orders.delivery_date").toUpperCase(),
                 "KG",
                 i18n.t("orders.total_price").toUpperCase()
         });

@@ -34,6 +34,8 @@ class BackupServiceTest {
         // 1. Take backup before mutation
         Path snapshot = tempDir.resolve("snapshot.db");
         backupService.backupDatabase(snapshot);
+        backupService.backupDatabase(snapshot);
+        assertThrows(IllegalArgumentException.class, () -> backupService.backupDatabase(tempDir.resolve("./live.db")));
         assertTrue(Files.exists(snapshot));
         assertTrue(Files.size(snapshot) > 4096);
 

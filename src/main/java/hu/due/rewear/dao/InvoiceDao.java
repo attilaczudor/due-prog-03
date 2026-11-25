@@ -86,40 +86,59 @@ public final class InvoiceDao {
     }
 
     public Optional<Invoice> findById(long id) {
-        String sql = BASE_SELECT + " WHERE i.id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, id);
-            try (ResultSet rs = ps.executeQuery()) {
-                return rs.next() ? Optional.of(mapInvoice(rs)) : Optional.empty();
-            }
+        try (Connection conn = db.getConnection()) {
+            return findById(conn, id);
         } catch (SQLException e) {
             throw new DaoException("Failed to find invoice: " + id, e);
         }
     }
 
-    public Optional<Invoice> findByOrderId(long orderId) {
-        String sql = BASE_SELECT + " WHERE i.order_id = ? AND i.direction = 'OUTGOING' ORDER BY i.id DESC LIMIT 1";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setLong(1, orderId);
+    public Optional<Invoice> findById(Connection conn, long id) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(BASE_SELECT + " WHERE i.id = ?")) {
+            ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(mapInvoice(rs)) : Optional.empty();
             }
+        }
+    }
+
+    public Optional<Invoice> findByOrderId(long orderId) {
+        try (Connection conn = db.getConnection()) {
+            return findByOrderId(conn, orderId);
         } catch (SQLException e) {
             throw new DaoException("Failed to find invoice for order: " + orderId, e);
         }
     }
 
+    public Optional<Invoice> findByOrderId(Connection conn, long orderId) throws SQLException {
+        String sql = BASE_SELECT + """
+                WHERE i.order_id = ? AND i.direction = 'OUTGOING' AND i.category <> 'CREDIT_NOTE'
+                ORDER BY i.id DESC LIMIT 1
+                """;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, orderId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? Optional.of(mapInvoice(rs)) : Optional.empty();
+            }
+        }
+    }
+
     public List<InvoiceItem> findItemsByInvoiceId(long invoiceId) {
+        try (Connection conn = db.getConnection()) {
+            return findItemsByInvoiceId(conn, invoiceId);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to list invoice items for invoice: " + invoiceId, e);
+        }
+    }
+
+    public List<InvoiceItem> findItemsByInvoiceId(Connection conn, long invoiceId) throws SQLException {
         String sql = """
                 SELECT id, invoice_id, description, quantity, unit, unit_price, line_net
                 FROM invoice_items
                 WHERE invoice_id = ?
                 ORDER BY id
                 """;
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, invoiceId);
             try (ResultSet rs = ps.executeQuery()) {
                 List<InvoiceItem> items = new ArrayList<>();
@@ -136,8 +155,21 @@ public final class InvoiceDao {
                 }
                 return items;
             }
-        } catch (SQLException e) {
-            throw new DaoException("Failed to list invoice items for invoice: " + invoiceId, e);
+        }
+    }
+
+    /** Credit notes record the original invoice number at the start of each of their line descriptions. */
+    public boolean hasCreditNote(Connection conn, String referencePrefix) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT 1 FROM invoices i
+                JOIN invoice_items line ON line.invoice_id = i.id
+                WHERE i.category = 'CREDIT_NOTE' AND instr(line.description, ?) = 1
+                LIMIT 1
+                """)) {
+            ps.setString(1, referencePrefix);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
         }
     }
 
@@ -392,16 +424,40 @@ public final class InvoiceDao {
         }
     }
 
-    /** Stores or clears the portable relative attachment path for an invoice's scanned receipt. */
-    public void updateAttachmentPath(long invoiceId, String relativePath) {
-        String sql = "UPDATE invoices SET attachment_path = ? WHERE id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, emptyToNull(relativePath));
-            ps.setLong(2, invoiceId);
-            ps.executeUpdate();
+    /** Replaces the receipt link only if it still matches the version read by the vault. */
+    public boolean replaceAttachmentPath(long invoiceId, String previousPath, String relativePath) {
+        try (Connection conn = db.getConnection()) {
+            return replaceAttachmentPath(conn, invoiceId, previousPath, relativePath);
         } catch (SQLException e) {
             throw new DaoException("Failed to update invoice attachment path: " + invoiceId, e);
+        }
+    }
+
+    public boolean replaceAttachmentPath(Connection conn, long invoiceId, String previousPath,
+                                         String relativePath) throws SQLException {
+        String sql = "UPDATE invoices SET attachment_path = ? WHERE id = ? AND attachment_path IS ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, emptyToNull(relativePath));
+            ps.setLong(2, invoiceId);
+            ps.setString(3, previousPath);
+            return ps.executeUpdate() == 1;
+        }
+    }
+
+    public String findArchivedPdfPath(Connection conn, long invoiceId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT archived_pdf_path FROM invoices WHERE id = ?")) {
+            ps.setLong(1, invoiceId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next() ? rs.getString(1) : null;
+            }
+        }
+    }
+
+    public void setArchivedPdfPath(Connection conn, long invoiceId, String path) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("UPDATE invoices SET archived_pdf_path = ? WHERE id = ?")) {
+            ps.setString(1, path);
+            ps.setLong(2, invoiceId);
+            ps.executeUpdate();
         }
     }
 

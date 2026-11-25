@@ -10,6 +10,7 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
@@ -25,17 +26,24 @@ public final class EmailDao {
     }
 
     public List<EmailMessage> findByOwnerAndFolder(long ownerUserId, String folder) {
+        return findByOwnerAndFolders(ownerUserId, List.of(folder));
+    }
+
+    public List<EmailMessage> findByOwnerAndFolders(long ownerUserId, List<String> folders) {
+        if (folders.isEmpty()) return List.of();
         String sql = """
                 SELECT id, owner_user_id, folder, from_address, to_addresses, cc_addresses,
                        subject, body, attachment_path, is_read, is_external, delivery_status, created_at
                 FROM emails
-                WHERE owner_user_id = ? AND folder = ?
+                WHERE owner_user_id = ? AND folder IN (%s)
                 ORDER BY created_at DESC, id DESC
-                """;
+                """.formatted(String.join(", ", Collections.nCopies(folders.size(), "?")));
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, ownerUserId);
-            ps.setString(2, folder.toUpperCase(Locale.ROOT));
+            for (int i = 0; i < folders.size(); i++) {
+                ps.setString(i + 2, folders.get(i).toUpperCase(Locale.ROOT));
+            }
             try (ResultSet rs = ps.executeQuery()) {
                 List<EmailMessage> list = new ArrayList<>();
                 while (rs.next()) {
@@ -44,7 +52,7 @@ public final class EmailDao {
                 return list;
             }
         } catch (SQLException e) {
-            throw new DaoException("Failed to load emails for folder " + folder, e);
+            throw new DaoException("Failed to load emails for mailbox folders", e);
         }
     }
 

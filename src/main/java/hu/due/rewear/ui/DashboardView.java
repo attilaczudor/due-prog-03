@@ -123,7 +123,8 @@ public final class DashboardView extends JPanel implements NavigableView {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (SwingUtilities.isLeftMouseButton(e) && e.getClickCount() == 1) {
-                    int row = recentTable.rowAtPoint(e.getPoint());
+                    int viewRow = recentTable.rowAtPoint(e.getPoint());
+                    int row = viewRow < 0 ? -1 : recentTable.convertRowIndexToModel(viewRow);
                     if (row >= 0 && row < recentMovements.size()) {
                         openMovementPackageDetails(recentMovements.get(row));
                     }

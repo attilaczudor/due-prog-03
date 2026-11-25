@@ -52,7 +52,18 @@ public final class SchemaInitializer {
             ensureMultiCurrencySchema(conn);
             ensureTaxAndPartnerSchema(conn);
             ensureV22OperationsAndCommsSchema(conn);
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("UPDATE roles SET name = 'Station Manager' WHERE code = 'OPERATOR' AND name = 'Sorting Operator'");
+                stmt.execute("INSERT OR IGNORE INTO roles (code, name) VALUES ('SORTER', 'Sorting Operator'), ('SORTING_HELPER', 'Sorting Helper')");
+            }
+            addColumnIfMissing(conn, "orders", "delivery_date", "TEXT");
+            addColumnIfMissing(conn, "sorting_bags", "packed_by", "INTEGER REFERENCES users(id)");
+            addColumnIfMissing(conn, "sorting_bags", "pack_day", "TEXT");
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CREATE INDEX IF NOT EXISTS idx_sorting_pack_worker_day ON sorting_bags(packed_by, pack_day)");
+            }
         });
+        new SortingRosterMigration(dbManager).upgrade(sql);
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
     }
 
@@ -102,25 +113,30 @@ public final class SchemaInitializer {
         }
 
         // 3. Add partner_type & country_code to customers, tax_type_code & attachment_path to invoices if missing
-        addColumnIfMissing(conn, "customers", "partner_type", "TEXT NOT NULL DEFAULT 'CUSTOMER'");
-        addColumnIfMissing(conn, "customers", "country_code", "TEXT NOT NULL DEFAULT 'HU'");
+        boolean addedPartnerType = addColumnIfMissing(conn, "customers", "partner_type", "TEXT NOT NULL DEFAULT 'CUSTOMER'");
+        boolean addedPartnerCountry = addColumnIfMissing(conn, "customers", "country_code", "TEXT NOT NULL DEFAULT 'HU'");
         addColumnIfMissing(conn, "invoices", "tax_type_code", "TEXT");
         addColumnIfMissing(conn, "invoices", "attachment_path", "TEXT");
+        addColumnIfMissing(conn, "invoices", "archived_pdf_path", "TEXT");
 
         // 4. Infer country_code for existing non-Hungarian customers & backfill tax_type_code on existing invoices
+        if (addedPartnerCountry) {
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("""
+                        UPDATE customers SET country_code = 'SK'
+                        WHERE country_code = 'HU' AND (upper(COALESCE(tax_number, '')) LIKE 'SK%' OR lower(COALESCE(email, '')) LIKE '%.sk')
+                        """);
+                stmt.execute("""
+                        UPDATE customers SET country_code = 'AT'
+                        WHERE country_code = 'HU' AND (upper(COALESCE(tax_number, '')) LIKE 'AT%' OR lower(COALESCE(email, '')) LIKE '%.at')
+                        """);
+                stmt.execute("""
+                        UPDATE customers SET country_code = 'DE'
+                        WHERE country_code = 'HU' AND (upper(COALESCE(tax_number, '')) LIKE 'DE%' OR lower(COALESCE(email, '')) LIKE '%.de')
+                        """);
+            }
+        }
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("""
-                    UPDATE customers SET country_code = 'SK'
-                    WHERE country_code = 'HU' AND (upper(COALESCE(tax_number, '')) LIKE 'SK%' OR lower(COALESCE(email, '')) LIKE '%.sk')
-                    """);
-            stmt.execute("""
-                    UPDATE customers SET country_code = 'AT'
-                    WHERE country_code = 'HU' AND (upper(COALESCE(tax_number, '')) LIKE 'AT%' OR lower(COALESCE(email, '')) LIKE '%.at')
-                    """);
-            stmt.execute("""
-                    UPDATE customers SET country_code = 'DE'
-                    WHERE country_code = 'HU' AND (upper(COALESCE(tax_number, '')) LIKE 'DE%' OR lower(COALESCE(email, '')) LIKE '%.de')
-                    """);
             stmt.execute("""
                     UPDATE invoices SET tax_type_code = CASE
                         WHEN vat_rate = 0 THEN 'EU-0'
@@ -132,7 +148,10 @@ public final class SchemaInitializer {
                     """);
         }
 
-        // 5. If upgrading an already-populated DB with zero suppliers yet, add starter suppliers & an Austrian buyer
+        // 5. Seed starter partners only when upgrading to the partner-type schema.
+        if (!addedPartnerType) {
+            return;
+        }
         long custCount = 0;
         long supCount = 0;
         try (Statement stmt = conn.createStatement()) {
@@ -179,8 +198,8 @@ public final class SchemaInitializer {
     private void ensureV22OperationsAndCommsSchema(Connection conn) throws SQLException {
         // 1. Add location_type, assigned_station_id, and order assignment/arrival/handover columns if upgrading
         addColumnIfMissing(conn, "warehouse_locations", "location_type", "TEXT NOT NULL DEFAULT 'STORAGE'");
-        addColumnIfMissing(conn, "users", "assigned_station_id", "INTEGER");
-        addColumnIfMissing(conn, "orders", "assigned_forklift_id", "INTEGER");
+        boolean addedStationAssignment = addColumnIfMissing(conn, "users", "assigned_station_id", "INTEGER");
+        boolean addedForkliftAssignment = addColumnIfMissing(conn, "orders", "assigned_forklift_id", "INTEGER");
         addColumnIfMissing(conn, "orders", "dispatch_location_id", "INTEGER");
         addColumnIfMissing(conn, "orders", "customer_arrived_at", "TEXT");
         addColumnIfMissing(conn, "order_items", "handover_scanned", "INTEGER NOT NULL DEFAULT 0");
@@ -255,19 +274,21 @@ public final class SchemaInitializer {
                         INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
                         VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', 2000.0, 1)
                         """);
-                // Assign demo operator to ST-OP-01 if not yet assigned
-                stmt.execute("""
+                if (addedStationAssignment) {
+                    stmt.execute("""
                         UPDATE users
                         SET assigned_station_id = (SELECT id FROM warehouse_locations WHERE code = 'ST-OP-01' LIMIT 1)
                         WHERE lower(username) = 'operator' AND assigned_station_id IS NULL
                         """);
-                // Assign open demo orders to demo forklift driver & DOCK-01 if unassigned
-                stmt.execute("""
+                }
+                if (addedForkliftAssignment) {
+                    stmt.execute("""
                         UPDATE orders
                         SET assigned_forklift_id = (SELECT id FROM users WHERE lower(username) = 'forklift' LIMIT 1),
                             dispatch_location_id = (SELECT id FROM warehouse_locations WHERE code = 'DOCK-01' LIMIT 1)
                         WHERE status IN ('DRAFT', 'PACKING') AND assigned_forklift_id IS NULL
                         """);
+                }
             }
 
             // 5. Backfill corporate email addresses (firstname.lastname@<domain>) for any existing user missing an email
@@ -310,7 +331,7 @@ public final class SchemaInitializer {
         addColumnIfMissing(conn, "garment_types", "price_eur_per_kg", "REAL NOT NULL DEFAULT 0");
         addColumnIfMissing(conn, "garment_types", "price_huf_per_kg", "REAL NOT NULL DEFAULT 0");
         addColumnIfMissing(conn, "quality_grades", "default_price_huf_per_kg", "REAL NOT NULL DEFAULT 0");
-        addColumnIfMissing(conn, "customers", "preferred_currency", "TEXT NOT NULL DEFAULT 'EUR'");
+        boolean addedPreferredCurrency = addColumnIfMissing(conn, "customers", "preferred_currency", "TEXT NOT NULL DEFAULT 'EUR'");
         addColumnIfMissing(conn, "orders", "currency", "TEXT NOT NULL DEFAULT 'EUR'");
         addColumnIfMissing(conn, "invoices", "exchange_rate", "REAL NOT NULL DEFAULT 400.0");
 
@@ -340,12 +361,14 @@ public final class SchemaInitializer {
             stmt.execute("UPDATE quality_grades SET default_price_huf_per_kg = ROUND(default_price_per_kg * 400.0, 0) "
                     + "WHERE default_price_huf_per_kg = 0 AND default_price_per_kg > 0");
             // Default Hungarian customers (.hu email) to HUF if still set to default EUR and untouched
-            stmt.execute("UPDATE customers SET preferred_currency = 'HUF' "
-                    + "WHERE preferred_currency = 'EUR' AND lower(COALESCE(email, '')) LIKE '%.hu'");
+            if (addedPreferredCurrency) {
+                stmt.execute("UPDATE customers SET preferred_currency = 'HUF' "
+                        + "WHERE preferred_currency = 'EUR' AND lower(COALESCE(email, '')) LIKE '%.hu'");
+            }
         }
     }
 
-    private void addColumnIfMissing(Connection conn, String table, String column, String definition) throws SQLException {
+    private boolean addColumnIfMissing(Connection conn, String table, String column, String definition) throws SQLException {
         Set<String> cols = new HashSet<>();
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("PRAGMA table_info(" + table + ")")) {
@@ -357,7 +380,9 @@ public final class SchemaInitializer {
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("ALTER TABLE " + table + " ADD COLUMN " + column + " " + definition);
             }
+            return true;
         }
+        return false;
     }
 
     private void ensureSuperAdminRoleAndAccount(Connection conn) throws SQLException {

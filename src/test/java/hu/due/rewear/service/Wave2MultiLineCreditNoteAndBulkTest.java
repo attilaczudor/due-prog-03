@@ -98,6 +98,7 @@ class Wave2MultiLineCreditNoteAndBulkTest {
         assertEquals(InvoiceStatus.PAID, ctx.getInvoiceDao().findById(paidUsd.id()).orElseThrow().status());
         assertEquals(InvoiceDirection.INCOMING, cnPaid.direction());
         assertEquals(InvoiceStatus.PAID, cnPaid.status());
+        assertThrows(IllegalStateException.class, () -> ctx.getInvoiceService().issueCreditNote(paidUsd.id(), adminId));
 
         FinancialSummary summary = ctx.getInvoiceService().computeSummary(List.of(paidUsd, cnPaid));
         assertEquals(0, BigDecimal.ZERO.compareTo(summary.forCurrency("USD", 2).netBalance()));

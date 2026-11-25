@@ -1,0 +1,79 @@
+inbox|lucide/inbox|Incoming|Bejövő|received expense purchase számla kiadás beérkező
+sent|lucide/send|Outgoing|Kimenő|sent revenue sale számla bevétel elküldött
+folder|lucide/folder-plus|Smart folder|Intelligens mappa|documents iratok
+invoices|lucide/receipt-text|Invoice|Számla|bill billing számlázás
+customers|lucide/user-round|Customer|Ügyfél|partner vevő
+orders|lucide/truck|Truck|Teherautó|delivery order szállítás rendelés fuvar
+email|lucide/mail|Email|E-mail|letter levél
+notifications|lucide/bell|Notification|Értesítés|alert jelzés
+messages|lucide/message-square|Message|Üzenet|chat beszélgetés
+todo|lucide/list-todo|Tasks|Teendők|checklist feladat
+dashboard|lucide/layout-grid|Overview|Áttekintés|dashboard
+inventory|lucide/layers|Inventory|Készlet|stock raktár
+locations|lucide/warehouse|Warehouse|Raktár|shelf storage polc tárolás
+intake|lucide/package-plus|Package intake|Csomagfelvétel|receiving bevételezés
+dictionaries|lucide/tag|Tag|Címke|code dictionary jelölés kód
+admin|lucide/shield-check|Administration|Adminisztráció|security karbantartás
+file-invoice|lucide/file-text|Document|Dokumentum|invoice számla irat
+receipt|lucide/receipt|Receipt|Bizonylat|expense nyugta
+file-check|lucide/file-check|Approved document|Jóváhagyott dokumentum|paid confirmed fizetve
+file-clock|lucide/file-clock|Pending document|Függő dokumentum|waiting overdue lejárt várakozik
+bank|lucide/landmark|Bank|Bank|account iban számla
+wallet|lucide/wallet|Wallet|Pénztárca|cash money készpénz
+credit-card|lucide/credit-card|Card payment|Kártyás fizetés|payment fizetés
+banknote|lucide/banknote|Banknote|Bankjegy|cash money készpénz
+coins|lucide/coins|Coins|Érmék|payment money pénz
+calculator|lucide/calculator|Calculator|Számológép|tax accounting könyvelés áfa
+percent|lucide/percent|Percentage|Százalék|vat discount adó áfa kedvezmény
+chart|lucide/chart-column|Report|Riport|finance statistics kimutatás pénzügy
+trending-up|lucide/trending-up|Revenue trend|Bevételi trend|income growth növekedés
+trending-down|lucide/trending-down|Expense trend|Kiadási trend|cost loss költség
+euro|lucide/euro|Euro|Euró|eur currency deviza valuta
+dollar|lucide/dollar-sign|Dollar|Dollár|usd currency deviza valuta
+pound|lucide/pound-sterling|Pound Sterling|Angol font|gbp currency deviza valuta
+currency|lucide/currency|Currency|Deviza|huf forint fx money pénz
+package|lucide/package|Package|Csomag|box carton doboz
+packages|lucide/boxes|Packages|Csomagok|pallet inventory raklap készlet
+forklift|lucide/forklift|Forklift|Targonca|lift warehouse emelő raktár
+container|lucide/container|Container|Konténer|shipping cargo szállítás rakomány
+ship|lucide/ship|Ship|Hajó|sea cargo tengeri rakomány
+plane|lucide/plane|Air freight|Légi fuvar|flight cargo repülő szállítás
+route|lucide/route|Route|Útvonal|delivery logistics fuvar logisztika
+map-pin|lucide/map-pin|Location pin|Helyjelölő|address destination cím célállomás
+map|lucide/map|Map|Térkép|route region útvonal régió
+barcode|lucide/barcode|Barcode|Vonalkód|scanner címke
+qr|lucide/qr-code|QR code|QR-kód|scan label beolvasás címke
+scale|lucide/scale|Scale|Mérleg|weight kg súly
+handshake|lucide/handshake|Agreement|Megállapodás|supplier partner contract beszállító szerződés
+users|lucide/users-round|Partners|Partnerek|supplier customer group beszállító vevő
+factory|lucide/factory|Factory|Gyár|production supplier gyártás beszállító
+shirt|lucide/shirt|Clothing|Ruházat|textile apparel second hand ruha textil használt
+hanger|lucide/shopping-bag|Shopping bag|Bevásárlótáska|orders retail sales értékesítés
+clock|lucide/clock|Time|Idő|waiting due határidő várakozik
+calendar|lucide/calendar-days|Calendar|Naptár|date schedule dátum
+archive|lucide/archive|Archive|Archívum|old documents régi iratok
+circle-check|lucide/circle-check|Done|Kész|paid success fizetve
+alert|lucide/triangle-alert|Warning|Figyelmeztetés|problem overdue hiba lejárt
+globe|lucide/globe|International|Nemzetközi|country nationality world ország nemzetiség világ
+language|lucide/languages|Language|Nyelv|translation country fordítás ország
+flag|lucide/flag|Flag|Zászló|country nationality ország nemzetiség
+flag-hu|flags/hu|Hungary|Magyarország|hu hun huf forint hungarian magyar flag ország zászló
+flag-eu|flags/eu|European Union|Európai Unió|eu eur europe europe flag zászló
+flag-at|flags/at|Austria|Ausztria|at austrian osztrák flag zászló
+flag-de|flags/de|Germany|Németország|de german német flag zászló
+flag-sk|flags/sk|Slovakia|Szlovákia|sk slovak szlovák flag zászló
+flag-cz|flags/cz|Czechia|Csehország|cz czech česká cseh flag zászló
+flag-pl|flags/pl|Poland|Lengyelország|pl polish lengyel flag zászló
+flag-ro|flags/ro|Romania|Románia|ro romanian román flag zászló
+flag-hr|flags/hr|Croatia|Horvátország|hr croatian horvát flag zászló
+flag-si|flags/si|Slovenia|Szlovénia|si slovenian szlovén flag zászló
+flag-it|flags/it|Italy|Olaszország|it italian olasz flag zászló
+flag-fr|flags/fr|France|Franciaország|fr french francia flag zászló
+flag-nl|flags/nl|Netherlands|Hollandia|nl dutch holland flag zászló
+flag-be|flags/be|Belgium|Belgium|be belgian belga flag zászló
+flag-es|flags/es|Spain|Spanyolország|es spanish spanyol flag zászló
+flag-gb|flags/gb|United Kingdom|Egyesült Királyság|gb uk british angol brit flag zászló
+flag-us|flags/us|United States|Egyesült Államok|us usa american amerikai usd flag zászló
+flag-ch|flags/ch|Switzerland|Svájc|ch swiss svájci flag zászló
+flag-ua|flags/ua|Ukraine|Ukrajna|ua ukrainian ukrán flag zászló
+flag-rs|flags/rs|Serbia|Szerbia|rs serbian szerb flag zászló

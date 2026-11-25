@@ -128,7 +128,6 @@ public final class ThemeManager {
         extra.put("CheckBox.arc", "0");
         extra.put("ProgressBar.arc", "0");
         extra.put("ScrollBar.thumbArc", "0");
-        extra.put("TabbedPane.tabArc", "0");
         extra.put("Component.borderColor", borderHex);
         extra.put("Component.focusedBorderColor", fgHex);
         extra.put("Component.focusColor", fgHex);
@@ -198,19 +197,6 @@ public final class ThemeManager {
         extra.put("TableHeader.foreground", fgHex);
         extra.put("TableHeader.bottomSeparatorColor", borderHex);
         extra.put("TableHeader.separatorColor", gridHex);
-        extra.put("TabbedPaneUI", BrutalistTabbedPaneUI.class.getName());
-        extra.put("TabbedPane.background", bgHex);
-        extra.put("TabbedPane.foreground", fgHex);
-        extra.put("TabbedPane.selectedBackground", fgHex);
-        extra.put("TabbedPane.selectedForeground", bgHex);
-        extra.put("TabbedPane.hoverColor", hoverHex);
-        extra.put("TabbedPane.hoverForeground", fgHex);
-        extra.put("TabbedPane.focusColor", fgHex);
-        extra.put("TabbedPane.focusForeground", bgHex);
-        extra.put("TabbedPane.underlineColor", fgHex);
-        extra.put("TabbedPane.inactiveUnderlineColor", borderHex);
-        extra.put("TabbedPane.tabSeparatorColor", borderHex);
-        extra.put("TabbedPane.contentAreaColor", borderHex);
         extra.put("Separator.foreground", borderHex);
         extra.put("OptionPane.background", bgHex);
         extra.put("OptionPane.messageForeground", fgHex);
@@ -236,8 +222,6 @@ public final class ThemeManager {
         defaults.put("Table.showHorizontalLines", true);
         defaults.put("Table.showVerticalLines", false);
         defaults.put("TableHeader.font", monoFont(Font.BOLD, 11.5f));
-        defaults.put("TabbedPane.showTabSeparators", true);
-        defaults.put("TabbedPane.tabSeparatorsFullHeight", true);
         defaults.put("OptionPane.informationIcon", BrutalistOptionPaneIcons.information());
         defaults.put("OptionPane.warningIcon", BrutalistOptionPaneIcons.warning());
         defaults.put("OptionPane.errorIcon", BrutalistOptionPaneIcons.error());

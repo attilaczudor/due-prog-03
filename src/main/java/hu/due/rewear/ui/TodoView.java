@@ -163,7 +163,7 @@ public final class TodoView extends JPanel implements NavigableView {
     }
 
     private void openSelectedSystemTarget() {
-        int row = sysTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(sysTable);
         if (row >= 0 && row < systemItems.size() && navigator != null) {
             String target = systemItems.get(row).targetView();
             if (target != null && !target.isBlank()) {
@@ -209,7 +209,7 @@ public final class TodoView extends JPanel implements NavigableView {
     }
 
     private void handleTogglePersonalTodo() {
-        int row = persTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(persTable);
         if (row >= 0 && row < personalItems.size()) {
             PersonalTodo item = personalItems.get(row);
             ctx.getTodoService().togglePersonalTodo(item.id(), !item.completed());
@@ -218,7 +218,7 @@ public final class TodoView extends JPanel implements NavigableView {
     }
 
     private void handleDeletePersonalTodo() {
-        int row = persTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(persTable);
         if (row >= 0 && row < personalItems.size()) {
             ctx.getTodoService().deletePersonalTodo(personalItems.get(row).id());
             refreshData();

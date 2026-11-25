@@ -2,562 +2,365 @@ package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
-import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.CurrencyDef;
 import hu.due.rewear.model.TaxType;
 
-import javax.swing.BorderFactory;
-import javax.swing.JButton;
-import javax.swing.JCheckBox;
-import javax.swing.JComboBox;
-import javax.swing.JLabel;
-import javax.swing.JOptionPane;
-import javax.swing.JPanel;
-import javax.swing.JScrollPane;
-import javax.swing.JSplitPane;
-import javax.swing.JTable;
-import javax.swing.JTextField;
-import javax.swing.ListSelectionModel;
+import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
-import java.awt.BorderLayout;
-import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import java.math.BigDecimal;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.function.BooleanSupplier;
 
-/**
- * Tab 2 of {@link InvoicesView}: dedicated Invoice Settings panel for managing
- * the editable Seller Company Profile &amp; per-currency Bank IBANs ({@code app_settings}),
- * configurable VAT / Tax Types ({@code tax_types}), and operating Currencies ({@code currencies}).
- * Notifies the host view whenever configuration changes so ledger buttons and dropdowns stay in sync.
- */
+/** Seller details, payment accounts and invoice reference data in Admin. */
 final class InvoiceSettingsPanel extends JPanel {
-
     private final AppContext ctx;
-    private final Runnable onConfigChanged;
-
-    // Company Profile & Per-Currency Bank IBANs section
+    private final SettingsStack stack = new SettingsStack();
+    private final JLabel title = new JLabel();
     private final JPanel companyCard = new JPanel(new BorderLayout(0, 8));
-    private final JLabel companySectionTitle = new JLabel();
-    private final JLabel companyNameLbl = new JLabel();
-    private final JLabel companyTaxLbl = new JLabel();
-    private final JLabel companyAddressLbl = new JLabel();
-    private final JLabel companyEmailLbl = new JLabel();
-    private final JLabel ibanCurrencyLbl = new JLabel();
-    private final JLabel ibanValueLbl = new JLabel();
-    private final JTextField companyNameField = new JTextField(22);
-    private final JTextField companyTaxField = new JTextField(18);
-    private final JTextField companyAddressField = new JTextField(24);
-    private final JTextField companyEmailField = new JTextField(20);
-    private final JComboBox<String> ibanCurrencyCombo = new JComboBox<>();
-    private final JTextField ibanField = new JTextField(26);
-    private final JButton saveCompanyBtn = new JButton();
-    private final Map<String, String> draftIbans = new LinkedHashMap<>();
-    private String activeIbanCurrency = "HUF";
-    private boolean loadingCompany = false;
+    private final JLabel companyTitle = new JLabel();
+    private final JLabel ibanTitle = new JLabel();
+    private final Map<JLabel, String> companyLabels = new LinkedHashMap<>();
+    private final JTextField companyName = new JTextField(24);
+    private final JTextField companyTax = new JTextField(24);
+    private final JTextField street = new JTextField(24);
+    private final JTextField city = new JTextField(24);
+    private final JTextField postalCode = new JTextField(24);
+    private final JTextField companyEmail = new JTextField(24);
+    private final JPanel ibanRows = new JPanel(new GridBagLayout());
+    private final Map<String, JTextField> ibanFields = new LinkedHashMap<>();
+    private final JButton saveCompany = new JButton();
 
-    // Tax Types section
-    private final JPanel taxCard = new JPanel(new BorderLayout(0, 8));
-    private final JLabel taxSectionTitle = new JLabel();
-    private final JButton addTaxBtn = new JButton();
-    private final JButton editTaxBtn = new JButton();
-    private final JButton toggleTaxBtn = new JButton();
-    private final JButton deleteTaxBtn = new JButton();
+    private final JLabel taxTitle = new JLabel();
+    private final JLabel currencyTitle = new JLabel();
+    private final JButton addTax = new JButton();
+    private final JButton addCurrency = new JButton();
     private final DefaultTableModel taxModel = BrutalistStyle.nonEditableTableModel();
-    private final JTable taxTable = new JTable(taxModel);
-
-    // Currencies section
-    private final JPanel currencyCard = new JPanel(new BorderLayout(0, 8));
-    private final JLabel currencySectionTitle = new JLabel();
-    private final JButton addCurrencyBtn = new JButton();
-    private final JButton editCurrencyBtn = new JButton();
-    private final JButton toggleCurrencyBtn = new JButton();
-    private final JButton deleteCurrencyBtn = new JButton();
     private final DefaultTableModel currencyModel = BrutalistStyle.nonEditableTableModel();
+    private final JTable taxTable = new JTable(taxModel);
     private final JTable currencyTable = new JTable(currencyModel);
+    private final JPanel taxCard = tableCard(taxTitle, taxTable, addTax);
+    private final JPanel currencyCard = tableCard(currencyTitle, currencyTable, addCurrency);
+    private List<TaxType> taxTypes = List.of();
+    private List<CurrencyDef> currencies = List.of();
 
-    private List<TaxType> allTaxTypes = List.of();
-    private List<CurrencyDef> allCurrencies = List.of();
-
-    private record ScopeOption(String code, String label) {
-        @Override
-        public String toString() {
-            return label;
-        }
-    }
-
-    InvoiceSettingsPanel(AppContext ctx, Runnable onConfigChanged) {
+    InvoiceSettingsPanel(AppContext ctx) {
+        super(new BorderLayout());
         this.ctx = ctx;
-        this.onConfigChanged = onConfigChanged;
+        title.setFont(ThemeManager.monoFont(Font.BOLD, 15f));
+        title.setBorder(BorderFactory.createEmptyBorder(2, 0, 2, 0));
+        companyTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        ibanTitle.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
+        ibanRows.setOpaque(false);
+        companyEmail.setEditable(ctx.getSession().isSuperAdmin());
 
-        setLayout(new BorderLayout(0, 10));
-        setBorder(BorderFactory.createEmptyBorder(12, 0, 0, 0));
+        var companyForm = new JPanel(new GridBagLayout());
+        companyForm.setOpaque(false);
+        addCompanyField(companyForm, "customers.company", companyName);
+        addCompanyField(companyForm, "invoice.tax_number", companyTax);
+        addCompanyField(companyForm, "invoice.settings.street", street);
+        addCompanyField(companyForm, "invoice.settings.city", city);
+        addCompanyField(companyForm, "invoice.settings.postal_code", postalCode);
+        addCompanyField(companyForm, "invoice.email", companyEmail);
 
-        buildUi();
-        wireEvents();
+        var banking = new JPanel(new BorderLayout(0, 4));
+        banking.setOpaque(false);
+        banking.add(ibanTitle, BorderLayout.NORTH);
+        banking.add(ibanRows, BorderLayout.CENTER);
+        var body = new JPanel(new BorderLayout(0, 10));
+        body.setOpaque(false);
+        body.add(companyForm, BorderLayout.NORTH);
+        body.add(banking, BorderLayout.CENTER);
+        companyCard.add(companyTitle, BorderLayout.NORTH);
+        companyCard.add(body, BorderLayout.CENTER);
+        companyCard.add(actions(saveCompany), BorderLayout.SOUTH);
+
+        for (JComponent part : List.of(title, companyCard, taxCard, currencyCard)) {
+            part.setAlignmentX(LEFT_ALIGNMENT);
+            stack.add(part);
+            stack.add(Box.createVerticalStrut(10));
+        }
+        var scroll = new JScrollPane(stack, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        scroll.setBorder(BorderFactory.createEmptyBorder());
+        add(scroll, BorderLayout.CENTER);
+
+        saveCompany.addActionListener(e -> saveCompany());
+        addTax.addActionListener(e -> openTax(null));
+        addCurrency.addActionListener(e -> openCurrency(null));
+        activateRow(taxTable, () -> {
+            int row = taxTable.getSelectedRow();
+            if (row >= 0) openTax(taxTypes.get(taxTable.convertRowIndexToModel(row)));
+        });
+        activateRow(currencyTable, () -> {
+            int row = currencyTable.getSelectedRow();
+            if (row >= 0) openCurrency(currencies.get(currencyTable.convertRowIndexToModel(row)));
+        });
     }
 
-    private void buildUi() {
-        // North Card: Seller Company Profile & Per-Currency Bank IBANs
-        JPanel compHeader = new JPanel(new BorderLayout(8, 0));
-        compHeader.setOpaque(false);
-        companySectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
-        compHeader.add(companySectionTitle, BorderLayout.WEST);
-        compHeader.add(saveCompanyBtn, BorderLayout.EAST);
-        companyCard.add(compHeader, BorderLayout.NORTH);
-
-        JPanel compGrid = new JPanel(new GridBagLayout());
-        compGrid.setOpaque(false);
-        GridBagConstraints cg = new GridBagConstraints();
-        cg.insets = new Insets(3, 4, 3, 8);
-        cg.fill = GridBagConstraints.HORIZONTAL;
-        cg.anchor = GridBagConstraints.WEST;
-
-        // Row 0: Company Name | Tax Number
-        cg.gridx = 0; cg.gridy = 0; cg.weightx = 0; compGrid.add(companyNameLbl, cg);
-        cg.gridx = 1; cg.weightx = 0.5; compGrid.add(companyNameField, cg);
-        cg.gridx = 2; cg.weightx = 0; compGrid.add(companyTaxLbl, cg);
-        cg.gridx = 3; cg.weightx = 0.5; compGrid.add(companyTaxField, cg);
-
-        // Row 1: Address | Email
-        cg.gridx = 0; cg.gridy = 1; cg.weightx = 0; compGrid.add(companyAddressLbl, cg);
-        cg.gridx = 1; cg.weightx = 0.5; compGrid.add(companyAddressField, cg);
-        cg.gridx = 2; cg.weightx = 0; compGrid.add(companyEmailLbl, cg);
-        cg.gridx = 3; cg.weightx = 0.5; compGrid.add(companyEmailField, cg);
-
-        // Row 2: Bank Account Currency selector | IBAN
-        cg.gridx = 0; cg.gridy = 2; cg.weightx = 0; compGrid.add(ibanCurrencyLbl, cg);
-        cg.gridx = 1; cg.weightx = 0.5; compGrid.add(ibanCurrencyCombo, cg);
-        cg.gridx = 2; cg.weightx = 0; compGrid.add(ibanValueLbl, cg);
-        cg.gridx = 3; cg.weightx = 0.5; compGrid.add(ibanField, cg);
-
-        companyCard.add(compGrid, BorderLayout.CENTER);
-        add(companyCard, BorderLayout.NORTH);
-
-        // Top Card: VAT / Tax Types
-        JPanel taxHeader = new JPanel(new BorderLayout(8, 0));
-        taxHeader.setOpaque(false);
-        taxSectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
-        taxHeader.add(taxSectionTitle, BorderLayout.WEST);
-
-        JPanel taxBtns = new JPanel(new WrapLayout(FlowLayout.RIGHT, 6, 2));
-        taxBtns.setOpaque(false);
-        taxBtns.add(addTaxBtn);
-        taxBtns.add(editTaxBtn);
-        taxBtns.add(toggleTaxBtn);
-        taxBtns.add(deleteTaxBtn);
-        taxHeader.add(taxBtns, BorderLayout.CENTER);
-
-        taxCard.add(taxHeader, BorderLayout.NORTH);
-        taxTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        BrutalistStyle.styleTable(taxTable);
-        taxCard.add(new JScrollPane(taxTable), BorderLayout.CENTER);
-
-        // Bottom Card: Operating Currencies
-        JPanel curHeader = new JPanel(new BorderLayout(8, 0));
-        curHeader.setOpaque(false);
-        currencySectionTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
-        curHeader.add(currencySectionTitle, BorderLayout.WEST);
-
-        JPanel curBtns = new JPanel(new WrapLayout(FlowLayout.RIGHT, 6, 2));
-        curBtns.setOpaque(false);
-        curBtns.add(addCurrencyBtn);
-        curBtns.add(editCurrencyBtn);
-        curBtns.add(toggleCurrencyBtn);
-        curBtns.add(deleteCurrencyBtn);
-        curHeader.add(curBtns, BorderLayout.CENTER);
-
-        currencyCard.add(curHeader, BorderLayout.NORTH);
-        currencyTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
-        BrutalistStyle.styleTable(currencyTable);
-        currencyCard.add(new JScrollPane(currencyTable), BorderLayout.CENTER);
-
-        JSplitPane split = new JSplitPane(JSplitPane.VERTICAL_SPLIT, taxCard, currencyCard);
-        split.setResizeWeight(0.55);
-        split.setDividerLocation(240);
-        add(split, BorderLayout.CENTER);
+    private static final class SettingsStack extends JPanel implements Scrollable {
+        SettingsStack() { setLayout(new BoxLayout(this, BoxLayout.Y_AXIS)); }
+        @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+        @Override public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction) { return 24; }
+        @Override public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction) {
+            return Math.max(24, visible.height - 24);
+        }
+        @Override public boolean getScrollableTracksViewportWidth() { return true; }
+        @Override public boolean getScrollableTracksViewportHeight() { return false; }
     }
 
-    private void wireEvents() {
-        ibanCurrencyCombo.addActionListener(e -> {
-            if (loadingCompany) return;
-            // Save typed IBAN for previous currency into draft map before switching
-            if (activeIbanCurrency != null && !activeIbanCurrency.isBlank()) {
-                draftIbans.put(activeIbanCurrency, ibanField.getText().trim());
-            }
-            Object sel = ibanCurrencyCombo.getSelectedItem();
-            if (sel != null) {
-                activeIbanCurrency = sel.toString();
-                ibanField.setText(draftIbans.getOrDefault(activeIbanCurrency, ""));
-            }
-        });
-        saveCompanyBtn.addActionListener(e -> handleSaveCompanyProfile());
-
-        addTaxBtn.addActionListener(e -> openTaxDialog(null));
-        editTaxBtn.addActionListener(e -> {
-            int r = taxTable.getSelectedRow();
-            if (r >= 0 && r < allTaxTypes.size()) {
-                openTaxDialog(allTaxTypes.get(r));
-            }
-        });
-        toggleTaxBtn.addActionListener(e -> handleToggleTax());
-        deleteTaxBtn.addActionListener(e -> handleDeleteTax());
-
-        addCurrencyBtn.addActionListener(e -> openCurrencyDialog(null));
-        editCurrencyBtn.addActionListener(e -> {
-            int r = currencyTable.getSelectedRow();
-            if (r >= 0 && r < allCurrencies.size()) {
-                openCurrencyDialog(allCurrencies.get(r));
-            }
-        });
-        toggleCurrencyBtn.addActionListener(e -> handleToggleCurrency());
-        deleteCurrencyBtn.addActionListener(e -> handleDeleteCurrency());
+    private static JPanel tableCard(JLabel heading, JTable table, JButton add) {
+        var card = new JPanel(new BorderLayout(0, 8));
+        heading.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        var scroll = new JScrollPane(table);
+        scroll.setPreferredSize(new Dimension(380, 194));
+        card.add(heading, BorderLayout.NORTH);
+        card.add(scroll, BorderLayout.CENTER);
+        card.add(actions(add), BorderLayout.SOUTH);
+        return card;
     }
 
-    // --- Tax Type CRUD ---
+    private static JPanel actions(JButton button) {
+        var row = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        row.setOpaque(false);
+        row.add(button);
+        return row;
+    }
 
-    private void openTaxDialog(TaxType existing) {
-        I18nManager i18n = ctx.getI18n();
-        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 14);
-        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 22);
-        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 22);
-        JTextField rateF = new JTextField(
-                existing != null ? existing.ratePercent().stripTrailingZeros().toPlainString() : "0", 10);
-
-        JComboBox<ScopeOption> scopeCombo = new JComboBox<>(new ScopeOption[]{
-                new ScopeOption("HU", i18n.t("invoice.settings.scope.HU")),
-                new ScopeOption("EU", i18n.t("invoice.settings.scope.EU")),
-                new ScopeOption("NON_EU", i18n.t("invoice.settings.scope.NON_EU")),
-                new ScopeOption("ANY", i18n.t("invoice.settings.scope.ANY"))
-        });
-        if (existing != null) {
-            for (int i = 0; i < scopeCombo.getItemCount(); i++) {
-                if (scopeCombo.getItemAt(i).code().equalsIgnoreCase(existing.countryScope())) {
-                    scopeCombo.setSelectedIndex(i);
-                    break;
+    private static void activateRow(JTable table, Runnable open) {
+        table.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                int row = table.rowAtPoint(e.getPoint());
+                if (row >= 0 && e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
+                    table.setRowSelectionInterval(row, row);
+                    open.run();
                 }
             }
-        }
-        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
-
-        JPanel form = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(4, 4, 4, 6);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        int r = 0;
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.code") + " *:", codeF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.name.en") + " *:", enF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.name.hu") + " *:", huF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.settings.tax_rate") + " *:", rateF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.settings.country_scope") + ":", scopeCombo);
-        if (existing != null) {
-            gbc.gridx = 1;
-            gbc.gridy = r;
-            form.add(activeBox, gbc);
-        }
-
-        if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.settings.taxes"),
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
-            return;
-        }
-        try {
-            BigDecimal rate = CurrencyCode.parseAmount(rateF.getText());
-            ScopeOption sc = (ScopeOption) scopeCombo.getSelectedItem();
-            String scope = sc != null ? sc.code() : "ANY";
-            if (enF.getText().trim().isEmpty() || huF.getText().trim().isEmpty()) {
-                throw new IllegalArgumentException(i18n.t("validation.names_bilingual_required"));
-            }
-            if (existing == null) {
-                ctx.getFinanceConfigDao().insertTaxType(codeF.getText(), enF.getText(), huF.getText(), rate, scope);
-            } else {
-                ctx.getFinanceConfigDao().updateTaxType(existing.id(), codeF.getText(), enF.getText(), huF.getText(),
-                        rate, scope, activeBox.isSelected());
-            }
-            onConfigChanged.run();
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
+        });
+        table.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(KeyStroke.getKeyStroke("ENTER"), "openRow");
+        table.getActionMap().put("openRow", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent event) { open.run(); }
+        });
     }
 
-    private void handleToggleTax() {
-        int r = taxTable.getSelectedRow();
-        if (r < 0 || r >= allTaxTypes.size()) {
-            return;
-        }
-        TaxType t = allTaxTypes.get(r);
-        ctx.getFinanceConfigDao().updateTaxType(t.id(), t.code(), t.nameEn(), t.nameHu(),
-                t.ratePercent(), t.countryScope(), !t.active());
-        onConfigChanged.run();
+    private void addCompanyField(JPanel form, String key, JTextField field) {
+        var label = new JLabel();
+        addRow(form, companyLabels.size(), label, field);
+        companyLabels.put(label, key);
     }
 
-    private void handleDeleteTax() {
-        int r = taxTable.getSelectedRow();
-        if (r < 0 || r >= allTaxTypes.size()) {
-            return;
-        }
-        I18nManager i18n = ctx.getI18n();
-        TaxType t = allTaxTypes.get(r);
-        if (ctx.getFinanceConfigDao().isTaxTypeReferenced(t.code())) {
-            JOptionPane.showMessageDialog(this, i18n.t("invoice.settings.in_use", t.code()),
-                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (JOptionPane.showConfirmDialog(this, i18n.t("dictionaries.delete_confirm", t.code()),
-                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-            ctx.getFinanceConfigDao().deleteTaxType(t.id());
-            onConfigChanged.run();
-        }
+    private static void addRow(JPanel form, int row, JLabel label, JComponent field) {
+        var grid = new GridBagConstraints();
+        grid.gridy = row;
+        grid.insets = new Insets(3, 0, 3, 10);
+        grid.anchor = GridBagConstraints.LINE_START;
+        label.setLabelFor(field);
+        form.add(label, grid);
+        grid.gridx = 1;
+        grid.weightx = 1;
+        grid.fill = GridBagConstraints.HORIZONTAL;
+        grid.insets = new Insets(3, 0, 3, 0);
+        form.add(field, grid);
     }
 
-    // --- Currency CRUD ---
-
-    private void openCurrencyDialog(CurrencyDef existing) {
-        I18nManager i18n = ctx.getI18n();
-        JTextField codeF = new JTextField(existing != null ? existing.code() : "", 10);
-        JTextField enF = new JTextField(existing != null ? existing.nameEn() : "", 22);
-        JTextField huF = new JTextField(existing != null ? existing.nameHu() : "", 22);
-        JTextField symF = new JTextField(existing != null ? existing.symbol() : "", 8);
-        JComboBox<Integer> decCombo = new JComboBox<>(new Integer[]{2, 0});
-        decCombo.setSelectedItem(existing != null ? existing.decimalPlaces() : 2);
-        JCheckBox activeBox = new JCheckBox(i18n.t("common.activate"), existing == null || existing.active());
-
-        JPanel form = new JPanel(new GridBagLayout());
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(4, 4, 4, 6);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        int r = 0;
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.code") + " (ISO, e.g. USD) *:", codeF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.name.en") + " *:", enF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("common.name.hu") + " *:", huF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.settings.symbol") + " *:", symF);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("invoice.settings.decimals") + ":", decCombo);
-        if (existing != null) {
-            gbc.gridx = 1;
-            gbc.gridy = r;
-            form.add(activeBox, gbc);
-        }
-
-        if (JOptionPane.showConfirmDialog(this, form, i18n.t("invoice.settings.currencies"),
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
-            return;
-        }
-        try {
-            if (enF.getText().trim().isEmpty() || huF.getText().trim().isEmpty()) {
-                throw new IllegalArgumentException(i18n.t("validation.names_bilingual_required"));
-            }
-            int dec = decCombo.getSelectedItem() instanceof Integer d ? d : 2;
-            if (existing == null) {
-                ctx.getFinanceConfigDao().insertCurrency(codeF.getText(), enF.getText(), huF.getText(), symF.getText(), dec);
-            } else {
-                ctx.getFinanceConfigDao().updateCurrency(existing.id(), codeF.getText(), enF.getText(), huF.getText(),
-                        symF.getText(), dec, activeBox.isSelected());
-            }
-            onConfigChanged.run();
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
+    void refreshData() {
+        var profile = ctx.getSettingsDao().getCompanyProfile();
+        setField(companyName, profile.name());
+        setField(companyTax, profile.taxNumber());
+        setField(street, profile.addressParts().street());
+        setField(city, profile.addressParts().city());
+        setField(postalCode, profile.addressParts().postalCode());
+        setField(companyEmail, profile.email());
+        refreshLists();
+        rebuildIbans(profile.ibansByCurrency());
     }
 
-    private void handleToggleCurrency() {
-        int r = currencyTable.getSelectedRow();
-        if (r < 0 || r >= allCurrencies.size()) {
-            return;
-        }
-        CurrencyDef c = allCurrencies.get(r);
-        ctx.getFinanceConfigDao().updateCurrency(c.id(), c.code(), c.nameEn(), c.nameHu(),
-                c.symbol(), c.decimalPlaces(), !c.active());
-        onConfigChanged.run();
+    private static void setField(JTextField field, String value) {
+        field.setText(value);
+        field.setCaretPosition(0);
     }
 
-    private void handleDeleteCurrency() {
-        int r = currencyTable.getSelectedRow();
-        if (r < 0 || r >= allCurrencies.size()) {
-            return;
-        }
-        I18nManager i18n = ctx.getI18n();
-        CurrencyDef c = allCurrencies.get(r);
-        if (ctx.getFinanceConfigDao().isCurrencyReferenced(c.code())) {
-            JOptionPane.showMessageDialog(this, i18n.t("invoice.settings.in_use", c.code()),
-                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        if (JOptionPane.showConfirmDialog(this, i18n.t("dictionaries.delete_confirm", c.code()),
-                i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
-            ctx.getFinanceConfigDao().deleteCurrency(c.id());
-            onConfigChanged.run();
-        }
-    }
-
-    // --- Company Profile Persistence ---
-
-    private void handleSaveCompanyProfile() {
-        I18nManager i18n = ctx.getI18n();
-        try {
-            String name = companyNameField.getText().trim();
-            if (name.isEmpty()) {
-                throw new IllegalArgumentException(i18n.t("validation.company_required"));
-            }
-            if (activeIbanCurrency != null && !activeIbanCurrency.isBlank()) {
-                draftIbans.put(activeIbanCurrency, ibanField.getText().trim());
-            }
-            CompanyProfile existing = ctx.getSettingsDao().getCompanyProfile();
-            CompanyProfile updated = new CompanyProfile(
-                    name,
-                    companyAddressField.getText().trim(),
-                    companyTaxField.getText().trim(),
-                    companyEmailField.getText().trim(),
-                    existing.phone(),
-                    draftIbans
-            );
-            ctx.getSettingsDao().saveCompanyProfile(updated);
-            JOptionPane.showMessageDialog(this, i18n.t("invoice.settings.company_saved"),
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
-    }
-
-    // --- Refresh, i18n & Theme ---
-
-    void refreshTables() {
-        I18nManager i18n = ctx.getI18n();
-        String yes = i18n.t("common.yes").toUpperCase(Locale.ROOT);
-        String no = i18n.t("common.no").toUpperCase(Locale.ROOT);
-
-        allTaxTypes = ctx.getFinanceConfigDao().findTaxTypes(false);
+    private void refreshLists() {
+        taxTypes = ctx.getFinanceConfigDao().findTaxTypes(false);
+        currencies = ctx.getFinanceConfigDao().findCurrencies(false);
         taxModel.setRowCount(0);
-        for (TaxType t : allTaxTypes) {
-            taxModel.addRow(new Object[]{
-                    t.code(),
-                    t.nameEn(),
-                    t.nameHu(),
-                    t.rateDisplay(),
-                    i18n.t("invoice.settings.scope." + t.countryScope()),
-                    t.active() ? yes : no
-            });
+        for (TaxType type : taxTypes) {
+            taxModel.addRow(new Object[]{type.code(), type.nameEn(), type.nameHu(), type.rateDisplay(),
+                    t("invoice.settings.scope." + type.countryScope()), yesNo(type.active())});
         }
-
-        allCurrencies = ctx.getFinanceConfigDao().findCurrencies(false);
         currencyModel.setRowCount(0);
-        for (CurrencyDef c : allCurrencies) {
-            currencyModel.addRow(new Object[]{
-                    c.code(),
-                    c.nameEn(),
-                    c.nameHu(),
-                    c.symbol(),
-                    Integer.toString(c.decimalPlaces()),
-                    c.active() ? yes : no
-            });
+        for (CurrencyDef currency : currencies) {
+            currencyModel.addRow(new Object[]{currency.code(), currency.nameEn(), currency.nameHu(), currency.symbol(),
+                    currency.decimalPlaces(), yesNo(currency.active())});
         }
+    }
 
-        // Load Seller Company Profile & per-currency IBANs
-        loadingCompany = true;
+    private void rebuildIbans(Map<String, String> values) {
+        ibanFields.clear();
+        ibanRows.removeAll();
+        int row = 0;
+        for (CurrencyDef currency : currencies) {
+            var field = new JTextField(24);
+            setField(field, values.getOrDefault(currency.code(), ""));
+            addRow(ibanRows, row++, new JLabel(currency.code()), field);
+            ibanFields.put(currency.code(), field);
+        }
+        ibanRows.revalidate();
+        ibanRows.repaint();
+    }
+
+    private Map<String, String> readIbans() {
+        Map<String, String> values = new LinkedHashMap<>();
+        ibanFields.forEach((code, field) -> values.put(code, field.getText().strip()));
+        return values;
+    }
+
+    private void saveCompany() {
         try {
-            CompanyProfile profile = ctx.getSettingsDao().getCompanyProfile();
-            companyNameField.setText(profile.name());
-            companyTaxField.setText(profile.taxNumber());
-            companyAddressField.setText(profile.address());
-            companyEmailField.setText(profile.email());
-            draftIbans.clear();
-            draftIbans.putAll(profile.ibansByCurrency());
-
-            String prevCur = activeIbanCurrency;
-            ibanCurrencyCombo.removeAllItems();
-            for (CurrencyDef c : allCurrencies) {
-                if (c.active()) {
-                    ibanCurrencyCombo.addItem(c.code());
-                }
+            if (companyName.getText().isBlank()) throw new IllegalArgumentException(t("validation.company_required"));
+            var address = new CompanyProfile.Address(street.getText(), city.getText(), postalCode.getText());
+            String email = ctx.getSession().isSuperAdmin() ? companyEmail.getText().strip() : null;
+            if (email != null && !email.matches("[^\\s,;@]+@[^\\s,;@]+\\.[^\\s,;@]+")) {
+                throw new IllegalArgumentException(t("invoice.settings.invalid_email"));
             }
-            if (ibanCurrencyCombo.getItemCount() == 0) {
-                ibanCurrencyCombo.addItem("HUF");
-                ibanCurrencyCombo.addItem("EUR");
-            }
-            if (prevCur != null) {
-                ibanCurrencyCombo.setSelectedItem(prevCur);
-            }
-            Object sel = ibanCurrencyCombo.getSelectedItem();
-            activeIbanCurrency = sel != null ? sel.toString() : "HUF";
-            ibanField.setText(draftIbans.getOrDefault(activeIbanCurrency, ""));
-        } finally {
-            loadingCompany = false;
+            ctx.getSettingsDao().saveInvoiceCompanyProfile(companyName.getText(), address, companyTax.getText(), email, readIbans());
+            JOptionPane.showMessageDialog(this, t("invoice.settings.company_saved"), t("common.success"), JOptionPane.INFORMATION_MESSAGE);
+        } catch (RuntimeException ex) {
+            showError(ex);
         }
+    }
+
+    private void openTax(TaxType existing) {
+        var form = new JPanel(new GridBagLayout());
+        var code = editorField(form, 0, "common.code", existing == null ? "" : existing.code());
+        var en = editorField(form, 1, "common.name.en", existing == null ? "" : existing.nameEn());
+        var hu = editorField(form, 2, "common.name.hu", existing == null ? "" : existing.nameHu());
+        var rate = editorField(form, 3, "invoice.settings.tax_rate", existing == null ? "0" : existing.ratePercent().stripTrailingZeros().toPlainString());
+        var scopeCodes = List.of("HU", "EU", "NON_EU", "ANY");
+        var scopes = new JComboBox<>(scopeCodes.stream().map(key -> t("invoice.settings.scope." + key)).toArray(String[]::new));
+        if (existing != null && scopeCodes.contains(existing.countryScope())) scopes.setSelectedIndex(scopeCodes.indexOf(existing.countryScope()));
+        addRow(form, 4, new JLabel(t("invoice.settings.country_scope")), scopes);
+        JCheckBox active = activeControl(form, 5, existing == null || existing.active(), existing != null);
+        if (existing != null && ctx.getFinanceConfigDao().isTaxTypeReferenced(existing.code())) code.setEditable(false);
+        editRecord(form, t("invoice.settings.taxes"), () -> {
+            requireNames(en, hu);
+            var value = CurrencyCode.parseAmount(rate.getText());
+            var scope = scopeCodes.get(scopes.getSelectedIndex());
+            if (existing == null) ctx.getFinanceConfigDao().insertTaxType(code.getText(), en.getText(), hu.getText(), value, scope);
+            else ctx.getFinanceConfigDao().updateTaxType(existing.id(), code.getText(), en.getText(), hu.getText(), value, scope, active.isSelected());
+        }, existing == null ? null : () -> deleteRecord(existing.code(), () -> ctx.getFinanceConfigDao().isTaxTypeReferenced(existing.code()),
+                () -> ctx.getFinanceConfigDao().deleteTaxType(existing.id())));
+    }
+
+    private void openCurrency(CurrencyDef existing) {
+        var form = new JPanel(new GridBagLayout());
+        var code = editorField(form, 0, "common.code", existing == null ? "" : existing.code());
+        var en = editorField(form, 1, "common.name.en", existing == null ? "" : existing.nameEn());
+        var hu = editorField(form, 2, "common.name.hu", existing == null ? "" : existing.nameHu());
+        var symbol = editorField(form, 3, "invoice.settings.symbol", existing == null ? "" : existing.symbol());
+        var decimals = new JComboBox<>(new Integer[]{2, 0});
+        decimals.setSelectedItem(existing == null ? 2 : existing.decimalPlaces());
+        addRow(form, 4, new JLabel(t("invoice.settings.decimals")), decimals);
+        JCheckBox active = activeControl(form, 5, existing == null || existing.active(), existing != null);
+        if (existing != null && ctx.getFinanceConfigDao().isCurrencyReferenced(existing.code())) code.setEditable(false);
+        editRecord(form, t("invoice.settings.currencies"), () -> {
+            requireNames(en, hu);
+            int places = (Integer) decimals.getSelectedItem();
+            if (existing == null) ctx.getFinanceConfigDao().insertCurrency(code.getText(), en.getText(), hu.getText(), symbol.getText(), places);
+            else ctx.getFinanceConfigDao().updateCurrency(existing.id(), code.getText(), en.getText(), hu.getText(), symbol.getText(), places, active.isSelected());
+        }, existing == null ? null : () -> deleteRecord(existing.code(), () -> ctx.getFinanceConfigDao().isCurrencyReferenced(existing.code()),
+                () -> ctx.getFinanceConfigDao().deleteCurrency(existing.id())));
+    }
+
+    private JTextField editorField(JPanel form, int row, String key, String value) {
+        var field = new JTextField(23);
+        setField(field, value);
+        addRow(form, row, new JLabel(t(key)), field);
+        return field;
+    }
+
+    private JCheckBox activeControl(JPanel form, int row, boolean active, boolean editing) {
+        var input = new JCheckBox(t("invoice.settings.active"), active);
+        if (editing) addRow(form, row, new JLabel(t("common.status")), input);
+        return input;
+    }
+
+    private void editRecord(JPanel form, String heading, Runnable save, BooleanSupplier delete) {
+        Object[] buttons = delete == null ? new Object[]{t("common.save"), t("common.cancel")}
+                : new Object[]{t("common.save"), t("common.cancel"), t("common.delete")};
+        while (true) {
+            int action = JOptionPane.showOptionDialog(this, form, heading, JOptionPane.DEFAULT_OPTION,
+                    JOptionPane.PLAIN_MESSAGE, null, buttons, buttons[0]);
+            try {
+                if (action == 0) save.run();
+                else if (action == 2 && delete != null) {
+                    if (!delete.getAsBoolean()) continue;
+                } else return;
+                var pendingIbans = new LinkedHashMap<>(ctx.getSettingsDao().getCompanyProfile().ibansByCurrency());
+                pendingIbans.putAll(readIbans());
+                refreshLists();
+                rebuildIbans(pendingIbans);
+                return;
+            } catch (RuntimeException ex) {
+                showError(ex);
+            }
+        }
+    }
+
+    private boolean deleteRecord(String code, BooleanSupplier referenced, Runnable delete) {
+        if (referenced.getAsBoolean()) {
+            JOptionPane.showMessageDialog(this, t("invoice.settings.in_use", code), t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return false;
+        }
+        if (JOptionPane.showConfirmDialog(this, t("dictionaries.delete_confirm", code), t("common.confirm"),
+                JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) return false;
+        delete.run();
+        return true;
+    }
+
+    private void requireNames(JTextField en, JTextField hu) {
+        if (en.getText().isBlank() || hu.getText().isBlank()) throw new IllegalArgumentException(t("validation.names_bilingual_required"));
     }
 
     void applyTranslations() {
-        I18nManager i18n = ctx.getI18n();
-        companySectionTitle.setText(i18n.t("invoice.settings.company").toUpperCase(Locale.ROOT));
-        companyNameLbl.setText(i18n.t("customers.company") + " *:");
-        companyTaxLbl.setText(i18n.t("invoice.tax_number") + ":");
-        companyAddressLbl.setText(i18n.t("invoice.address") + ":");
-        companyEmailLbl.setText(i18n.t("invoice.email") + ":");
-        ibanCurrencyLbl.setText(i18n.t("invoice.settings.iban_currency") + ":");
-        ibanValueLbl.setText(i18n.t("invoice.settings.iban") + ":");
-        saveCompanyBtn.setText(i18n.t("common.save").toUpperCase(Locale.ROOT));
-
-        taxSectionTitle.setText(i18n.t("invoice.settings.taxes").toUpperCase(Locale.ROOT));
-        addTaxBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
-        editTaxBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
-        toggleTaxBtn.setText(i18n.t("common.activate").toUpperCase(Locale.ROOT)
-                + " / " + i18n.t("common.deactivate").toUpperCase(Locale.ROOT));
-        deleteTaxBtn.setText(i18n.t("common.delete").toUpperCase(Locale.ROOT));
-
-        currencySectionTitle.setText(i18n.t("invoice.settings.currencies").toUpperCase(Locale.ROOT));
-        addCurrencyBtn.setText("+ " + i18n.t("common.add").toUpperCase(Locale.ROOT));
-        editCurrencyBtn.setText(i18n.t("common.edit").toUpperCase(Locale.ROOT));
-        toggleCurrencyBtn.setText(i18n.t("common.activate").toUpperCase(Locale.ROOT)
-                + " / " + i18n.t("common.deactivate").toUpperCase(Locale.ROOT));
-        deleteCurrencyBtn.setText(i18n.t("common.delete").toUpperCase(Locale.ROOT));
-
-        taxModel.setColumnIdentifiers(new Object[]{
-                i18n.t("common.code").toUpperCase(Locale.ROOT),
-                i18n.t("common.name.en").toUpperCase(Locale.ROOT),
-                i18n.t("common.name.hu").toUpperCase(Locale.ROOT),
-                i18n.t("invoice.settings.tax_rate").toUpperCase(Locale.ROOT),
-                i18n.t("invoice.settings.country_scope").toUpperCase(Locale.ROOT),
-                i18n.t("common.status").toUpperCase(Locale.ROOT)
-        });
-
-        currencyModel.setColumnIdentifiers(new Object[]{
-                i18n.t("common.code").toUpperCase(Locale.ROOT),
-                i18n.t("common.name.en").toUpperCase(Locale.ROOT),
-                i18n.t("common.name.hu").toUpperCase(Locale.ROOT),
-                i18n.t("invoice.settings.symbol").toUpperCase(Locale.ROOT),
-                i18n.t("invoice.settings.decimals").toUpperCase(Locale.ROOT),
-                i18n.t("common.status").toUpperCase(Locale.ROOT)
-        });
+        title.setText(t("invoice.tab.settings").toUpperCase(Locale.ROOT));
+        companyTitle.setText(t("invoice.settings.company").toUpperCase(Locale.ROOT));
+        ibanTitle.setText(t("invoice.settings.iban"));
+        companyLabels.forEach((label, key) -> label.setText(t(key)));
+        saveCompany.setText(t("common.save").toUpperCase(Locale.ROOT));
+        taxTitle.setText(t("invoice.settings.taxes").toUpperCase(Locale.ROOT));
+        currencyTitle.setText(t("invoice.settings.currencies").toUpperCase(Locale.ROOT));
+        addTax.setText("+ " + t("common.add").toUpperCase(Locale.ROOT));
+        addCurrency.setText(addTax.getText());
+        taxModel.setColumnIdentifiers(columns("common.code", "common.name.en", "common.name.hu", "invoice.settings.tax_rate",
+                "invoice.settings.country_scope", "common.status"));
+        currencyModel.setColumnIdentifiers(columns("common.code", "common.name.en", "common.name.hu", "invoice.settings.symbol",
+                "invoice.settings.decimals", "common.status"));
     }
 
     void applyTheme() {
-        setBackground(ThemeManager.bg());
-        BrutalistStyle.applyBoxCard(companyCard, 10, 12);
-        BrutalistStyle.applyBoxCard(taxCard, 10, 12);
-        BrutalistStyle.applyBoxCard(currencyCard, 10, 12);
-        companySectionTitle.setForeground(ThemeManager.fg());
-        taxSectionTitle.setForeground(ThemeManager.fg());
-        currencySectionTitle.setForeground(ThemeManager.fg());
-        BrutalistStyle.stylePrimaryButton(saveCompanyBtn);
-
-        BrutalistStyle.stylePrimaryButton(addTaxBtn);
-        BrutalistStyle.styleSecondaryButton(editTaxBtn);
-        BrutalistStyle.styleSecondaryButton(toggleTaxBtn);
-        BrutalistStyle.styleSecondaryButton(deleteTaxBtn);
-
-        BrutalistStyle.stylePrimaryButton(addCurrencyBtn);
-        BrutalistStyle.styleSecondaryButton(editCurrencyBtn);
-        BrutalistStyle.styleSecondaryButton(toggleCurrencyBtn);
-        BrutalistStyle.styleSecondaryButton(deleteCurrencyBtn);
-
+        stack.setBackground(ThemeManager.bg());
+        for (JPanel card : List.of(companyCard, taxCard, currencyCard)) BrutalistStyle.applyBoxCard(card, 10, 12);
+        for (JLabel label : List.of(title, companyTitle, ibanTitle, taxTitle, currencyTitle)) label.setForeground(ThemeManager.fg());
+        BrutalistStyle.stylePrimaryButton(saveCompany);
+        BrutalistStyle.stylePrimaryButton(addTax);
+        BrutalistStyle.stylePrimaryButton(addCurrency);
         BrutalistStyle.styleTable(taxTable);
         BrutalistStyle.styleTable(currencyTable);
-        taxTable.repaint();
-        currencyTable.repaint();
     }
+
+    private String[] columns(String... keys) {
+        return java.util.Arrays.stream(keys).map(key -> t(key).toUpperCase(Locale.ROOT)).toArray(String[]::new);
+    }
+
+    private String yesNo(boolean value) { return t(value ? "common.yes" : "common.no").toUpperCase(Locale.ROOT); }
+    private String t(String key, Object... args) { return ctx.getI18n().t(key, args); }
+    private void showError(RuntimeException ex) { JOptionPane.showMessageDialog(this, ex.getMessage(), t("common.error"), JOptionPane.ERROR_MESSAGE); }
 }

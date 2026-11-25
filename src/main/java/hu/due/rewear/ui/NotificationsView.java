@@ -88,7 +88,7 @@ public final class NotificationsView extends JPanel implements NavigableView {
             }
         });
         markReadBtn.addActionListener(e -> {
-            int row = notifTable.getSelectedRow();
+            int row = TableSorting.selectedModelRow(notifTable);
             if (row >= 0 && row < notifications.size()) {
                 ctx.getNotificationService().markRead(notifications.get(row).id());
                 refreshData();
@@ -101,7 +101,7 @@ public final class NotificationsView extends JPanel implements NavigableView {
     }
 
     private void handleOpenTarget() {
-        int row = notifTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(notifTable);
         if (row >= 0 && row < notifications.size()) {
             AppNotification n = notifications.get(row);
             ctx.getNotificationService().markRead(n.id());
@@ -138,7 +138,7 @@ public final class NotificationsView extends JPanel implements NavigableView {
             if (!n.read()) unread++;
             notifModel.addRow(new Object[]{
                     n.read() ? "✓" : "●",
-                    n.category(),
+                    AppNotification.CAT_SORTING.equals(n.category()) ? ctx.getI18n().t("nav.sorting") : n.category(),
                     n.title(),
                     n.message(),
                     n.createdAt() != null ? DT_FMT.format(n.createdAt()) : ""

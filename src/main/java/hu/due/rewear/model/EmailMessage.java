@@ -29,4 +29,9 @@ public record EmailMessage(
     public boolean hasAttachment() {
         return attachmentPath != null && !attachmentPath.isBlank();
     }
+
+    public EmailMessage withRead(boolean value) {
+        return new EmailMessage(id, ownerUserId, folder, fromAddress, toAddresses, ccAddresses, subject, body,
+                attachmentPath, value, external, deliveryStatus, createdAt);
+    }
 }

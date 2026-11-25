@@ -1,12 +1,12 @@
 package hu.due.rewear.service;
 
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.dao.DaoException;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.model.AppNotification;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.LocationType;
-import hu.due.rewear.model.PackageStatus;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.WarehouseLocation;
 
@@ -16,7 +16,9 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 
@@ -51,7 +53,8 @@ public final class TransportService {
             boolean customerArrived
     ) {
         public boolean isAtDispatchZone() {
-            return currentLocationType == LocationType.DISPATCH_ZONE;
+            return currentLocationType == LocationType.DISPATCH_ZONE
+                    && (targetDispatchLocationId == null || currentLocationId == targetDispatchLocationId);
         }
     }
 
@@ -75,21 +78,21 @@ public final class TransportService {
         this.notificationService = notificationService;
     }
 
-    /** Returns all {@code IN_STOCK} packages currently waiting at any {@link LocationType#OPERATOR_STATION}. */
+
+    private static final String STAGING_FROM = """
+            FROM order_items oi
+            JOIN orders o ON o.id = oi.order_id
+            JOIN inventory_packages ip ON ip.id = oi.package_id
+            JOIN warehouse_locations wl ON wl.id = ip.location_id
+            """;
+    private static final String ACTIVE_STAGING = """
+            WHERE o.status IN ('DRAFT', 'PACKING') AND ip.status = 'RESERVED'
+              AND (o.delivery_date IS NULL OR (o.status='PACKING'
+                   AND o.assigned_forklift_id IS NOT NULL AND o.dispatch_location_id IS NOT NULL))
+            """;
+
     public List<InventoryPackage> findPutawayQueue() {
-        List<WarehouseLocation> stations = locationDao.findByType(LocationType.OPERATOR_STATION, false);
-        if (stations.isEmpty()) {
-            return List.of();
-        }
-        List<InventoryPackage> result = new ArrayList<>();
-        for (WarehouseLocation st : stations) {
-            for (InventoryPackage pkg : packageDao.findByLocationId(st.id())) {
-                if (pkg.status() == PackageStatus.IN_STOCK) {
-                    result.add(pkg);
-                }
-            }
-        }
-        return result;
+        return packageDao.findPutawayQueue();
     }
 
     /** Returns all active order-staging tasks across all orders (used by Management / Dashboard). */
@@ -97,144 +100,231 @@ public final class TransportService {
         return findOrderStagingTasksForDriver(null);
     }
 
-    /**
-     * Returns active ({@code DRAFT} / {@code PACKING}) order-staging tasks.
-     * When {@code driverId} is non-null, filters strictly to orders assigned to that Forklift Driver.
-     */
     public List<StagingTask> findOrderStagingTasksForDriver(Long driverId) {
-        String sql = """
-                SELECT ip.id AS package_id, ip.qr_code, ip.weight_kg,
-                       wl.id AS loc_id, wl.code AS loc_code, wl.location_type,
-                       o.id AS order_id, o.order_number, c.name AS customer_name, o.status AS order_status,
-                       o.assigned_forklift_id, fk.full_name AS assigned_forklift_name,
-                       o.dispatch_location_id, dl.code AS dispatch_location_code,
-                       o.customer_arrived_at
-                FROM order_items oi
-                JOIN orders o ON o.id = oi.order_id
-                JOIN customers c ON c.id = o.customer_id
-                JOIN inventory_packages ip ON ip.id = oi.package_id
-                JOIN warehouse_locations wl ON wl.id = ip.location_id
-                LEFT JOIN users fk ON fk.id = o.assigned_forklift_id
-                LEFT JOIN warehouse_locations dl ON dl.id = o.dispatch_location_id
-                WHERE o.status IN ('DRAFT', 'PACKING')
-                  AND ip.status = 'RESERVED'
-                """ + (driverId != null ? " AND o.assigned_forklift_id = ? " : "") + """
-                ORDER BY CASE WHEN o.customer_arrived_at IS NOT NULL THEN 0 ELSE 1 END,
-                         CASE WHEN wl.location_type = 'DISPATCH_ZONE' THEN 1 ELSE 0 END,
-                         o.order_number ASC, ip.qr_code ASC
-                """;
+        try (Connection conn = db.getConnection()) {
+            return queryStaging(conn, driverId, "", null);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to load forklift order staging tasks", e);
+        }
+    }
+
+    public int countPendingStaging(Long driverId) {
+        String sql = "SELECT COUNT(*) " + STAGING_FROM + ACTIVE_STAGING + """
+                AND (wl.location_type <> 'DISPATCH_ZONE'
+                     OR (o.dispatch_location_id IS NOT NULL AND ip.location_id <> o.dispatch_location_id))
+                """ + (driverId == null ? "" : " AND o.assigned_forklift_id = ?");
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             if (driverId != null) {
                 ps.setLong(1, driverId);
             }
             try (ResultSet rs = ps.executeQuery()) {
+                return rs.getInt(1);
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to count pending staging tasks", e);
+        }
+    }
+
+    private List<StagingTask> queryStaging(Connection conn, Long driverId, String filter, Object value)
+            throws SQLException {
+        String sql = """
+                SELECT ip.id AS package_id, ip.qr_code, ip.weight_kg,
+                       wl.id AS loc_id, wl.code AS loc_code, wl.location_type,
+                       o.id AS order_id, o.order_number, c.name AS customer_name, o.status AS order_status,
+                       o.assigned_forklift_id, fk.full_name AS assigned_forklift_name,
+                       o.dispatch_location_id, dl.code AS dispatch_location_code, o.customer_arrived_at
+                """ + STAGING_FROM + """
+                JOIN customers c ON c.id = o.customer_id
+                LEFT JOIN users fk ON fk.id = o.assigned_forklift_id
+                LEFT JOIN warehouse_locations dl ON dl.id = o.dispatch_location_id
+                """ + ACTIVE_STAGING + filter + (driverId == null ? "" : " AND o.assigned_forklift_id = ?")
+                + """
+                 ORDER BY o.customer_arrived_at IS NULL,
+                          wl.location_type = 'DISPATCH_ZONE'
+                              AND (o.dispatch_location_id IS NULL OR ip.location_id = o.dispatch_location_id),
+                          o.delivery_date IS NULL, o.delivery_date, o.order_number, ip.qr_code
+                """;
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            int index = 1;
+            if (value != null) {
+                ps.setObject(index++, value);
+            }
+            if (driverId != null) {
+                ps.setLong(index, driverId);
+            }
+            try (ResultSet rs = ps.executeQuery()) {
                 List<StagingTask> tasks = new ArrayList<>();
                 while (rs.next()) {
-                    long fkRaw = rs.getLong("assigned_forklift_id");
-                    Long fkId = rs.wasNull() ? null : fkRaw;
-                    long dlRaw = rs.getLong("dispatch_location_id");
-                    Long dlId = rs.wasNull() ? null : dlRaw;
+                    long forkliftId = rs.getLong("assigned_forklift_id");
+                    Long assignedForklift = rs.wasNull() ? null : forkliftId;
+                    long dockId = rs.getLong("dispatch_location_id");
+                    Long assignedDock = rs.wasNull() ? null : dockId;
                     tasks.add(new StagingTask(
-                            rs.getLong("package_id"),
-                            rs.getString("qr_code"),
-                            BigDecimal.valueOf(rs.getDouble("weight_kg")),
-                            rs.getLong("loc_id"),
-                            rs.getString("loc_code"),
-                            LocationType.fromDb(rs.getString("location_type")),
-                            rs.getLong("order_id"),
-                            rs.getString("order_number"),
-                            rs.getString("customer_name"),
-                            rs.getString("order_status"),
-                            fkId,
-                            rs.getString("assigned_forklift_name"),
-                            dlId,
-                            rs.getString("dispatch_location_code"),
-                            rs.getString("customer_arrived_at") != null
-                    ));
+                            rs.getLong("package_id"), rs.getString("qr_code"),
+                            BigDecimal.valueOf(rs.getDouble("weight_kg")), rs.getLong("loc_id"),
+                            rs.getString("loc_code"), LocationType.fromDb(rs.getString("location_type")),
+                            rs.getLong("order_id"), rs.getString("order_number"), rs.getString("customer_name"),
+                            rs.getString("order_status"), assignedForklift, rs.getString("assigned_forklift_name"),
+                            assignedDock, rs.getString("dispatch_location_code"),
+                            rs.getString("customer_arrived_at") != null));
                 }
                 return tasks;
             }
-        } catch (SQLException e) {
-            throw new hu.due.rewear.dao.DaoException("Failed to load forklift order staging tasks", e);
         }
     }
 
-    /** Moves one or more packages from an Operator Station onto a {@link LocationType#STORAGE} shelf. */
+    /** Moves one or more packages from an Operator Station onto a storage shelf. */
     public int putawayToStorage(List<Long> packageIds, long targetStorageLocationId, long driverUserId) {
-        WarehouseLocation target = locationDao.findById(targetStorageLocationId)
-                .orElseThrow(() -> new IllegalArgumentException("Target storage shelf not found."));
-        if (target.locationType() != LocationType.STORAGE) {
-            throw new IllegalArgumentException("Putaway destination must be a STORAGE shelf.");
-        }
-        return inventoryService.relocatePackages(packageIds, targetStorageLocationId,
-                "Forklift putaway -> " + target.code(), driverUserId);
+        return db.executeInTransaction(conn -> {
+            WarehouseLocation target = requireActiveLocation(conn, targetStorageLocationId, LocationType.STORAGE);
+            return inventoryService.relocatePackages(conn, packageIds, target.id(),
+                    "Forklift putaway -> " + target.code(), driverUserId);
+        });
     }
 
-    /**
-     * Barcode/QR scan collection: forklift driver scans a package's QR code to start fulfilling an assigned
-     * order and move the package directly to the order's Collection / Dispatch Site ({@code DISPATCH_ZONE}).
-     */
+    /** Collects one package and advances its order in the same transaction. */
     public StagingTask scanAndCollectForOrder(String rawQrCode, Long fallbackDispatchLocationId,
-                                              long driverUserId, boolean enforceAssignedDriver) {
+                                             long driverUserId, boolean enforceAssignedDriver) {
         if (rawQrCode == null || rawQrCode.isBlank()) {
             throw new IllegalArgumentException("Scan or enter a package QR code.");
         }
         String qr = rawQrCode.trim().toUpperCase(Locale.ROOT);
-        List<StagingTask> candidates = enforceAssignedDriver
-                ? findOrderStagingTasksForDriver(driverUserId)
-                : findOrderStagingTasks();
-        StagingTask task = candidates.stream()
-                .filter(t -> t.qrCode().equalsIgnoreCase(qr))
-                .findFirst()
-                .orElseThrow(() -> new IllegalArgumentException(
-                        "Package " + qr + " is not in your assigned open order collection queue."));
-
-        Long targetDockId = task.targetDispatchLocationId() != null
-                ? task.targetDispatchLocationId()
-                : fallbackDispatchLocationId;
-        if (targetDockId == null) {
-            List<WarehouseLocation> docks = locationDao.findByType(LocationType.DISPATCH_ZONE, true);
-            if (docks.isEmpty()) {
-                throw new IllegalStateException("No active DISPATCH_ZONE collection site configured.");
+        Long driverFilter = enforceAssignedDriver ? driverUserId : null;
+        Map<Long, StagingTask> readyOrders = new LinkedHashMap<>();
+        StagingTask result = db.executeInTransaction(conn -> {
+            List<StagingTask> matches = queryStaging(conn, driverFilter, " AND ip.qr_code = ?", qr);
+            if (matches.isEmpty()) {
+                matches = queryStaging(conn, driverFilter, " AND ip.qr_code = ? COLLATE NOCASE", qr);
             }
-            targetDockId = docks.get(0).id();
-        }
-
-        // Transition DRAFT -> PACKING automatically when forklift starts scanning packages for the order
-        if ("DRAFT".equalsIgnoreCase(task.orderStatus())) {
-            final long orderId = task.orderId();
-            db.runInTransaction(conn -> {
-                try (PreparedStatement ps = conn.prepareStatement("UPDATE orders SET status = 'PACKING' WHERE id = ? AND status = 'DRAFT'")) {
-                    ps.setLong(1, orderId);
-                    ps.executeUpdate();
-                }
-            });
-        }
-
-        stageToDispatchZone(List.of(task.packageId()), targetDockId, driverUserId);
-        return findOrderStagingTasks().stream()
-                .filter(t -> t.packageId() == task.packageId())
-                .findFirst().orElse(task);
+            if (matches.size() != 1) {
+                throw new IllegalArgumentException("Package " + qr + " must match one eligible open order.");
+            }
+            StagingTask task = matches.get(0);
+            Long dockId = task.targetDispatchLocationId() != null
+                    ? task.targetDispatchLocationId() : fallbackDispatchLocationId;
+            long targetId = dockId != null ? dockId : firstActiveDock(conn);
+            stagePackage(conn, task, targetId, driverUserId, readyOrders);
+            return queryStaging(conn, driverFilter, " AND ip.id = ?", task.packageId()).get(0);
+        });
+        notifyReadyOrders(readyOrders);
+        return result;
     }
 
-    /** Moves one or more order-reserved packages to a {@link LocationType#DISPATCH_ZONE} collection dock. */
     public int stageToDispatchZone(List<Long> packageIds, long targetDispatchLocationId, long driverUserId) {
-        WarehouseLocation target = locationDao.findById(targetDispatchLocationId)
-                .orElseThrow(() -> new IllegalArgumentException("Target dispatch/collection zone not found."));
-        if (target.locationType() != LocationType.DISPATCH_ZONE) {
-            throw new IllegalArgumentException("Order staging destination must be a DISPATCH_ZONE.");
+        return stageToDispatchZone(packageIds, targetDispatchLocationId, driverUserId, false);
+    }
+
+    /** Stages an entire selection atomically and respects assigned docks and driver visibility. */
+    public int stageToDispatchZone(List<Long> packageIds, long targetDispatchLocationId,
+                                   long driverUserId, boolean enforceAssignedDriver) {
+        if (packageIds == null || packageIds.isEmpty()) {
+            return 0;
         }
-        int moved = inventoryService.relocatePackages(packageIds, targetDispatchLocationId,
-                "Forklift order collection -> " + target.code(), driverUserId);
-        if (notificationService != null && moved > 0) {
-            notificationService.notifyRoles(
-                    Set.of(RoleCode.MANAGER),
-                    AppNotification.CAT_ORDER_READY,
-                    "Collected at " + target.code(),
-                    moved + " order package(s) scanned & placed at collection site " + target.code() + " by forklift.",
-                    hu.due.rewear.ui.MainFrame.VIEW_ORDERS);
+        Long driverFilter = enforceAssignedDriver ? driverUserId : null;
+        Map<Long, StagingTask> readyOrders = new LinkedHashMap<>();
+        int moved = db.executeInTransaction(conn -> {
+            int count = 0;
+            for (Long packageId : packageIds) {
+                if (packageId == null) {
+                    continue;
+                }
+                List<StagingTask> matches = queryStaging(conn, driverFilter, " AND ip.id = ?", packageId);
+                if (matches.size() != 1) {
+                    throw new IllegalArgumentException("Package " + packageId + " must match one eligible open order.");
+                }
+                count += stagePackage(conn, matches.get(0), targetDispatchLocationId, driverUserId, readyOrders);
+            }
+            return count;
+        });
+        notifyReadyOrders(readyOrders);
+        return moved;
+    }
+
+    private int stagePackage(Connection conn, StagingTask task, long dockId, long driverUserId,
+                             Map<Long, StagingTask> readyOrders) throws SQLException {
+        if (task.targetDispatchLocationId() != null && task.targetDispatchLocationId() != dockId) {
+            throw new IllegalArgumentException("Order " + task.orderNumber() + " is assigned to "
+                    + task.targetDispatchLocationCode() + ".");
+        }
+        try (var ps = conn.prepareStatement("""
+                SELECT 1 FROM orders o JOIN users u ON u.id=? JOIN roles r ON r.id=u.role_id
+                WHERE o.id=? AND o.delivery_date IS NOT NULL AND r.code='FORKLIFT'
+                  AND (u.active=0 OR o.assigned_forklift_id<>u.id)
+                """)) {
+            ps.setLong(1, driverUserId);
+            ps.setLong(2, task.orderId());
+            try (var rows = ps.executeQuery()) {
+                if (rows.next()) throw new IllegalStateException("This scheduled order belongs to another warehouse driver.");
+            }
+        }
+        WarehouseLocation dock = requireActiveLocation(conn, dockId, LocationType.DISPATCH_ZONE);
+        if (task.currentLocationId() != dock.id()
+                && dock.usedWeightKg().add(task.weightKg()).compareTo(dock.maxCapacityKg()) > 0) {
+            throw new IllegalStateException("Dispatch zone " + dock.code() + " has insufficient capacity.");
+        }
+        int moved = inventoryService.relocatePackages(conn, List.of(task.packageId()), dock.id(),
+                "Forklift order collection -> " + dock.code(), driverUserId);
+        if ("DRAFT".equals(task.orderStatus()) || task.targetDispatchLocationId() == null) {
+            try (PreparedStatement ps = conn.prepareStatement("""
+                    UPDATE orders SET status = 'PACKING', dispatch_location_id = ?
+                    WHERE id = ?
+                    """)) {
+                ps.setLong(1, dock.id());
+                ps.setLong(2, task.orderId());
+                ps.executeUpdate();
+            }
+        }
+        if (moved > 0 && allPackagesStaged(conn, task.orderId(), dock.id())) {
+            readyOrders.put(task.orderId(), task);
         }
         return moved;
+    }
+
+    private boolean allPackagesStaged(Connection conn, long orderId, long dockId) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT NOT EXISTS (
+                    SELECT 1 FROM order_items oi
+                    JOIN inventory_packages ip ON ip.id = oi.package_id
+                    WHERE oi.order_id = ? AND (ip.location_id <> ? OR ip.status <> 'RESERVED')
+                )
+                """)) {
+            ps.setLong(1, orderId);
+            ps.setLong(2, dockId);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.getBoolean(1);
+            }
+        }
+    }
+
+    private WarehouseLocation requireActiveLocation(Connection conn, long id, LocationType type) throws SQLException {
+        return locationDao.findById(conn, id)
+                .filter(location -> location.active() && location.locationType() == type)
+                .orElseThrow(() -> new IllegalArgumentException("Choose an active " + type + " destination."));
+    }
+
+    private long firstActiveDock(Connection conn) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("""
+                SELECT id FROM warehouse_locations WHERE location_type = 'DISPATCH_ZONE' AND active = 1
+                ORDER BY code LIMIT 1
+                """);
+             ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return rs.getLong(1);
+            }
+            throw new IllegalStateException("No active dispatch zone is configured.");
+        }
+    }
+
+    private void notifyReadyOrders(Map<Long, StagingTask> readyOrders) {
+        if (notificationService == null) {
+            return;
+        }
+        for (StagingTask task : readyOrders.values()) {
+            notificationService.notifyRoles(Set.of(RoleCode.MANAGER), AppNotification.CAT_ORDER_READY,
+                    "Ready for pickup: " + task.orderNumber(),
+                    "All packages for " + task.orderNumber() + " are at the assigned dispatch zone.",
+                    hu.due.rewear.ui.MainFrame.VIEW_ORDERS);
+        }
     }
 }

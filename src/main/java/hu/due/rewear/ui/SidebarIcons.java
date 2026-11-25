@@ -39,10 +39,10 @@ public final class SidebarIcons {
             case MainFrame.VIEW_SCANNER -> makeIcon(size, SidebarIcons::paintScanner);
             case MainFrame.VIEW_INVENTORY -> makeIcon(size, SidebarIcons::paintInventory);
             case MainFrame.VIEW_LOCATIONS -> makeIcon(size, SidebarIcons::paintLocations);
-            case MainFrame.VIEW_DICTIONARIES -> makeIcon(size, SidebarIcons::paintDictionaries);
+            case MainFrame.VIEW_SORTING, MainFrame.VIEW_DICTIONARIES -> makeIcon(size, SidebarIcons::paintDictionaries);
             case MainFrame.VIEW_CUSTOMERS -> makeIcon(size, SidebarIcons::paintCustomers);
             case MainFrame.VIEW_ORDERS -> makeIcon(size, SidebarIcons::paintOrders);
-            case MainFrame.VIEW_INVOICES -> makeIcon(size, SidebarIcons::paintInvoices);
+            case MainFrame.VIEW_INVOICES, MainFrame.VIEW_PAYROLL -> makeIcon(size, SidebarIcons::paintInvoices);
             case MainFrame.VIEW_EMAIL -> makeIcon(size, SidebarIcons::paintEmail);
             case MainFrame.VIEW_NOTIFICATIONS -> makeIcon(size, SidebarIcons::paintNotifications);
             case MainFrame.VIEW_MESSAGES -> makeIcon(size, SidebarIcons::paintMessages);
@@ -79,6 +79,44 @@ public final class SidebarIcons {
         return makeIcon(size, g -> {
             g.draw(new Line2D.Double(12, 5, 12, 19));
             g.draw(new Line2D.Double(5, 12, 19, 12));
+        });
+    }
+
+    static Icon moreVertical(int size) {
+        return makeIcon(size, g -> {
+            for (int y : new int[]{5, 12, 19}) {
+                g.fill(new java.awt.geom.Ellipse2D.Double(10, y - 2, 4, 4));
+            }
+        });
+    }
+
+    static Icon filter(int size) {
+        return makeIcon(size, g -> {
+            Path2D path = new Path2D.Double();
+            path.moveTo(3, 5);
+            path.lineTo(21, 5);
+            path.lineTo(14, 13);
+            path.lineTo(14, 19);
+            path.lineTo(10, 17);
+            path.lineTo(10, 13);
+            path.closePath();
+            g.draw(path);
+        });
+    }
+
+    static Icon smartFolder(int size) {
+        return makeIcon(size, g -> {
+            Path2D path = new Path2D.Double();
+            path.moveTo(3, 19);
+            path.lineTo(3, 5);
+            path.lineTo(10, 5);
+            path.lineTo(12, 8);
+            path.lineTo(21, 8);
+            path.lineTo(21, 19);
+            path.closePath();
+            g.draw(path);
+            g.draw(new Line2D.Double(12, 11, 12, 16));
+            g.draw(new Line2D.Double(9.5, 13.5, 14.5, 13.5));
         });
     }
 

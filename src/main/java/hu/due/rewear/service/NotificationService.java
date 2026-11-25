@@ -3,6 +3,8 @@ package hu.due.rewear.service;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.dao.NotificationDao;
 import hu.due.rewear.dao.UserDao;
+import hu.due.rewear.i18n.I18nManager;
+import hu.due.rewear.i18n.I18nManager.ExternalSourceStatus;
 import hu.due.rewear.model.AppNotification;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
@@ -17,6 +19,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * (e.g. notifying Forklift Drivers when an Operator creates packages or when an Order needs staging).
  */
 public final class NotificationService {
+    public static final String TRANSLATIONS_TARGET = "admin.translations";
 
     private final DatabaseManager db;
     private final NotificationDao notificationDao;
@@ -71,12 +74,34 @@ public final class NotificationService {
         fireChanged();
     }
 
+    void record(java.sql.Connection conn, long userId, String category, String title, String message,
+                String targetView) throws java.sql.SQLException {
+        notificationDao.insert(conn, userId, category, title, message, targetView, LocalDateTime.now());
+    }
+
+    void publishCommitted() {
+        fireChanged();
+    }
+
     public List<AppNotification> listForUser(long userId, int limit) {
         return notificationDao.findForUser(userId, limit);
     }
 
     public int countUnread(long userId) {
         return notificationDao.countUnread(userId);
+    }
+
+    public int checkTranslationUpdate(User user, ExternalSourceStatus status, I18nManager i18n) {
+        if (user.roleCode() != RoleCode.ADMIN && user.roleCode() != RoleCode.SUPER_ADMIN) return 0;
+        String message = switch (status) {
+            case CURRENT -> "";
+            case RELOAD_REQUIRED -> i18n.t("admin.i18n.alert.changed");
+            case UNAVAILABLE -> i18n.t("admin.i18n.alert.unavailable");
+        };
+        notificationDao.reconcileTranslationAlert(user.id(),
+                status == ExternalSourceStatus.CURRENT ? "" : status.name(),
+                i18n.t("admin.i18n.alert.title"), message, TRANSLATIONS_TARGET);
+        return notificationDao.countUnreadForTarget(user.id(), TRANSLATIONS_TARGET);
     }
 
     public void markRead(long notificationId) {

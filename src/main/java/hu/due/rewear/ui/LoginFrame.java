@@ -52,7 +52,10 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final JButton superAdminBtn = new JButton("SUPERADMIN");
     private final JButton adminBtn = new JButton("ADMIN");
     private final JButton managerBtn = new JButton("MANAGER");
-    private final JButton operatorBtn = new JButton("OPERATOR");
+    private final JButton operatorBtn = new JButton();
+    private final JButton sorterBtn = new JButton();
+    private final JButton helperBtn = new JButton();
+    private final JButton fulfilmentDriverBtn = new JButton();
     private final JButton forkliftBtn = new JButton("FORKLIFT");
 
     private final JComboBox<String> langCombo = new JComboBox<>();
@@ -158,7 +161,7 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         footer.add(loginAsLabel);
         footer.add(Box.createVerticalStrut(8));
 
-        JPanel quickFillPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 8, 0));
+        JPanel quickFillPanel = new JPanel(new java.awt.GridLayout(2, 4, 8, 6));
         quickFillPanel.setOpaque(false);
         Consumer<String[]> fill = creds -> {
             usernameField.setText(creds[0]);
@@ -171,11 +174,22 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         operatorBtn.addActionListener(e -> fill.accept(new String[]{"operator", "operator123"}));
         forkliftBtn.addActionListener(e -> fill.accept(new String[]{"forklift", "forklift123"}));
 
+        sorterBtn.addActionListener(e -> fill.accept(new String[]{"sorter01", "sorter123"}));
+        helperBtn.addActionListener(e -> fill.accept(new String[]{"helper01", "helper123"}));
+        fulfilmentDriverBtn.addActionListener(e -> fill.accept(new String[]{"forklift2", "forklift2123"}));
+
         quickFillPanel.add(superAdminBtn);
         quickFillPanel.add(adminBtn);
         quickFillPanel.add(managerBtn);
         quickFillPanel.add(operatorBtn);
+        quickFillPanel.add(sorterBtn);
+        quickFillPanel.add(helperBtn);
         quickFillPanel.add(forkliftBtn);
+        quickFillPanel.add(fulfilmentDriverBtn);
+        for (var entry : java.util.Map.of(sorterBtn, "sorter01", helperBtn, "helper01",
+                fulfilmentDriverBtn, "forklift2").entrySet()) {
+            entry.getKey().setEnabled(ctx.getUserDao().findByUsername(entry.getValue()).isPresent());
+        }
         footer.add(quickFillPanel);
 
         outer.add(footer, BorderLayout.SOUTH);
@@ -194,8 +208,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         usernameLabel.setForeground(ThemeManager.fg());
         passwordLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
-        BrutalistStyle.styleSecondaryButtons(superAdminBtn, adminBtn, managerBtn, operatorBtn, forkliftBtn);
-        BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn, forkliftBtn);
+        BrutalistStyle.styleSecondaryButtons(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn, helperBtn, forkliftBtn, fulfilmentDriverBtn);
+        BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn, helperBtn, forkliftBtn, fulfilmentDriverBtn);
         loginAsLabel.setForeground(ThemeManager.muted());
     }
 
@@ -238,12 +252,19 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         passwordLabel.setText(i18n.t("login.password"));
         loginButton.setText(i18n.t("login.button"));
         loginAsLabel.setText(i18n.t("login.login_as"));
+        operatorBtn.setText(i18n.t("role.OPERATOR"));
+        sorterBtn.setText(i18n.t("role.SORTER"));
+        helperBtn.setText(i18n.t("role.SORTING_HELPER"));
+        forkliftBtn.setText(i18n.t("login.supply_driver"));
+        fulfilmentDriverBtn.setText(i18n.t("login.fulfilment_driver"));
+        BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn, helperBtn, forkliftBtn, fulfilmentDriverBtn);
     }
 
     @Override
     public void onLanguageChanged(String languageCode) {
         populateLanguages();
         applyTranslations();
+        pack();
     }
 
     @Override

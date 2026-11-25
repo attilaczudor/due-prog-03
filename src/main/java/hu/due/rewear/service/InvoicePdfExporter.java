@@ -74,7 +74,7 @@ public final class InvoicePdfExporter {
 
             @Override
             public String getDefaultFileName() {
-                return "invoice-" + invoice.invoiceNumber() + ".pdf";
+                return InvoiceFiles.baseName(invoice) + ".pdf";
             }
 
             @Override
@@ -211,7 +211,7 @@ public final class InvoicePdfExporter {
             g.drawRect(Math.round(margin), Math.round(y), Math.round(colW), Math.round(boxH));
             String invCur = inv.effectiveCurrencyCode();
             if (isOutgoing) {
-                paintCompanyBlock(g, leftHeader, invCur, margin + 8, y + 14);
+                paintCompanyBlock(g, leftHeader, invCur, margin + 8, y + 14, colW - 16);
             } else {
                 paintPartnerBlock(g, leftHeader, inv, margin + 8, y + 14);
             }
@@ -222,7 +222,7 @@ public final class InvoicePdfExporter {
             if (isOutgoing) {
                 paintPartnerBlock(g, rightHeader, inv, rx + 8, y + 14);
             } else {
-                paintCompanyBlock(g, rightHeader, invCur, rx + 8, y + 14);
+                paintCompanyBlock(g, rightHeader, invCur, rx + 8, y + 14, colW - 16);
             }
 
             // Right QR code
@@ -360,7 +360,7 @@ public final class InvoicePdfExporter {
         g.drawString(footer, margin, pageH - 22f);
     }
 
-    private void paintCompanyBlock(Graphics2D g, String header, String currencyCode, float x, float y) {
+    private void paintCompanyBlock(Graphics2D g, String header, String currencyCode, float x, float y, float width) {
         CompanyProfile company = companyProfileSupplier.get();
         if (company == null) {
             company = CompanyProfile.defaults();
@@ -370,12 +370,29 @@ public final class InvoicePdfExporter {
         g.drawString(header, x, y);
         g.setColor(Color.BLACK);
         g.setFont(new Font(Font.MONOSPACED, Font.BOLD, 10));
-        g.drawString(FormatUtil.truncate(company.name(), 28), x, y + 16);
+        drawFittedLine(g, company.name(), x, y + 16, width);
         g.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 8));
-        g.drawString(FormatUtil.truncate(company.address(), 34), x, y + 32);
-        g.drawString("TAX: " + FormatUtil.truncate(company.taxNumber(), 28), x, y + 46);
-        g.drawString("EMAIL: " + FormatUtil.truncate(company.email(), 28), x, y + 60);
-        g.drawString("IBAN (" + currencyCode + "): " + FormatUtil.truncate(company.ibanForCurrency(currencyCode), 28), x, y + 74);
+        if (company.addressParts().locality().isEmpty()) {
+            drawFittedLine(g, company.addressParts().street(), x, y + 35, width);
+        } else {
+            drawFittedLine(g, company.addressParts().locality(), x, y + 29, width);
+            drawFittedLine(g, company.addressParts().street(), x, y + 40, width);
+        }
+        drawFittedLine(g, "TAX: " + company.taxNumber(), x, y + 52, width);
+        drawFittedLine(g, "EMAIL: " + company.email(), x, y + 64, width);
+        String iban = company.ibanForCurrency(currencyCode);
+        if (!iban.isBlank()) {
+            g.drawString("IBAN (" + currencyCode + ")", x, y + 76);
+            drawFittedLine(g, iban, x, y + 87, width);
+        }
+    }
+
+    private static void drawFittedLine(Graphics2D g, String text, float x, float y, float availableWidth) {
+        Font font = g.getFont();
+        int width = g.getFontMetrics().stringWidth(text);
+        if (width > availableWidth) g.setFont(font.deriveFont(font.getSize2D() * availableWidth / width));
+        g.drawString(text, x, y);
+        g.setFont(font);
     }
 
     private void paintPartnerBlock(Graphics2D g, String header, Invoice inv, float x, float y) {

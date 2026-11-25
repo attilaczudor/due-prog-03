@@ -157,19 +157,48 @@ public final class UserDao {
         }
     }
 
-    public void updateAccountSettings(long userId, String fullName, String email, String phone, byte[] avatarPng) {
+    public void updateManagedAccount(long userId, String lastName, String firstName, long roleId,
+                                     boolean active, Long stationId, String email, String passwordHash) {
+        String ln = lastName == null ? "" : lastName.trim();
+        String fn = firstName == null ? "" : firstName.trim();
+        String sql = """
+                UPDATE users
+                SET full_name = ?, last_name = ?, first_name = ?, role_id = ?, active = ?, assigned_station_id = ?,
+                    email = COALESCE(?, email), password_hash = COALESCE(?, password_hash)
+                WHERE id = ?
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, (ln + " " + fn).trim());
+            ps.setString(2, ln);
+            ps.setString(3, fn);
+            ps.setLong(4, roleId);
+            ps.setInt(5, active ? 1 : 0);
+            ps.setObject(6, stationId);
+            ps.setString(7, email == null ? null : email.trim());
+            ps.setString(8, passwordHash);
+            ps.setLong(9, userId);
+            if (ps.executeUpdate() != 1) {
+                throw new SQLException("User not found: " + userId);
+            }
+        } catch (SQLException e) {
+            throw new DaoException("Failed to update user account: " + userId, e);
+        }
+    }
+
+    public void updateAccountSettings(long userId, String fullName, String phone, byte[] avatarPng) {
         String clean = fullName.replaceAll("\\s*\\([^)]*\\)\\s*", " ").trim();
         String[] parts = clean.split("\\s+", 2);
-        updateAccountSettings(userId, null, parts[0], parts.length > 1 ? parts[1] : "", email, phone, avatarPng, null);
+        updateAccountSettings(userId, null, parts[0], parts.length > 1 ? parts[1] : "", phone, avatarPng, null);
     }
 
     public void updateAccountSettings(long userId, String username, String lastName, String firstName,
-                                      String email, String phone, byte[] avatarPng, Long roleId) {
+                                      String phone, byte[] avatarPng, Long roleId) {
         String ln = lastName == null ? "" : lastName.trim();
         String fn = firstName == null ? "" : firstName.trim();
         String full = (ln + " " + fn).trim();
         StringBuilder sql = new StringBuilder(
-                "UPDATE users SET full_name = ?, last_name = ?, first_name = ?, email = ?, phone = ?, avatar_png = ?");
+                "UPDATE users SET full_name = ?, last_name = ?, first_name = ?, phone = ?, avatar_png = ?");
         if (username != null && !username.isBlank()) {
             sql.append(", username = ?");
         }
@@ -184,7 +213,6 @@ public final class UserDao {
             ps.setString(idx++, full);
             ps.setString(idx++, ln);
             ps.setString(idx++, fn);
-            ps.setString(idx++, email == null || email.isBlank() ? null : email.trim());
             ps.setString(idx++, phone == null || phone.isBlank() ? null : phone.trim());
             if (avatarPng != null && avatarPng.length > 0) {
                 ps.setBytes(idx++, avatarPng);

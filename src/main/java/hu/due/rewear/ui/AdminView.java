@@ -1,12 +1,15 @@
 package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
+import hu.due.rewear.config.SchemaInitializer;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.Role;
+import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.User;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -20,10 +23,11 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JPasswordField;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 import javax.swing.ListSelectionModel;
+import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
@@ -32,11 +36,16 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 
@@ -53,21 +62,19 @@ public final class AdminView extends JPanel implements NavigableView {
 
     private final AppContext ctx;
 
-    private final JTabbedPane tabs = new JTabbedPane();
+    private final SectionNavigation sections;
 
-    // Tab 1: Users
+    // Users
     private final JButton addUserBtn = new JButton();
-    private final JButton editUserBtn = new JButton();
-    private final JButton resetPwBtn = new JButton();
     private final DefaultTableModel usersModel = BrutalistStyle.nonEditableTableModel();
     private final JTable usersTable = new JTable(usersModel);
 
-    // Tab 2: Audit Log
+    // Log
     private final JButton exportAuditBtn = new JButton();
     private final DefaultTableModel auditModel = BrutalistStyle.nonEditableTableModel();
     private final JTable auditTable = new JTable(auditModel);
 
-    // Tab 3: Maintenance
+    // Database and translations
     private final JPanel dbCard = new JPanel();
     private final JLabel dbCardTitle = new JLabel();
     private final JLabel dbInfoLabel = new JLabel();
@@ -81,7 +88,7 @@ public final class AdminView extends JPanel implements NavigableView {
     private final JButton loadI18nBtn = new JButton();
     private final JButton resetI18nBtn = new JButton();
 
-    // Tab 4: System & Packages
+    // System
     private final JPanel runtimeCard = new JPanel();
     private final JLabel runtimeCardTitle = new JLabel();
     private final JLabel runtimeInfoLabel = new JLabel();
@@ -89,17 +96,21 @@ public final class AdminView extends JPanel implements NavigableView {
     private final DefaultTableModel packagesModel = BrutalistStyle.nonEditableTableModel();
     private final JTable packagesTable = new JTable(packagesModel);
 
-    // Tab 5: Email Settings (SUPER_ADMIN only)
+    // Email Settings (SUPER_ADMIN only)
     private AdminEmailSettingsPanel emailSettingsPanel;
 
-    // Tab 6: Roles & Modules Access Matrix (SUPER_ADMIN only)
+    // Roles (SUPER_ADMIN only)
     private AdminModulesPanel modulesPanel;
+    private InvoiceSettingsPanel invoiceSettingsPanel;
+    private NavIntegrationPanel navIntegrationPanel;
+    private BankIntegrationPanel bankIntegrationPanel;
 
     private List<User> users = List.of();
     private List<StockMovement> allMovements = List.of();
 
     public AdminView(AppContext ctx) {
         this.ctx = ctx;
+        sections = new SectionNavigation(ctx.getI18n());
 
         setLayout(new BorderLayout(0, 10));
         setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
@@ -111,38 +122,28 @@ public final class AdminView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Tab 1: Users
         JPanel usersPanel = new JPanel(new BorderLayout(0, 8));
         usersPanel.setBorder(BorderFactory.createEmptyBorder(10, 4, 4, 4));
         JPanel usersBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         usersBar.add(addUserBtn);
-        usersBar.add(editUserBtn);
-        usersBar.add(resetPwBtn);
         usersPanel.add(usersBar, BorderLayout.NORTH);
         BrutalistStyle.styleTable(usersTable);
         usersTable.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
         usersPanel.add(new JScrollPane(usersTable), BorderLayout.CENTER);
 
-        // Tab 2: Audit Log
         JPanel auditPanel = new JPanel(new BorderLayout(0, 8));
         auditPanel.setBorder(BorderFactory.createEmptyBorder(10, 4, 4, 4));
         JPanel auditBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 2));
         auditBar.add(exportAuditBtn);
         auditPanel.add(auditBar, BorderLayout.NORTH);
         BrutalistStyle.styleTable(auditTable);
-        auditTable.setAutoCreateRowSorter(true);
         auditPanel.add(new JScrollPane(auditTable), BorderLayout.CENTER);
-
-        // Tab 3: Maintenance
-        JPanel maintPanel = new JPanel();
-        maintPanel.setLayout(new BoxLayout(maintPanel, BoxLayout.Y_AXIS));
-        maintPanel.setBorder(BorderFactory.createEmptyBorder(12, 4, 4, 4));
 
         dbCard.setLayout(new BoxLayout(dbCard, BoxLayout.Y_AXIS));
         dbCard.setAlignmentX(LEFT_ALIGNMENT);
         dbCardTitle.setFont(ThemeManager.monoFont(Font.BOLD, 14f));
         dbInfoLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
-        JPanel dbBtns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
+        JPanel dbBtns = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 6));
         dbBtns.setAlignmentX(LEFT_ALIGNMENT);
         dbBtns.add(backupDbBtn);
         dbBtns.add(restoreDbBtn);
@@ -156,23 +157,15 @@ public final class AdminView extends JPanel implements NavigableView {
         i18nCard.setAlignmentX(LEFT_ALIGNMENT);
         i18nCardTitle.setFont(ThemeManager.monoFont(Font.BOLD, 14f));
         i18nInfoLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 12f));
-        JPanel i18nBtns = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 6));
-        i18nBtns.setAlignmentX(LEFT_ALIGNMENT);
-        i18nBtns.add(exportI18nBtn);
-        i18nBtns.add(loadI18nBtn);
-        i18nBtns.add(resetI18nBtn);
         i18nCard.add(i18nCardTitle);
         i18nCard.add(Box.createVerticalStrut(6));
         i18nCard.add(i18nInfoLabel);
-        i18nCard.add(Box.createVerticalStrut(8));
-        i18nCard.add(i18nBtns);
+        for (JButton button : List.of(exportI18nBtn, loadI18nBtn, resetI18nBtn)) {
+            button.setAlignmentX(LEFT_ALIGNMENT);
+            i18nCard.add(Box.createVerticalStrut(6));
+            i18nCard.add(button);
+        }
 
-        maintPanel.add(dbCard);
-        maintPanel.add(Box.createVerticalStrut(14));
-        maintPanel.add(i18nCard);
-        maintPanel.add(Box.createVerticalGlue());
-
-        // Tab 4: System & Packages
         JPanel systemPanel = new JPanel(new BorderLayout(0, 12));
         systemPanel.setBorder(BorderFactory.createEmptyBorder(12, 4, 4, 4));
 
@@ -191,23 +184,70 @@ public final class AdminView extends JPanel implements NavigableView {
         pkgWrap.add(new JScrollPane(packagesTable), BorderLayout.CENTER);
         systemPanel.add(pkgWrap, BorderLayout.CENTER);
 
-        tabs.addTab("", usersPanel);
-        tabs.addTab("", auditPanel);
-        tabs.addTab("", maintPanel);
-        tabs.addTab("", systemPanel);
+        sections.addSection("admin.tab.users", SidebarIcons.forView(MainFrame.VIEW_CUSTOMERS, 16), usersPanel);
+        if (ctx.getSession().isSuperAdmin()) {
+            modulesPanel = new AdminModulesPanel(ctx);
+            sections.addSection("admin.tab.modules", SidebarIcons.forView(MainFrame.VIEW_ADMIN, 16), modulesPanel);
+        }
+        if (ctx.getSession().canManageUsersAndMaintenance()) {
+            invoiceSettingsPanel = new InvoiceSettingsPanel(ctx);
+            sections.addSection("invoice.tab.settings", AvatarBadge.createGearIcon(16), invoiceSettingsPanel);
+        }
         if (ctx.getSession().isSuperAdmin()) {
             emailSettingsPanel = new AdminEmailSettingsPanel(ctx, this::refreshData);
-            tabs.addTab("", emailSettingsPanel);
-            modulesPanel = new AdminModulesPanel(ctx);
-            tabs.addTab("", modulesPanel);
+            sections.addSection("admin.tab.mail", SidebarIcons.forView(MainFrame.VIEW_EMAIL, 16), emailSettingsPanel);
         }
-        add(tabs, BorderLayout.CENTER);
+        if (ctx.getSession().canManageUsersAndMaintenance()) {
+            navIntegrationPanel = new NavIntegrationPanel(ctx);
+            bankIntegrationPanel = new BankIntegrationPanel(ctx);
+            sections.addSection("admin.tab.nav", SidebarIcons.mailDrafts(16), navIntegrationPanel);
+            sections.addSection("admin.tab.bank", SidebarIcons.forView(MainFrame.VIEW_INVOICES, 16), bankIntegrationPanel);
+        }
+        sections.addSection("admin.tab.database", SidebarIcons.forView(MainFrame.VIEW_INVENTORY, 16), cardPage(dbCard));
+        sections.addSection("admin.tab.translations", SidebarIcons.mailDrafts(16), cardPage(i18nCard));
+        sections.addSection("admin.tab.audit", SidebarIcons.forView(MainFrame.VIEW_TODO, 16), auditPanel);
+        sections.addSection("admin.tab.system", SidebarIcons.forView(MainFrame.VIEW_DASHBOARD, 16), systemPanel);
+        sections.setSelectionListener(this::refreshSection);
+        add(sections, BorderLayout.CENTER);
+    }
+
+    private void refreshSection(String section) {
+        if (invoiceSettingsPanel != null && "invoice.tab.settings".equals(section)) invoiceSettingsPanel.refreshData();
+        if (navIntegrationPanel != null && "admin.tab.nav".equals(section)) navIntegrationPanel.refreshData();
+        if (bankIntegrationPanel != null && "admin.tab.bank".equals(section)) bankIntegrationPanel.refreshData();
+    }
+
+    private static JPanel cardPage(JPanel card) {
+        JPanel page = new JPanel(new BorderLayout());
+        page.setBorder(BorderFactory.createEmptyBorder(12, 4, 4, 4));
+        page.add(card, BorderLayout.NORTH);
+        return page;
+    }
+
+    void showTranslations() {
+        sections.select("admin.tab.translations");
     }
 
     private void wireEvents() {
         addUserBtn.addActionListener(e -> openCreateUserDialog());
-        editUserBtn.addActionListener(e -> openEditUserDialog());
-        resetPwBtn.addActionListener(e -> handleResetPassword());
+        usersTable.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent event) {
+                int row = usersTable.rowAtPoint(event.getPoint());
+                if (SwingUtilities.isLeftMouseButton(event) && event.getClickCount() == 2 && row >= 0) {
+                    usersTable.setRowSelectionInterval(row, row);
+                    openEditUserDialog();
+                }
+            }
+        });
+        usersTable.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT)
+                .put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "editSelectedUser");
+        usersTable.getActionMap().put("editSelectedUser", new AbstractAction() {
+            @Override
+            public void actionPerformed(ActionEvent event) {
+                openEditUserDialog();
+            }
+        });
 
         exportAuditBtn.addActionListener(e -> handleExportAuditCsv());
 
@@ -220,8 +260,8 @@ public final class AdminView extends JPanel implements NavigableView {
     }
 
     private User getSelectedUser() {
-        int r = usersTable.getSelectedRow();
-        return (r >= 0 && r < users.size()) ? users.get(r) : null;
+        int selected = usersTable.getSelectedRow();
+        return selected < 0 ? null : users.get(usersTable.convertRowIndexToModel(selected));
     }
 
     private void openCreateUserDialog() {
@@ -233,7 +273,7 @@ public final class AdminView extends JPanel implements NavigableView {
         JTextField lastNameF = new JTextField(18);
         JTextField firstNameF = new JTextField(18);
         JTextField emailF = new JTextField(22);
-        emailF.setEditable(ctx.getSession().isSuperAdmin());
+        emailF.setEditable(false);
         Runnable updateEmailPreview = () -> {
             String gen = ctx.getEmailService().generateDefaultEmail(
                     firstNameF.getText(), lastNameF.getText(), userF.getText());
@@ -267,7 +307,7 @@ public final class AdminView extends JPanel implements NavigableView {
         addField(form, gbc, r++, i18n.t("login.username") + " *", userF);
         addField(form, gbc, r++, i18n.t("profile.last_name") + " *", lastNameF);
         addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
-        addField(form, gbc, r++, i18n.t("customer.email"), emailF);
+        addField(form, gbc, r++, i18n.t("profile.email"), emailF);
         addField(form, gbc, r++, i18n.t("login.password") + " *", pwF);
         addField(form, gbc, r++, i18n.t("admin.user.role") + " *", roleCombo);
         addField(form, gbc, r, i18n.t("admin.user.assigned_station"), stationCombo);
@@ -281,10 +321,7 @@ public final class AdminView extends JPanel implements NavigableView {
         String combinedName = (lastNameF.getText().trim() + " " + firstNameF.getText().trim()).trim();
         try {
             long createdId = ctx.getAuthService().createUser(userF.getText(), new String(pwF.getPassword()), combinedName, role.id(), true);
-            String finalEmail = emailF.getText().trim().isEmpty()
-                    ? ctx.getEmailService().generateDefaultEmail(firstNameF.getText(), lastNameF.getText(), userF.getText())
-                    : emailF.getText().trim();
-            ctx.getUserDao().updateEmail(createdId, finalEmail);
+            ctx.getUserDao().updateEmail(createdId, emailF.getText());
             if (role.code() == hu.due.rewear.model.RoleCode.OPERATOR
                     && stationCombo.getSelectedItem() instanceof StationOption so) {
                 ctx.getUserDao().updateAssignedStation(createdId, so.stationId());
@@ -299,18 +336,25 @@ public final class AdminView extends JPanel implements NavigableView {
         User u = getSelectedUser();
         if (u == null) return;
         I18nManager i18n = ctx.getI18n();
-        boolean targetIsSuperAdmin = u.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN;
+        boolean canEditEmail = ctx.getSession().isSuperAdmin();
+        boolean targetIsSuperAdmin = u.roleCode() == RoleCode.SUPER_ADMIN;
+        if (!ctx.getSession().canManageUsersAndMaintenance() || (targetIsSuperAdmin && !canEditEmail)) {
+            JOptionPane.showMessageDialog(this, i18n.t("admin.user.edit_denied"),
+                    i18n.t("common.error"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
         List<Role> roles = ctx.getRoleDao().findAll().stream()
-                .filter(role -> targetIsSuperAdmin || role.code() != hu.due.rewear.model.RoleCode.SUPER_ADMIN)
+                .filter(role -> targetIsSuperAdmin || role.code() != RoleCode.SUPER_ADMIN)
                 .toList();
 
         JTextField lastNameF = new JTextField(u.safeLastName(), 18);
         JTextField firstNameF = new JTextField(u.safeFirstName(), 18);
-        String initialEmail = (u.email() != null && !u.email().isBlank())
-                ? u.email()
-                : ctx.getEmailService().generateDefaultEmail(u.safeFirstName(), u.safeLastName(), u.username());
+        String initialEmail = u.email() == null ? "" : u.email().trim();
         JTextField emailF = new JTextField(initialEmail, 22);
-        emailF.setEditable(ctx.getSession().isSuperAdmin());
+        emailF.setEditable(canEditEmail);
+        if (!canEditEmail) {
+            emailF.setToolTipText(i18n.t("profile.email.managed"));
+        }
         JComboBox<Role> roleCombo = new JComboBox<>(roles.toArray(new Role[0]));
         for (Role role : roles) {
             if (role.id() == u.roleId()) {
@@ -321,7 +365,7 @@ public final class AdminView extends JPanel implements NavigableView {
         JComboBox<StationOption> stationCombo = buildStationCombo(u.assignedStationId(), i18n);
         Runnable syncStationEnabled = () -> {
             Role selRole = (Role) roleCombo.getSelectedItem();
-            stationCombo.setEnabled(selRole != null && selRole.code() == hu.due.rewear.model.RoleCode.OPERATOR);
+            stationCombo.setEnabled(selRole != null && selRole.code() == RoleCode.OPERATOR);
         };
         roleCombo.addActionListener(e -> syncStationEnabled.run());
         syncStationEnabled.run();
@@ -339,35 +383,62 @@ public final class AdminView extends JPanel implements NavigableView {
         int r = 0;
         addField(form, gbc, r++, i18n.t("profile.last_name") + " *", lastNameF);
         addField(form, gbc, r++, i18n.t("profile.first_name") + " *", firstNameF);
-        addField(form, gbc, r++, i18n.t("customer.email"), emailF);
+        addField(form, gbc, r++, i18n.t("profile.email"), emailF);
         addField(form, gbc, r++, i18n.t("admin.user.role") + " *", roleCombo);
         addField(form, gbc, r++, i18n.t("admin.user.assigned_station"), stationCombo);
-        gbc.gridx = 1; gbc.gridy = r; form.add(activeBox, gbc);
+        gbc.gridx = 1; gbc.gridy = r++; form.add(activeBox, gbc);
 
-        if (JOptionPane.showConfirmDialog(this, form, i18n.t("common.edit") + " — " + u.username(),
-                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE) != JOptionPane.OK_OPTION) {
-            return;
-        }
-        long currentAdminId = ctx.getSession().requireCurrentUser().id();
-        if (u.id() == currentAdminId && !activeBox.isSelected()) {
-            JOptionPane.showMessageDialog(this, i18n.t("admin.user.cannot_disable_self"),
-                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-        Role role = (Role) roleCombo.getSelectedItem();
-        if (role == null) return;
-        try {
-            ctx.getUserDao().updateProfile(u.id(), lastNameF.getText(), firstNameF.getText(), role.id(), activeBox.isSelected());
-            if (ctx.getSession().isSuperAdmin()) {
-                ctx.getUserDao().updateEmail(u.id(), emailF.getText().trim());
+        gbc.gridx = 0;
+        gbc.gridy = r++;
+        gbc.gridwidth = 2;
+        JLabel resetTitle = new JLabel(i18n.t("admin.user.reset_pw"));
+        resetTitle.setBorder(BorderFactory.createEmptyBorder(8, 0, 0, 0));
+        resetTitle.setFont(ThemeManager.monoFont(Font.BOLD, 13f));
+        form.add(resetTitle, gbc);
+        gbc.gridwidth = 1;
+        JPasswordField newPassword = new JPasswordField(18);
+        JPasswordField confirmPassword = new JPasswordField(18);
+        addField(form, gbc, r++, i18n.t("profile.password.new"), newPassword);
+        addField(form, gbc, r, i18n.t("profile.password.confirm"), confirmPassword);
+
+        String[] options = {i18n.t("common.save"), i18n.t("common.cancel")};
+        while (JOptionPane.showOptionDialog(this, form, i18n.t("common.edit") + " — " + u.username(),
+                JOptionPane.OK_CANCEL_OPTION, JOptionPane.PLAIN_MESSAGE, null, options, options[0]) == 0) {
+            char[] password = newPassword.getPassword();
+            char[] confirmation = confirmPassword.getPassword();
+            try {
+                if (!Arrays.equals(password, confirmation)) {
+                    JOptionPane.showMessageDialog(this, i18n.t("profile.error.password_mismatch"),
+                            i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+                    continue;
+                }
+                if (password.length > 0 && password.length < 6) {
+                    JOptionPane.showMessageDialog(this, i18n.t("profile.error.password_short"),
+                            i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+                    continue;
+                }
+                Role role = (Role) roleCombo.getSelectedItem();
+                if (role == null) {
+                    return;
+                }
+                Long assignedId = stationCombo.getSelectedItem() instanceof StationOption so ? so.stationId() : null;
+                String editedEmail = emailF.getText().trim();
+                String emailChange = canEditEmail && !editedEmail.equals(initialEmail) ? editedEmail : null;
+                ctx.getAuthService().updateManagedUser(u.id(), lastNameF.getText(), firstNameF.getText(),
+                        role, activeBox.isSelected(), assignedId, emailChange, password);
+                refreshData();
+                return;
+            } catch (Exception ex) {
+                String message = switch (String.valueOf(ex.getMessage())) {
+                    case "ADMIN_USER_EDIT_DENIED" -> i18n.t("admin.user.edit_denied");
+                    case "ADMIN_USER_CANNOT_DISABLE_SELF" -> i18n.t("admin.user.cannot_disable_self");
+                    default -> ex.getMessage();
+                };
+                JOptionPane.showMessageDialog(this, message, i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+            } finally {
+                Arrays.fill(password, '\0');
+                Arrays.fill(confirmation, '\0');
             }
-            Long assignedId = (role.code() == hu.due.rewear.model.RoleCode.OPERATOR
-                    && stationCombo.getSelectedItem() instanceof StationOption so)
-                    ? so.stationId() : null;
-            ctx.getUserDao().updateAssignedStation(u.id(), assignedId);
-            refreshData();
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
@@ -392,22 +463,6 @@ public final class AdminView extends JPanel implements NavigableView {
         }
         combo.setSelectedItem(selected);
         return combo;
-    }
-
-    private void handleResetPassword() {
-        User u = getSelectedUser();
-        if (u == null) return;
-        I18nManager i18n = ctx.getI18n();
-        String newPw = JOptionPane.showInputDialog(this, i18n.t("admin.user.new_pw_prompt"),
-                i18n.t("admin.user.reset_pw") + " (" + u.username() + ")", JOptionPane.PLAIN_MESSAGE);
-        if (newPw == null) return;
-        try {
-            ctx.getAuthService().resetPassword(u.id(), newPw);
-            JOptionPane.showMessageDialog(this, i18n.t("common.success"),
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
     }
 
     private void handleExportAuditCsv() {
@@ -456,6 +511,7 @@ public final class AdminView extends JPanel implements NavigableView {
         }
         try {
             ctx.getBackupService().restoreDatabase(chooser.getSelectedFile().toPath());
+            new SchemaInitializer(ctx.getDatabaseManager()).initialize();
             refreshData();
             JOptionPane.showMessageDialog(this, i18n.t("admin.db.restored"),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
@@ -485,6 +541,8 @@ public final class AdminView extends JPanel implements NavigableView {
         I18nManager i18n = ctx.getI18n();
         JFileChooser chooser = new JFileChooser();
         chooser.setFileFilter(new FileNameExtensionFilter("CSV Files (*.csv)", "csv"));
+        String configuredPath = ctx.getPreferences().getExternalTranslationsPath();
+        if (!configuredPath.isBlank()) chooser.setSelectedFile(new File(configuredPath));
         if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
         Path csvPath = chooser.getSelectedFile().toPath();
         try {
@@ -586,6 +644,7 @@ public final class AdminView extends JPanel implements NavigableView {
 
         updateMaintenanceInfo();
         updateSystemDiagnostics();
+        refreshSection(sections.selectedKey());
         if (emailSettingsPanel != null) {
             emailSettingsPanel.refreshData();
         }
@@ -608,6 +667,8 @@ public final class AdminView extends JPanel implements NavigableView {
             // Ignore transient size read error
         }
         long receiptCount = ctx.getReceiptVaultService().countVaultFiles();
+        var invoiceArchive = ctx.getInvoiceArchiveService();
+        var i18n = ctx.getI18n();
         String theme = ThemeManager.isDarkMode() ? "DARK" : "LIGHT";
 
         runtimeInfoLabel.setText("<html>"
@@ -615,8 +676,10 @@ public final class AdminView extends JPanel implements NavigableView {
                 + " &nbsp;|&nbsp; <b>OS:</b> " + System.getProperty("os.name") + " " + System.getProperty("os.arch")
                 + " &nbsp;|&nbsp; <b>Heap:</b> " + usedMb + " / " + maxMb + " MB<br>"
                 + "<b>SQLite DB:</b> " + dbPath + " (" + dbKb + " KB)"
-                + " &nbsp;|&nbsp; <b>Receipts Vault:</b> " + ctx.getReceiptVaultService().getReceiptsDir()
-                + " (" + receiptCount + " file(s))<br>"
+                + "<br><b>" + i18n.t("admin.system.invoice_archive") + ":</b> " + invoiceArchive.getDirectory()
+                + " (" + i18n.t("admin.system.file_count", invoiceArchive.countInvoices()) + ")<br>"
+                + "<b>" + i18n.t("admin.system.receipt_vault") + ":</b> " + ctx.getReceiptVaultService().getReceiptsDir()
+                + " (" + i18n.t("admin.system.file_count", receiptCount) + ")<br>"
                 + "<b>UI:</b> Brutalist Monochrome (" + theme + ") &nbsp;|&nbsp; <b>Active Language:</b> "
                 + ctx.getI18n().getActiveLanguage().toUpperCase(java.util.Locale.ROOT)
                 + "</html>");
@@ -640,16 +703,14 @@ public final class AdminView extends JPanel implements NavigableView {
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
-        tabs.setTitleAt(0, i18n.t("admin.tab.users").toUpperCase());
-        tabs.setTitleAt(1, i18n.t("admin.tab.audit").toUpperCase());
-        tabs.setTitleAt(2, i18n.t("admin.tab.maintenance").toUpperCase());
-        tabs.setTitleAt(3, i18n.t("admin.tab.system").toUpperCase());
-        if (emailSettingsPanel != null && tabs.getTabCount() > 4) {
-            tabs.setTitleAt(4, i18n.t("admin.tab.mail").toUpperCase());
+        sections.applyTranslations();
+        if (invoiceSettingsPanel != null) invoiceSettingsPanel.applyTranslations();
+        if (navIntegrationPanel != null) navIntegrationPanel.applyTranslations();
+        if (bankIntegrationPanel != null) bankIntegrationPanel.applyTranslations();
+        if (emailSettingsPanel != null) {
             emailSettingsPanel.applyTranslations();
         }
-        if (modulesPanel != null && tabs.getTabCount() > 5) {
-            tabs.setTitleAt(5, i18n.t("admin.tab.modules").toUpperCase());
+        if (modulesPanel != null) {
             modulesPanel.applyTranslations();
         }
 
@@ -662,16 +723,16 @@ public final class AdminView extends JPanel implements NavigableView {
         });
 
         addUserBtn.setText("+ " + i18n.t("common.add").toUpperCase());
-        editUserBtn.setText(i18n.t("common.edit").toUpperCase());
-        resetPwBtn.setText(i18n.t("admin.user.reset_pw").toUpperCase());
+        usersTable.getAccessibleContext().setAccessibleDescription(i18n.t("admin.user.edit_hint"));
+        usersTable.setToolTipText(i18n.t("admin.user.edit_hint"));
 
         exportAuditBtn.setText(i18n.t("common.export.csv").toUpperCase());
 
-        dbCardTitle.setText("SQLITE DATABASE");
+        dbCardTitle.setText(i18n.t("admin.tab.database").toUpperCase(Locale.ROOT));
         backupDbBtn.setText(i18n.t("admin.db.backup").toUpperCase());
         restoreDbBtn.setText(i18n.t("admin.db.restore").toUpperCase());
 
-        i18nCardTitle.setText("CSV INTERNATIONALIZATION (I18N)");
+        i18nCardTitle.setText(i18n.t("admin.tab.translations").toUpperCase(Locale.ROOT));
         exportI18nBtn.setText(i18n.t("admin.i18n.export").toUpperCase());
         loadI18nBtn.setText(i18n.t("admin.i18n.reload").toUpperCase());
         resetI18nBtn.setText(i18n.t("admin.i18n.reset").toUpperCase());
@@ -679,7 +740,7 @@ public final class AdminView extends JPanel implements NavigableView {
         usersModel.setColumnIdentifiers(new Object[]{
                 i18n.t("login.username").toUpperCase(),
                 i18n.t("admin.user.full_name").toUpperCase(),
-                i18n.t("customer.email").toUpperCase(),
+                i18n.t("profile.email").toUpperCase(),
                 i18n.t("admin.user.role").toUpperCase(),
                 i18n.t("common.status").toUpperCase(),
                 i18n.t("common.created_at").toUpperCase()
@@ -698,11 +759,14 @@ public final class AdminView extends JPanel implements NavigableView {
 
     @Override
     public void applyTheme() {
+        sections.applyTheme();
+        if (invoiceSettingsPanel != null) invoiceSettingsPanel.applyTheme();
+        if (navIntegrationPanel != null) navIntegrationPanel.applyTheme();
+        if (bankIntegrationPanel != null) bankIntegrationPanel.applyTheme();
         BrutalistStyle.stylePrimaryButton(addUserBtn);
         BrutalistStyle.stylePrimaryButton(backupDbBtn);
         BrutalistStyle.stylePrimaryButton(loadI18nBtn);
         BrutalistStyle.styleSecondaryButtons(
-                editUserBtn, resetPwBtn,
                 exportAuditBtn,
                 restoreDbBtn, exportI18nBtn, resetI18nBtn);
         BrutalistStyle.applyBoxCard(dbCard, 14, 16);

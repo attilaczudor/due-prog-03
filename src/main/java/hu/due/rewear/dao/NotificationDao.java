@@ -69,6 +69,58 @@ public final class NotificationDao {
         }
     }
 
+    public int countUnreadForTarget(long userId, String targetView) {
+        String sql = "SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0 AND target_view = ?";
+        try (var conn = db.getConnection(); var ps = conn.prepareStatement(sql)) {
+            ps.setLong(1, userId);
+            ps.setString(2, targetView);
+            try (var rows = ps.executeQuery()) {
+                return rows.next() ? rows.getInt(1) : 0;
+            }
+        } catch (SQLException ex) {
+            throw new DaoException("Failed to count unread notifications for " + targetView, ex);
+        }
+    }
+
+    public void reconcileTranslationAlert(long userId, String state, String title, String message, String targetView) {
+        String key = "admin.translation_alert." + userId;
+        try (var conn = db.getConnection();
+             var ps = conn.prepareStatement("SELECT setting_value FROM app_settings WHERE setting_key = ?")) {
+            ps.setString(1, key);
+            try (var rows = ps.executeQuery()) {
+                if (state.equals(rows.next() ? rows.getString(1) : "")) return;
+            }
+        } catch (SQLException ex) {
+            throw new DaoException("Failed to read translation alert state", ex);
+        }
+        db.runInTransaction(conn -> {
+            try (var ps = conn.prepareStatement("""
+                    INSERT INTO app_settings(setting_key, setting_value)
+                    SELECT ?, ?
+                    WHERE ? <> '' OR EXISTS(SELECT 1 FROM app_settings WHERE setting_key = ?)
+                    ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+                    WHERE app_settings.setting_value <> excluded.setting_value
+                    """)) {
+                ps.setString(1, key);
+                ps.setString(2, state);
+                ps.setString(3, state);
+                ps.setString(4, key);
+                if (ps.executeUpdate() == 0) return;
+            }
+            try (var ps = conn.prepareStatement("""
+                    UPDATE notifications SET is_read = 1
+                    WHERE user_id = ? AND is_read = 0 AND target_view = ?
+                    """)) {
+                ps.setLong(1, userId);
+                ps.setString(2, targetView);
+                ps.executeUpdate();
+            }
+            if (!state.isEmpty()) {
+                insert(conn, userId, "SYSTEM", title, message, targetView, LocalDateTime.now());
+            }
+        });
+    }
+
     public long insert(Connection conn, long userId, String category, String title,
                        String message, String targetView, LocalDateTime createdAt) throws SQLException {
         String sql = """

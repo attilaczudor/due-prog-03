@@ -20,7 +20,7 @@ public final class SessionContext {
     }
 
     public synchronized boolean canAccessModule(AppModule module) {
-        if (currentUser == null || module == null) {
+        if (currentUser == null || module == null || !module.allowsRole(currentUser.roleCode())) {
             return false;
         }
         if (currentUser.roleCode() == RoleCode.SUPER_ADMIN || module.isAlwaysEnabled()) {
@@ -77,7 +77,7 @@ public final class SessionContext {
         return isAdmin() || hasRole(RoleCode.MANAGER);
     }
 
-    public synchronized boolean isOperator() {
+    public synchronized boolean isStationManager() {
         return hasRole(RoleCode.OPERATOR);
     }
 
@@ -86,7 +86,7 @@ public final class SessionContext {
     }
 
     public boolean canUseIntake() {
-        return isManagerOrAdmin() || isOperator();
+        return isManagerOrAdmin() || isStationManager();
     }
 
     public boolean canUseTransportQueue() {

@@ -4,6 +4,7 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.model.CompanyProfile;
 import hu.due.rewear.model.CurrencyCode;
 import hu.due.rewear.model.EmailSettings;
+import hu.due.rewear.model.NavDemoSettings;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -25,6 +26,9 @@ public final class SettingsDao {
     public static final String KEY_EUR_HUF_RATE = "fx.eur_huf";
     public static final String KEY_COMPANY_NAME = "company.name";
     public static final String KEY_COMPANY_ADDRESS = "company.address";
+    private static final String KEY_COMPANY_STREET = "company.address.street";
+    private static final String KEY_COMPANY_CITY = "company.address.city";
+    private static final String KEY_COMPANY_POSTAL_CODE = "company.address.postal_code";
     public static final String KEY_COMPANY_TAX_NUMBER = "company.tax_number";
     public static final String KEY_COMPANY_EMAIL = "company.email";
     public static final String KEY_COMPANY_PHONE = "company.phone";
@@ -77,6 +81,36 @@ public final class SettingsDao {
         }
     }
 
+    public NavDemoSettings getNavDemoSettings() {
+        var fields = new java.util.EnumMap<NavDemoSettings.Field, String>(NavDemoSettings.Field.class);
+        try (var conn = db.getConnection();
+             var query = conn.prepareStatement("SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'nav.demo.%'");
+             var rows = query.executeQuery()) {
+            var lookup = new java.util.HashMap<String, String>();
+            while (rows.next()) lookup.put(rows.getString(1), rows.getString(2));
+            for (var field : NavDemoSettings.Field.values()) {
+                String value = lookup.get("nav.demo." + field.key());
+                if (value != null) fields.put(field, value);
+            }
+            return new NavDemoSettings(fields);
+        } catch (SQLException ex) {
+            throw new DaoException("Could not load NAV demo setup", ex);
+        }
+    }
+
+    public void saveNavDemoSettings(NavDemoSettings settings) {
+        db.runInTransaction(conn -> {
+            try (var query = conn.prepareStatement("""
+                    INSERT INTO app_settings(setting_key, setting_value) VALUES(?, ?)
+                    ON CONFLICT(setting_key) DO UPDATE SET setting_value = excluded.setting_value
+                    """)) {
+                for (var field : NavDemoSettings.Field.values()) {
+                    upsertSetting(query, "nav.demo." + field.key(), settings.value(field));
+                }
+            }
+        });
+    }
+
     public BigDecimal getEurToHufRate() {
         return get(KEY_EUR_HUF_RATE)
                 .map(raw -> {
@@ -104,6 +138,9 @@ public final class SettingsDao {
         String sql = "SELECT setting_key, setting_value FROM app_settings WHERE setting_key LIKE 'company.%'";
         String name = CompanyProfile.DEFAULT_NAME;
         String address = CompanyProfile.DEFAULT_ADDRESS;
+        String street = null;
+        String city = null;
+        String postalCode = null;
         String tax = CompanyProfile.DEFAULT_TAX_NUMBER;
         String email = CompanyProfile.DEFAULT_EMAIL;
         String phone = CompanyProfile.DEFAULT_PHONE;
@@ -121,13 +158,16 @@ public final class SettingsDao {
                 switch (k) {
                     case KEY_COMPANY_NAME -> { if (!v.isBlank()) name = v.trim(); }
                     case KEY_COMPANY_ADDRESS -> { if (!v.isBlank()) address = v.trim(); }
+                    case KEY_COMPANY_STREET -> street = v;
+                    case KEY_COMPANY_CITY -> city = v;
+                    case KEY_COMPANY_POSTAL_CODE -> postalCode = v;
                     case KEY_COMPANY_TAX_NUMBER -> { if (!v.isBlank()) tax = v.trim(); }
                     case KEY_COMPANY_EMAIL -> { if (!v.isBlank()) email = v.trim(); }
                     case KEY_COMPANY_PHONE -> phone = v.trim();
                     default -> {
                         if (k.startsWith(PREFIX_COMPANY_IBAN)) {
                             String cur = k.substring(PREFIX_COMPANY_IBAN.length()).trim().toUpperCase(Locale.ROOT);
-                            if (!cur.isEmpty() && !v.isBlank()) {
+                            if (!cur.isEmpty()) {
                                 ibans.put(cur, v.trim());
                             }
                         }
@@ -137,11 +177,27 @@ public final class SettingsDao {
         } catch (SQLException e) {
             throw new DaoException("Failed to load company profile settings", e);
         }
-        return new CompanyProfile(name, address, tax, email, phone, ibans);
+        var addressParts = street != null || city != null || postalCode != null
+                ? new CompanyProfile.Address(street, city, postalCode) : CompanyProfile.Address.fromLegacy(address);
+        return new CompanyProfile(name, addressParts, tax, email, phone, ibans);
     }
 
     /** Atomically persists seller/issuer company profile details and per-currency bank IBANs. */
     public void saveCompanyProfile(CompanyProfile profile) {
+        persistCompanyProfile(profile, true, true);
+    }
+
+    public void saveInvoiceCompanyProfile(String name, CompanyProfile.Address address, String taxNumber,
+                                          Map<String, String> ibans) {
+        saveInvoiceCompanyProfile(name, address, taxNumber, null, ibans);
+    }
+
+    public void saveInvoiceCompanyProfile(String name, CompanyProfile.Address address, String taxNumber,
+                                          String email, Map<String, String> ibans) {
+        persistCompanyProfile(new CompanyProfile(name, address, taxNumber, email, null, ibans), email != null, false);
+    }
+
+    private void persistCompanyProfile(CompanyProfile profile, boolean writeEmail, boolean writePhone) {
         if (profile == null) {
             throw new IllegalArgumentException("Company profile is required.");
         }
@@ -154,9 +210,12 @@ public final class SettingsDao {
             try (PreparedStatement ps = conn.prepareStatement(upsertSql)) {
                 upsertSetting(ps, KEY_COMPANY_NAME, profile.name());
                 upsertSetting(ps, KEY_COMPANY_ADDRESS, profile.address());
+                upsertSetting(ps, KEY_COMPANY_STREET, profile.addressParts().street());
+                upsertSetting(ps, KEY_COMPANY_CITY, profile.addressParts().city());
+                upsertSetting(ps, KEY_COMPANY_POSTAL_CODE, profile.addressParts().postalCode());
                 upsertSetting(ps, KEY_COMPANY_TAX_NUMBER, profile.taxNumber());
-                upsertSetting(ps, KEY_COMPANY_EMAIL, profile.email());
-                upsertSetting(ps, KEY_COMPANY_PHONE, profile.phone());
+                if (writeEmail) upsertSetting(ps, KEY_COMPANY_EMAIL, profile.email());
+                if (writePhone) upsertSetting(ps, KEY_COMPANY_PHONE, profile.phone());
                 for (Map.Entry<String, String> entry : profile.ibansByCurrency().entrySet()) {
                     String cur = entry.getKey().trim().toUpperCase(Locale.ROOT);
                     upsertSetting(ps, PREFIX_COMPANY_IBAN + cur, entry.getValue().trim());

@@ -41,7 +41,7 @@ public final class RoleModuleService {
     }
 
     public boolean isModuleEnabled(RoleCode role, AppModule module) {
-        if (role == null || module == null) {
+        if (role == null || module == null || !module.allowsRole(role)) {
             return false;
         }
         if (role == RoleCode.SUPER_ADMIN || module.isAlwaysEnabled()) {
@@ -57,7 +57,9 @@ public final class RoleModuleService {
         if (role == RoleCode.SUPER_ADMIN) {
             return EnumSet.allOf(AppModule.class);
         }
-        return dao.findEnabledModules(role);
+        Set<AppModule> enabled = dao.findEnabledModules(role);
+        enabled.removeIf(module -> !module.allowsRole(role));
+        return enabled;
     }
 
     public Map<RoleCode, Set<AppModule>> getPermissionMatrix() {
@@ -73,7 +75,7 @@ public final class RoleModuleService {
         if (targetRole == RoleCode.SUPER_ADMIN) {
             return; // Super Admin always has unrestricted access
         }
-        if (module.isAlwaysEnabled() && !enabled) {
+        if (!module.allowsRole(targetRole) || (module.isAlwaysEnabled() && !enabled)) {
             return; // Core home screen remains enabled for all roles
         }
         dao.setEnabled(targetRole, module, enabled);

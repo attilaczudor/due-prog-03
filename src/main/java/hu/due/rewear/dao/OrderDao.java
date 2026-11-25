@@ -12,6 +12,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.time.LocalDate;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -31,7 +32,7 @@ public final class OrderDao {
                    o.created_by, u.full_name AS created_by_name, o.created_at, o.shipped_at,
                    o.assigned_forklift_id, fk.full_name AS assigned_forklift_name,
                    o.dispatch_location_id, dl.code AS dispatch_location_code,
-                   o.customer_arrived_at
+                   o.customer_arrived_at, o.delivery_date
             FROM orders o
             JOIN customers c ON c.id = o.customer_id
             JOIN users u ON u.id = o.created_by
@@ -93,15 +94,19 @@ public final class OrderDao {
     }
 
     public Optional<Order> findById(long id) {
-        String sql = BASE_SELECT + " WHERE o.id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = db.getConnection()) {
+            return findById(conn, id);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to find order: " + id, e);
+        }
+    }
+
+    public Optional<Order> findById(Connection conn, long id) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement(BASE_SELECT + " WHERE o.id = ?")) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
             }
-        } catch (SQLException e) {
-            throw new DaoException("Failed to find order: " + id, e);
         }
     }
 
@@ -182,6 +187,14 @@ public final class OrderDao {
         }
     }
 
+    public void updateDeliveryDate(Connection conn, long orderId, LocalDate date) throws SQLException {
+        try (var ps = conn.prepareStatement("UPDATE orders SET delivery_date = ? WHERE id = ?")) {
+            ps.setString(1, date.toString());
+            ps.setLong(2, orderId);
+            ps.executeUpdate();
+        }
+    }
+
     public void updateCurrency(Connection conn, long orderId, String currencyCode) throws SQLException {
         String sql = "UPDATE orders SET currency = ? WHERE id = ?";
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -202,19 +215,30 @@ public final class OrderDao {
     }
 
     public void updateStatus(Connection conn, long orderId, OrderStatus status, LocalDateTime shippedAt) throws SQLException {
-        String sql = "UPDATE orders SET status = ?, shipped_at = ? WHERE id = ?";
+        String sql = """
+                UPDATE orders SET status = ?, shipped_at = ?,
+                    customer_arrived_at = CASE
+                        WHEN status IN ('SHIPPED', 'CANCELLED') OR ? = 'CANCELLED' THEN NULL
+                        ELSE customer_arrived_at
+                    END
+                WHERE id = ?
+                """;
         try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, status.name());
             ps.setString(2, DaoDateUtil.format(shippedAt));
-            ps.setLong(3, orderId);
+            ps.setString(3, status.name());
+            ps.setLong(4, orderId);
             ps.executeUpdate();
         }
     }
 
     public void updateAssignment(long orderId, Long forkliftUserId, Long dispatchLocationId) {
+        db.runInTransaction(conn -> updateAssignment(conn, orderId, forkliftUserId, dispatchLocationId));
+    }
+
+    public void updateAssignment(Connection conn, long orderId, Long forkliftUserId, Long dispatchLocationId) throws SQLException {
         String sql = "UPDATE orders SET assigned_forklift_id = ?, dispatch_location_id = ? WHERE id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             if (forkliftUserId != null && forkliftUserId > 0) ps.setLong(1, forkliftUserId);
             else ps.setNull(1, java.sql.Types.INTEGER);
             if (dispatchLocationId != null && dispatchLocationId > 0) ps.setLong(2, dispatchLocationId);
@@ -226,13 +250,16 @@ public final class OrderDao {
         }
     }
 
-    public void updateCustomerArrivedAt(long orderId, LocalDateTime arrivedAt) {
-        String sql = "UPDATE orders SET customer_arrived_at = ? WHERE id = ?";
+    public boolean recordCustomerArrival(long orderId, LocalDateTime arrivedAt) {
+        String sql = """
+                UPDATE orders SET customer_arrived_at = ?
+                WHERE id = ? AND status IN ('DRAFT', 'PACKING') AND customer_arrived_at IS NULL
+                """;
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, DaoDateUtil.format(arrivedAt));
             ps.setLong(2, orderId);
-            ps.executeUpdate();
+            return ps.executeUpdate() == 1;
         } catch (SQLException e) {
             throw new DaoException("Failed to mark customer arrived for order: " + orderId, e);
         }
@@ -261,7 +288,8 @@ public final class OrderDao {
                 rs.getString("assigned_forklift_name"),
                 dlId,
                 rs.getString("dispatch_location_code"),
-                DaoDateUtil.parse(rs.getString("customer_arrived_at"))
+                DaoDateUtil.parse(rs.getString("customer_arrived_at")),
+                rs.getString("delivery_date") == null ? null : LocalDate.parse(rs.getString("delivery_date"))
         );
     }
 }

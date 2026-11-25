@@ -67,11 +67,7 @@ public final class TodoService {
             appendForkliftTodos(user, items, i18n);
         } else if (role == RoleCode.OPERATOR) {
             appendOperatorTodos(user, items, i18n);
-        } else if (role == RoleCode.MANAGER) {
-            appendManagementTodos(items, i18n);
-            appendForkliftBacklogSummary(items, i18n);
-        } else {
-            // SUPER_ADMIN / ADMIN: full operational + financial oversight
+        } else if (role == RoleCode.MANAGER || role == RoleCode.ADMIN || role == RoleCode.SUPER_ADMIN) {
             appendManagementTodos(items, i18n);
             appendForkliftBacklogSummary(items, i18n);
         }

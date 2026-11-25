@@ -13,6 +13,10 @@ public interface NavigableView {
 
     JComponent getComponent();
 
+    default JComponent getHeaderActions() {
+        return null;
+    }
+
     default void refreshData() {
         // Optional hook called when the user navigates to this view.
     }

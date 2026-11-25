@@ -158,6 +158,39 @@ public final class InventoryPackageDao {
         }
     }
 
+    public List<InventoryPackage> findPutawayQueue() {
+        String sql = BASE_SELECT + """
+                WHERE ip.status = 'IN_STOCK' AND wl.location_type = 'OPERATOR_STATION'
+                ORDER BY wl.code, ip.created_at DESC, ip.id DESC
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            List<InventoryPackage> packages = new ArrayList<>();
+            while (rs.next()) {
+                packages.add(mapRow(rs));
+            }
+            return packages;
+        } catch (SQLException e) {
+            throw new DaoException("Failed to load the putaway queue", e);
+        }
+    }
+
+    public int countPutawayQueue() {
+        String sql = """
+                SELECT COUNT(*) FROM inventory_packages ip
+                JOIN warehouse_locations wl ON wl.id = ip.location_id
+                WHERE ip.status = 'IN_STOCK' AND wl.location_type = 'OPERATOR_STATION'
+                """;
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql);
+             ResultSet rs = ps.executeQuery()) {
+            return rs.getInt(1);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to count the putaway queue", e);
+        }
+    }
+
     public List<InventoryPackage> findByFilter(PackageFilter filter) {
         StringBuilder sql = new StringBuilder(BASE_SELECT).append(" WHERE 1=1 ");
         List<Object> params = new ArrayList<>();

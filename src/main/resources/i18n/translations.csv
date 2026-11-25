@@ -2,6 +2,12 @@ key,en,hu
 app.title,ReWear WMS — Second-Hand Clothing Warehouse,ReWear WMS — Használt Ruha Raktárkezelő
 app.logout,Sign Out,Kijelentkezés
 app.ready,Ready,Kész
+startup.progress,Startup progress,Indítás folyamatjelzője
+startup.storage,Preparing document folders,Tárhelymappák előkészítése
+startup.database,Opening the warehouse database,Raktári adatbázis megnyitása
+startup.initial_data,Checking initial warehouse data,Kezdeti raktáradatok ellenőrzése
+startup.services,Loading settings and services,Beállítások és szolgáltatások betöltése
+startup.failed,Could not start ReWear WMS. {0},A ReWear WMS indítása sikertelen. {0}
 common.save,Save,Mentés
 common.cancel,Cancel,Mégse
 common.add,Add,Hozzáadás
@@ -44,13 +50,13 @@ nav.inventory,Inventory,Készlet
 nav.locations,Warehouse Locations,Raktárhelyek
 nav.dictionaries,Code Dictionaries,Kódtörzsek
 nav.customers,Customers,Ügyfelek
-nav.orders,Orders & Dispatch,Rendelések és Kiadás
-nav.invoices,Invoices & Finance,Számlák és Pénzügy
+nav.orders,Orders,Rendelések
+nav.invoices,Payments,Pénzügyek
 nav.admin,Admin & Maintenance,Admin és Karbantartás
 role.SUPER_ADMIN,Super Administrator,Szuperadmin
 role.ADMIN,Administrator,Adminisztrátor
 role.MANAGER,Warehouse Manager,Raktárvezető
-role.OPERATOR,Sorting Operator,Válogató operátor
+role.OPERATOR,Station Manager,Állomásvezető
 status.package.IN_STOCK,In Stock,Készleten
 status.package.RESERVED,Reserved,Foglalt
 status.package.SHIPPED,Shipped,Kiszállítva
@@ -195,13 +201,15 @@ orders.delivery_note.title,DELIVERY NOTE / PACKING LIST,SZÁLLÍTÓLEVÉL / CSOM
 orders.delivery_note.signature_sender,Warehouse Dispatch Signature,Raktári kiadó aláírása
 orders.delivery_note.signature_receiver,Customer / Carrier Signature,Átvevő / Fuvarozó aláírása
 admin.title,Administration & Maintenance,Adminisztráció és Karbantartás
-admin.tab.users,Users & Roles,Felhasználók és Jogosultságok
-admin.tab.audit,Audit Log,Mozgásnapló (Audit)
-admin.tab.maintenance,Database & Translations,Adatbázis és Fordítások
+admin.tab.users,Users,Felhasználók
+admin.tab.audit,Log,Log
+admin.tab.database,Database,Adatbázis
+admin.tab.translations,Translations,Fordítások
 admin.user.full_name,Full Name,Teljes név
 admin.user.role,Role,Jogosultság
-admin.user.reset_pw,Reset Password,Jelszó visszaállítása
-admin.user.new_pw_prompt,Enter new password (min 6 chars):,Adja meg az új jelszót (min. 6 karakter):
+admin.user.reset_pw,Reset Password (Optional),Jelszó visszaállítása (opcionális)
+admin.user.edit_hint,Double-click a user or press Enter to edit.,Szerkesztés dupla kattintással vagy az Enter billentyűvel.
+admin.user.edit_denied,You do not have permission to edit this account.,Ehhez a fiókhoz nincs szerkesztési jogosultsága.
 admin.user.cannot_disable_self,You cannot deactivate your own active admin account.,Saját aktív admin fiókját nem inaktiválhatja.
 admin.db.backup,Backup Database (.db),Adatbázis mentése (.db)
 admin.db.restore,Restore Database (.db),Adatbázis visszaállítása (.db)
@@ -211,6 +219,9 @@ admin.i18n.export,Export translations.csv,translations.csv exportálása
 admin.i18n.reload,Load External translations.csv,Külső translations.csv betöltése
 admin.i18n.reset,Reset to Bundled Translations,Alapértelmezett fordítások visszaállítása
 admin.i18n.loaded,Loaded languages: {0},Betöltött nyelvek: {0}
+admin.i18n.alert.title,Translations need attention,A fordítások ellenőrzése szükséges
+admin.i18n.alert.changed,Reload the external translations CSV to apply its changes.,A módosítások alkalmazásához töltse be újra a külső fordítási CSV-fájlt.
+admin.i18n.alert.unavailable,The external translations CSV is unavailable. Select it again or restore the built-in translations.,A külső fordítási CSV-fájl nem érhető el. Válassza ki újra vagy állítsa vissza a beépített fordításokat.
 profile.title,Profile & Account Settings,Profil és fiókbeállítások
 profile.settings.tooltip,Profile & Account Settings,Profil és fiókbeállítások
 profile.avatar.upload,Upload Photo,Kép feltöltése
@@ -219,6 +230,7 @@ profile.handle,Handle (@username),Handle (@felhasználónév)
 profile.last_name,Last Name,Vezetéknév
 profile.first_name,First Name,Keresztnév
 profile.email,Email Address,E-mail cím
+profile.email.managed,Only a Super Admin can change this address in Users.,Az e-mail címet csak Szuperadmin módosíthatja a Felhasználók menüben.
 profile.phone,Phone / Contact,Telefon / Elérhetőség
 profile.password.section,Change Password (Optional),Jelszó módosítása (opcionális)
 profile.password.current,Current Password,Jelenlegi jelszó
@@ -261,11 +273,6 @@ docpreview.save_pdf,Save Selected PDF,Kiválasztott PDF mentése
 docpreview.print,Print Selected,Kiválasztottak nyomtatása
 docpreview.none_selected,"Please select at least one document to print, save, or email.",Kérjük jelöljön ki legalább egy dokumentumot a művelethez.
 docpreview.email.title,Send Documents by Email,Dokumentumok küldése e-mailben
-docpreview.email.to,Recipient Email,Címzett e-mail címe
-docpreview.email.subject,Subject,Tárgy
-docpreview.email.body,Message,Üzenet
-docpreview.email.attachments,Attached PDF(s) exported to:,Csatolandó PDF fájl(ok) mentve ide:
-docpreview.email.opened,PDF file(s) saved to {0}. Your email client and export folder have been opened.,A PDF fájl(ok) elmentve ide: {0}. Az e-mail kliens és az export mappa megnyitva.
 invoice.title,Invoices & Financial Overview,Számlák és Pénzügyi Áttekintés
 invoice.kpi.income,Total Income (Outgoing),Összes bevétel (Kimenő)
 invoice.kpi.expenses,Total Expenses (Incoming),Összes kiadás (Bejövő)
@@ -335,7 +342,7 @@ partners.filter.buyers,Buyers Only,Csak vevők
 partners.filter.suppliers,Providers Only,Csak szállítók
 partners.history,Partner Orders & Invoices,Partner rendelései és számlái
 invoice.tab.list,Invoices,Számlák
-invoice.tab.settings,Invoice Settings (Tax & Currencies),Számlabeállítások (ÁFA és Devizák)
+invoice.tab.settings,Invoice Settings,Számlabeállítások
 invoice.currency_view,Currency Ledger,Deviza nézet
 invoice.tax_type,VAT / Tax Type,ÁFA típus
 invoice.from_supplier,From Saved Provider (Optional),Mentett szállítóból (opcionális)
@@ -349,20 +356,26 @@ invoice.settings.scope.NON_EU,Outside EU (Export),EU-n kívüli (Export)
 invoice.settings.scope.ANY,Any / Manual,Bármely / Kézi
 invoice.settings.symbol,Symbol,Szimbólum
 invoice.settings.decimals,Decimals,Tizedesjegyek
-invoice.settings.in_use,Cannot delete '{0}' because existing records reference it. Deactivate it instead.,"A(z) '{0}' nem törölhető, mert meglévő tételek hivatkoznak rá. Használja az Inaktiválás gombot."
+invoice.settings.in_use,"Existing records reference {0}. Clear Active and save to deactivate it.","A(z) {0} kódra meglévő tételek hivatkoznak. Az inaktiváláshoz törölje az Aktív jelölést és mentse a módosítást."
+invoice.settings.active,Active,Aktív
+invoice.settings.street,Street address,Utca és házszám
+invoice.settings.city,City,Város
+invoice.settings.postal_code,Postal code,Irányítószám
+invoice.export_menu,Reports and exports,Riportok és exportálás
 validation.company_required,Company name is required.,A cégnév megadása kötelező.
 validation.names_bilingual_required,English and Hungarian names are required.,Az angol és a magyar név megadása is kötelező.
 validation.prices_non_negative,Prices must be 0 or greater.,Az árak nem lehetnek negatívak.
 validation.invalid_package_weights,Tare weight must be >= 0 and max weight must be > 0.,"A tára súly >= 0, a max. súly pedig > 0 kell legyen."
 validation.location_fields_required,All fields are required and capacity must be > 0.,"Minden mező kitöltése kötelező, és a kapacitás > 0 kell legyen."
 orders.no_active_buyers,No active buyers available.,Nincs aktív vevő (ügyfél) a rendszerben.
-invoice.settings.company,Seller Company Profile & Bank Accounts (IBAN),Eladói cégadatok és bankszámlaszámok (IBAN)
+invoice.settings.company,Seller Company Profile,Eladói cégadatok
 invoice.settings.company_saved,Company profile and bank accounts saved.,A cégadatok és bankszámlaszámok elmentve.
 invoice.settings.iban_currency,Bank Account Currency,Bankszámla deviza
 invoice.settings.iban,IBAN / Account No.,IBAN / Bankszámlaszám
 invoice.reminder.btn,Send Reminder,Fizetési emlékeztető
 invoice.reminder.subject,Payment Reminder — Invoice {0} ({1}),Fizetési emlékeztető — {0} számla ({1})
 invoice.reminder.body,"Dear {0}, please settle invoice {1} ({2}, due {3}) in {4} to IBAN {5}. Best regards, {6}","Tisztelt {0}! Tisztelettel emlékeztetjük a(z) {1} számú, {2} összegű számla kiegyenlítésére (határidő: {3}, deviza: {4}, IBAN: {5}). Üdvözlettel: {6}"
+invoice.reminder.body_no_iban,"Dear {0}, please settle invoice {1} ({2}, due {3}). Best regards, {6}","Tisztelt {0}! Tisztelettel emlékeztetjük a(z) {1} számú, {2} összegű számla kiegyenlítésére (határidő: {3}). Üdvözlettel: {6}"
 invoice.reminder.no_email,No email address is recorded on this invoice.,Ehhez a számlához nincs e-mail cím rögzítve.
 invoice.reminder.opened,Payment reminder draft opened in your email client.,A fizetési emlékeztető piszkozat megnyílt az e-mail kliensben.
 orders.edit_price,Edit Item Price,Tételár módosítása
@@ -393,8 +406,11 @@ partners.statement.pdf_title,Partner Account Statement & Aging,Partner egyenlegk
 partners.statement.aging_section,Multi-Currency Open Balance Aging,Devizánkénti nyitott egyenleg korosítás
 partners.statement.current,Current,Nem lejárt
 partners.statement.total_open,Total Open,Összes nyitott
-admin.tab.system,System & Packages,Rendszer és csomagok
+admin.tab.system,System,Rendszer
 admin.system.runtime,Runtime Environment & Portable Storage,Futtatókörnyezet és hordozható tárhely
+admin.system.invoice_archive,Invoice archive,Számlaarchívum
+admin.system.receipt_vault,Receipt vault,Bizonylattár
+admin.system.file_count,{0} files,{0} fájl
 admin.system.packages,Bundled Libraries & Dependencies,Csomagolt könyvtárak és függőségek
 admin.system.component,Component,Komponens
 admin.system.version,Version,Verzió
@@ -408,7 +424,7 @@ nav.staging,Order Staging,Összekészítés
 nav.email,Email,E-mail
 nav.messages,Messages,Üzenetek
 locations.type,Location Type,Hely típusa
-location.type.OPERATOR_STATION,Operator Station,Operátori állomás
+location.type.OPERATOR_STATION,Labelling Station,Címkézőállomás
 location.type.STORAGE,Storage Shelf,Raktárpolc
 location.type.DISPATCH_ZONE,Dispatch / Connection Zone,Kiadó / Összekészítő zóna
 print.presave.title,Pre-Save Product & Label Preview,Mentés előtti termék és címke előnézet
@@ -431,7 +447,7 @@ transport.staging.summary,Pending pickup: {0} / Total allocated: {1} package(s),
 transport.status.pickup,PICKUP NEEDED,ELSZÁLLÍTANDÓ
 transport.status.staged,AT DISPATCH,KIADÓ ZÓNÁBAN
 admin.tab.mail,Email Settings,E-mail beállítások
-admin.tab.modules,Roles & Modules,Szerepkörök és modulok
+admin.tab.modules,Roles,Szerepkörök
 admin.modules.info,Toggle which menu modules are enabled for each user role. Super Admin always has full access.,Kapcsold be vagy ki az egyes menümodulokat szerepkörönként. A Szuper Admin mindenhez hozzáfér.
 admin.modules.reset,Reset to Defaults,Alapértelmezések visszaállítása
 admin.modules.reset_confirm,Reset all role module permissions back to default rules?,Visszaállítod az összes szerepkör moduljogosultságait az alapértelmezett szabályokra?
@@ -473,6 +489,7 @@ email.recipient_search_placeholder,Type to search or pick recipients...,Keresés
 email.send,Send,Küldés
 email.save_draft,Save Draft,Piszkozat mentése
 email.sent_ok,Email sent successfully.,E-mail sikeresen elküldve.
+email.sent_simulated,External delivery was simulated. Internal recipients received the message.,A külső kézbesítés szimuláció volt. A belső címzettek megkapták az üzenetet.
 email.sim_received,Simulated external partner email received in Inbox.,Szimulált külső partner e-mail megérkezett a Beérkező mappába.
 chat.title,Team Messages,Belső üzenetek
 chat.rooms,Rooms,Szobák
@@ -491,8 +508,8 @@ email.scope.internal_only,Internal Team Mail Only,Csak belső céges levelezés
 nav.todo,To-Do,Teendők
 nav.notifications,Notifications,Értesítések
 notifications.title,Operational Notifications,Raktári értesítések
-admin.user.assigned_station,Assigned Operator Station,Hozzárendelt operátori állomás
-intake.station_locked_hint,Locked to your assigned Operator Station.,A hozzád rendelt operátori állomáshoz rögzítve.
+admin.user.assigned_station,Assigned Labelling Station,Hozzárendelt címkézőállomás
+intake.station_locked_hint,Locked to your assigned labelling station.,A hozzád rendelt címkézőállomáshoz rögzítve.
 todo.title,To-Do Lists,Teendők
 todo.kpi.system,System To-Do Tasks,Rendszer teendők
 todo.kpi.personal,Personal To-Dos (Open / Total),Saját teendők (Nyitott / Összes)
@@ -552,3 +569,243 @@ order.handover.completed,Order {0} verified & handed over to customer!,A(z) {0} 
 order.handover.progress,{0} / {1} scanned,{0} / {1} ellenőrizve
 order.handover.status.scanned,SCANNED,ELLENŐRIZVE
 order.handover.status.pending,PENDING,HÁTRAVAN
+invoice.new,New Invoice,Új számla
+invoice.choose_direction,Choose invoice direction,Válassza ki a számla irányát
+invoice.folder.outgoing,Outgoing Invoices,Kimenő számlák
+invoice.folder.incoming,Incoming Invoices,Bejövő számlák
+invoice.filter.direction,Direction,Irány
+invoice.filters.show,Show Filters,Szűrők megnyitása
+invoice.filters.hide,Hide Filters,Szűrők bezárása
+invoice.more_currencies,More Currencies,További devizák
+invoice.details,Invoice Details,Számla részletei
+smart.manage,Smart Folders,Intelligens mappák
+smart.new,New Smart Folder,Új intelligens mappa
+smart.edit,Edit Smart Folder,Intelligens mappa szerkesztése
+smart.delete,Delete Smart Folder,Intelligens mappa törlése
+smart.delete_confirm,Delete the saved view “{0}”?,Törli a(z) „{0}” mentett nézetet?
+smart.name,Folder Name,Mappa neve
+smart.icon,Folder Icon,Mappaikon
+smart.match_hint,All fields must match. Multiple checked values within a field are alternatives.,Minden mező feltétele számít. Egy mezőben bármely bejelölt érték megfelel.
+smart.invalid_name,Enter a folder name from 1 to 80 characters.,Adjon meg egy 1–80 karakter hosszú mappanevet.
+smart.duplicate,A smart folder with that name already exists.,Már van ilyen nevű intelligens mappa.
+smart.mailbox,Mailboxes,Postafiókmappák
+smart.mailbox_required,Select at least one mailbox.,Válasszon legalább egy postafiókmappát.
+smart.sender,Sender contains,A feladó tartalmazza
+smart.recipient,Recipient or CC contains,A címzett vagy a másolat címzettje tartalmazza
+smart.subject,Subject contains,A tárgy tartalmazza
+smart.body,Message body contains,Az üzenet szövege tartalmazza
+smart.keywords,Subject or message contains,A tárgy vagy az üzenet tartalmazza
+smart.read,Read,Olvasott
+invoice.kpi.short.income,Income,Bevétel
+invoice.kpi.short.expenses,Expenses,Kiadás
+invoice.kpi.short.balance,Net Balance,Nettó egyenleg
+invoice.kpi.short.unpaid,Unpaid,Fizetésre vár
+invoice.filters.active,Show active filters,Aktív szűrők megjelenítése
+invoice.entry.from_order,From Order,Rendelésből
+invoice.entry.order,Order,Rendelés
+invoice.entry.search_order,Search order number or customer…,Rendelésszám vagy ügyfél keresése…
+invoice.entry.search_partner,Search name or tax number…,Név vagy adószám keresése…
+invoice.entry.clear_selection,Clear selection,Kiválasztás törlése
+invoice.entry.customer,Saved Customer,Mentett vevő
+invoice.entry.supplier,Saved Supplier,Mentett szállító
+invoice.entry.attachment,Source Document,Bizonylat
+invoice.entry.choose_file,Choose File,Fájl kiválasztása
+invoice.entry.remove_file,Remove File,Fájl eltávolítása
+invoice.entry.itemized,Line Items,Tételek
+invoice.entry.net_only,Net Total Only,Csak nettó összeg
+invoice.entry.existing,Save opens existing invoice {0}.,A mentés megnyitja a meglévő számlát ({0}).
+invoice.entry.order_locked,To change invoice lines edit the order first.,A tételek módosításához először a rendelést szerkessze.
+invoice.entry.order_required,Select a non-cancelled order with at least one line.,Válasszon legalább egy tételes és nem törölt rendelést.
+invoice.entry.tax_required,Select a VAT type.,Válasszon ÁFA-típust.
+invoice.entry.line_description,Enter a description for each invoice line.,Minden számlatételhez adjon meg megnevezést.
+invoice.entry.partner_required,Select a partner or enter the partner name.,Válasszon partnert vagy adja meg a partner nevét.
+invoice.entry.country_invalid,Enter a two-letter country code.,Kétbetűs országkódot adjon meg.
+invoice.entry.total_required,Enter a non-negative net total or add invoice lines.,Adjon meg nem negatív nettó összeget vagy számlatételeket.
+invoice.entry.order_changed,The order changed. Review the updated lines before saving.,A rendelés megváltozott. Mentés előtt ellenőrizze a frissített tételeket.
+invoice.entry.tax_match,Use the existing partner {0} with this tax number?,A meglévő {0} partnert használja ehhez az adószámhoz?
+invoice.entry.tax_match_multiple,Select an active partner with this tax number or resolve it in Customers.,Válasszon aktív partnert ezzel az adószámmal vagy rendezze az adatot az Ügyfelek nézetben.
+invoice.entry.partner_both,Use {0} as both customer and supplier?,A(z) {0} partner vevő és szállító is legyen?
+admin.tab.nav,NAV Integration,NAV-integráció
+admin.tab.bank,Bank Integration,Banki integráció
+invoice.folder.all,All Invoices,Összes számla
+navdemo.title,NAV Online Invoice API 3.0 · Offline Demo,NAV Online Számla API 3.0 · Offline demó
+navdemo.note,Local simulation only. Outgoing invoices are previewed for issuer reporting. Incoming supplier invoices are previewed for lookup. Password and keys are never saved.,Helyi szimuláció. A kimenő számlák a kibocsátói adatszolgáltatás előnézetében jelennek meg. A bejövő számlákhoz lekérdezés tartozik. A jelszó és a kulcsok mentés nélkül maradnak.
+navdemo.environment,NAV environment (reference),NAV-környezet (tájékoztató)
+navdemo.endpoint,API base URL,API alap URL
+navdemo.tax_number,Taxpayer ID (8 digits),Adószám törzsszáma (8 számjegy)
+navdemo.login,Technical username,Technikai felhasználónév
+navdemo.password,Technical password,Technikai jelszó
+navdemo.signing_key,XML signing key,XML-aláírókulcs
+navdemo.exchange_key,XML exchange key,XML-cserekulcs
+navdemo.software_id,Software ID,Szoftverazonosító
+navdemo.software_name,Software name,Szoftver neve
+navdemo.software_version,Software version,Szoftver verziója
+navdemo.software_operation,Software operation type,Szoftver működési módja
+navdemo.developer,Software developer,Szoftver fejlesztője
+navdemo.developer_contact,Developer contact,Fejlesztő elérhetősége
+navdemo.developer_country,Developer country code,Fejlesztő országkódja
+navdemo.developer_tax,Developer tax number,Fejlesztő adószáma
+navdemo.outbound,Demo outgoing reporting,Kimenő adatszolgáltatás demója
+navdemo.inbound,Demo incoming lookup,Bejövő számlalekérdezés demója
+navdemo.results,Local invoice workflow preview,Helyi számlafolyamat előnézete
+navdemo.load_demo,Load Demo Values,Demóadatok betöltése
+navdemo.run,Run Local Demo,Helyi demó futtatása
+navdemo.operation,API operation,API-művelet
+navdemo.defaults_loaded,Demo values loaded.,A demóadatok betöltve.
+navdemo.saved,Demo settings saved. Credentials stay in this session.,A demóbeállítások mentve. A hitelesítő adatok csak ebben a munkamenetben érhetők el.
+navdemo.simulated,Local preview complete. Zero requests sent.,A helyi előnézet elkészült. Nem történt hálózati kérés.
+navdemo.required,Complete this field: {0},Töltse ki ezt a mezőt: {0}
+navdemo.tax_format,Enter the first eight digits of the Hungarian tax number.,Adja meg a magyar adószám első nyolc számjegyét.
+navdemo.software_format,Use 18 uppercase letters or digits or hyphens in the software ID.,A szoftverazonosító 18 nagybetűből vagy számjegyből vagy kötőjelből álljon.
+navdemo.country_format,Use a two-letter country code or leave it empty.,Kétbetűs országkódot adjon meg vagy hagyja üresen.
+navdemo.credentials_required,Fill in the password and both XML keys or load the demo values.,Töltse ki a jelszót és mindkét XML-kulcsot vagy töltse be a demóadatokat.
+navdemo.workflow_required,Select at least one demo workflow.,Válasszon legalább egy demófolyamatot.
+navdemo.draft,Draft · excluded,Piszkozat · kihagyva
+navdemo.credit_unlinked,Original invoice missing,Hiányzik az eredeti számla
+navdemo.pending,Local only,Csak helyi adat
+navdemo.demo_report,Simulated reporting,Szimulált adatszolgáltatás
+navdemo.demo_lookup,Simulated lookup,Szimulált lekérdezés
+bank.accounts,Bank Accounts,Bankszámlák
+bank.add_account,Add Account,Számla hozzáadása
+bank.edit_account,Edit Bank Account,Bankszámla szerkesztése
+bank.add_transaction,Add Transaction,Tranzakció hozzáadása
+bank.institution,Bank,Bank
+bank.account,Account name,Számla neve
+bank.account_reference,IBAN / Account number,IBAN / Bankszámlaszám
+bank.bic,BIC / SWIFT,BIC / SWIFT
+bank.balance,Balance,Egyenleg
+bank.source,Source,Forrás
+bank.demo,Demo,Demó
+bank.manual,Manual,Kézi
+bank.transactions,Transactions,Tranzakciók
+bank.transactions_for,Transactions · {0} ({1}),Tranzakciók · {0} ({1})
+bank.counterparty,Counterparty,Partner
+bank.transaction_reference,Transaction reference,Közlemény
+bank.amount,Amount,Összeg
+bank.totals,{0} balances: {1},{0} egyenlegek: {1}
+bank.opening_date,Opening date (YYYY-MM-DD),Nyitó dátum (ÉÉÉÉ-HH-NN)
+bank.opening_balance,Opening balance,Nyitó egyenleg
+bank.booking_date,Booking date (YYYY-MM-DD),Könyvelés dátuma (ÉÉÉÉ-HH-NN)
+bank.signed_amount,Amount (+ credit / − debit),Összeg (+ jóváírás / − terhelés)
+bank.currency_required,Select an account currency.,Válassza ki a bankszámla devizáját.
+bank.date_invalid,Enter a date in YYYY-MM-DD format.,ÉÉÉÉ-HH-NN formátumban adja meg a dátumot.
+docpreview.email.location,Open file location,Fájl helyének megnyitása
+docpreview.email.bundle_filename,ReWear documents,ReWear dokumentumok
+smart.icons.search,Search icons,Ikonok keresése
+smart.icons.more,Load more,További ikonok
+smart.no_results,No results,Nincs találat
+invoice.filters.partners,Partners and suppliers,Partnerek és szállítók
+invoice.filters.save_folder,Create smart folder,Új intelligens mappa
+invoice.settings.invalid_email,Enter a valid billing email address.,Adjon meg egy érvényes számlázási e-mail-címet.
+role.SORTER,Sorting Operator,Válogató operátor
+role.SORTING_HELPER,Sorting Helper,Válogatósegéd
+nav.sorting,Sorting,Válogatás
+sorting.requests,Raw supply requests,Alapanyagigények
+sorting.bags,Graded bags,Válogatott csomagok
+sorting.raw,Raw stock,Nyerskészlet
+sorting.teams,Sorting teams,Válogatócsapatok
+sorting.daily,Daily targets and bonuses,Napi célok és bónuszok
+sorting.request.new,Request raw stock,Alapanyag igénylése
+sorting.request.deliver,Confirm delivery,Átadás rögzítése
+sorting.request.report,Report graded bag,Válogatott csomag rögzítése
+sorting.request.finish,Close raw batch,Tétel lezárása
+sorting.request.cancel_confirm,Cancel this raw stock request?,Visszavonja ezt az alapanyagigényt?
+sorting.finish.hint,Return the unprocessed stock to its raw lot.,A feldolgozatlan alapanyagot adja vissza az eredeti tételbe.
+sorting.bag.pack,Pack and send to station,Csomagolás és továbbítás
+sorting.bag.register,Register and print label,Készletre vétel és címkenyomtatás
+sorting.lot.receive,Receive raw stock,Alapanyag bevételezése
+sorting.team.new,New sorting team,Új válogatócsapat
+sorting.team.sorters,Sorting operators,Válogatók
+sorting.team,Team or category,Csapat vagy kategória
+sorting.batch,Batch ID,Tételazonosító
+sorting.bag,Bag ID,Csomagazonosító
+sorting.lot,Raw lot,Alapanyagtétel
+sorting.station,Labelling station,Címkézőállomás
+sorting.target_group,Target group,Célcsoport
+sorting.product,Product type,Terméktípus
+sorting.grade,Quality grade,Minőségi osztály
+sorting.packaging,Packaging,Csomagolás
+sorting.qr,QR code,QR-kód
+sorting.requested_kg,Requested input (kg),Igényelt alapanyag (kg)
+sorting.delivered_kg,Delivered input (kg),Átadott alapanyag (kg)
+sorting.processed_kg,Processed input (kg),Feldolgozott alapanyag (kg)
+sorting.received_kg,Received input (kg),Bevételezett alapanyag (kg)
+sorting.available_kg,Available input (kg),Elérhető alapanyag (kg)
+sorting.output_kg,Finished output (kg),Késztermék (kg)
+sorting.target_kg,Daily input target (kg),Napi alapanyagcél (kg)
+sorting.bonus_rate,Bonus rate (%),Bónusz mértéke (%)
+sorting.bonus.unset,Rate not set,Mérték nincs beállítva
+sorting.bonus.eligible,Target reached,Cél teljesült
+sorting.bonus.below,Below target,Cél alatt
+sorting.work_day,Work day (YYYY-MM-DD),Munkanap (ÉÉÉÉ-HH-NN)
+sorting.show_day,Show work day,Munkanap megjelenítése
+sorting.requested_at,Requested at,Igénylés ideje
+sorting.delivered_at,Delivered at,Átadás ideje
+sorting.finished_at,Finished at,Lezárás ideje
+sorting.cancelled_at,Cancelled at,Visszavonás ideje
+sorting.received_at,Received at,Bevételezés ideje
+sorting.reported_at,Graded at,Válogatás ideje
+sorting.packed_at,Packed at,Csomagolás ideje
+sorting.registered_at,Registered at,Készletre vétel ideje
+login.supply_driver,Supply Driver,Alapanyag-targoncás
+login.fulfilment_driver,Fulfilment Driver,Kiszállítási targoncás
+orders.delivery_date,Delivery date,Szállítási dátum
+orders.requested_products,Requested products,Megrendelt termékek
+orders.requested_products.short,Products and stock,Termékek és készlet
+orders.requested_products.add,Add product,Termék hozzáadása
+orders.requested_products.remove,Remove product,Termék eltávolítása
+orders.requested_products.allocate,Reserve and start collection,Foglalás és összekészítés
+orders.requested_products.requested,Requested,Megrendelt
+orders.requested_products.reserved,Reserved,Lefoglalt
+orders.requested_products.available,Available in storage,Elérhető a raktárban
+orders.requested_products.shortage,Shortage,Hiány
+orders.webshop.import,Import webshop order,Webshoprendelés importálása
+orders.webshop.format,UTF-8 order file (.properties),UTF-8 rendelésfájl (.properties)
+orders.delivery_date.format,Delivery date (YYYY-MM-DD),Szállítási dátum (ÉÉÉÉ-HH-NN)
+orders.load_order,Verify vehicle loading,Járműrakodás ellenőrzése
+orders.requested_products.allocate_hint,Assign a driver and dock. Resolve stock shortages before reserving.,Foglalás előtt jelöljön ki targoncást és rakodóhelyet. Pótolja a készlethiányt.
+sorting.alert.request,Raw stock request #{0},Alapanyagigény #{0}
+sorting.alert.delivery,Raw stock delivered #{0},Alapanyag átadva #{0}
+sorting.alert.pack,Bag ready for packing #{0},Csomagolásra vár #{0}
+sorting.alert.label,Bag ready for labelling #{0},Címkézésre vár #{0}
+sorting.alert.putaway,Bag ready for putaway #{0},Betárolásra vár #{0}
+sorting.status.requested,Awaiting delivery,Átadásra vár
+sorting.status.delivered,In sorting,Válogatás alatt
+sorting.status.finished,Closed,Lezárva
+sorting.status.cancelled,Cancelled,Visszavonva
+sorting.status.graded,Awaiting packing,Csomagolásra vár
+sorting.status.packed,Awaiting label,Címkézésre vár
+sorting.status.registered,Registered,Készletre véve
+sorting.returned_kg,Returned input (kg),Visszaadott alapanyag (kg)
+sorting.other_kg,Other processed input (kg),Egyéb feldolgozott alapanyag (kg)
+sorting.team.helpers,Sorting helpers,Válogatósegédek
+sorting.packed_by,Packed by,Csomagolta
+nav.payroll,Payroll,Bérszámfejtés
+payroll.workers,Workers,Dolgozók
+payroll.departments,Departments,Részlegek
+payroll.rates,Department rates,Részlegenkénti bérek
+payroll.shifts,Daily shifts,Napi műszakok
+payroll.performance,Daily performance,Napi teljesítmény
+payroll.show_day,Show day,Nap megjelenítése
+payroll.draft_hint,Draft gross amounts,Bruttó bértervezet
+payroll.edit_monthly,Set monthly gross pay,Havi bruttó bér beállítása
+payroll.add_department,Add department,Részleg hozzáadása
+payroll.add_rate,Set department rate,Részlegbér beállítása
+payroll.add_shift,Record shift,Műszak rögzítése
+payroll.shift_delete,Remove this recorded shift?,Eltávolítja ezt a rögzített műszakot?
+payroll.worker,Worker,Dolgozó
+payroll.department,Department,Részleg
+payroll.duty,Duty,Munkakör
+payroll.monthly_gross,Monthly gross (HUF),Havi bruttó (Ft)
+payroll.effective,Effective from (YYYY-MM-DD),Érvényes ettől (ÉÉÉÉ-HH-NN)
+payroll.daily_rate,Daily gross (HUF),Napi bruttó (Ft)
+payroll.bonus_rate,Bonus rate (%),Bónusz mértéke (%)
+payroll.bonus_approved,Approve performance bonus,Teljesítménybónusz jóváhagyása
+payroll.bonus_status,Bonus approved,Bónusz jóváhagyva
+payroll.shift_share,Share of day (%),Műszak aránya (%)
+payroll.shift_gross,Shift gross (HUF),Műszak bruttó (Ft)
+payroll.bonus_gross,Gross bonus (HUF),Bruttó bónusz (Ft)
+payroll.draft_gross,Draft gross (HUF),Bruttó tervezet (Ft)
+payroll.packed_bags,Packed bags,Csomagolt zsákok
+payroll.packed_kg,Packed output (kg),Csomagolt késztermék (kg)
+payroll.active,Active,Aktív

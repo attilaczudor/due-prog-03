@@ -19,10 +19,16 @@ import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
+import hu.due.rewear.model.OrderStatus;
+import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.TaxType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Path;
+import java.sql.Connection;
+import java.sql.SQLException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.net.URLEncoder;
@@ -48,25 +54,48 @@ public final class InvoiceService {
     public record InvoiceLineInput(String description, BigDecimal quantity, String unit, BigDecimal unitPrice) {
     }
 
+    public record ReviewedOrder(Order order, Customer customer, List<OrderItem> items) {
+        public ReviewedOrder {
+            items = List.copyOf(items);
+        }
+    }
+
+    public static final class OrderChangedException extends IllegalStateException {
+        public OrderChangedException() {
+            super("The order changed while the invoice was open.");
+        }
+    }
+
+    public record ManualPartner(Long id, String name, String taxNumber, String address, String email,
+                                String country, boolean allowBoth) { }
+
+    public record ManualEntry(InvoiceDirection direction, InvoiceCategory category, String invoiceNumber,
+                              ManualPartner partner, List<InvoiceLineInput> lines, BigDecimal totalNet,
+                              TaxType tax, String currency, LocalDate issueDate, LocalDate dueDate,
+                              InvoiceStatus status, long userId, Path attachment) { }
+
     private final DatabaseManager db;
     private final InvoiceDao invoiceDao;
     private final OrderDao orderDao;
     private final OrderItemDao orderItemDao;
     private final CustomerDao customerDao;
     private final FinanceConfigDao financeConfigDao;
+    private final InvoiceArchiveService archive;
 
     public InvoiceService(DatabaseManager db,
                           InvoiceDao invoiceDao,
                           OrderDao orderDao,
                           OrderItemDao orderItemDao,
                           CustomerDao customerDao,
-                          FinanceConfigDao financeConfigDao) {
+                          FinanceConfigDao financeConfigDao,
+                          InvoiceArchiveService archive) {
         this.db = db;
         this.invoiceDao = invoiceDao;
         this.orderDao = orderDao;
         this.orderItemDao = orderItemDao;
         this.customerDao = customerDao;
         this.financeConfigDao = financeConfigDao;
+        this.archive = archive;
     }
 
     /**
@@ -97,33 +126,38 @@ public final class InvoiceService {
     }
 
     /**
-     * Returns the existing Outgoing invoice for an order (refreshing line items, currency & tax type if DRAFT/ISSUED),
+     * Returns the existing outgoing invoice for an order (refreshing its lines, currency and tax type while in DRAFT),
      * or creates a new Outgoing invoice populated from the order and customer data in the order's currency.
      */
     public Invoice ensureInvoiceForOrder(long orderId, TaxType chosenTax, long userId) {
-        Order order = orderDao.findById(orderId)
+        return saveReviewedOrder(reviewOrder(orderId), chosenTax, userId);
+    }
+
+    public ReviewedOrder reviewOrder(long orderId) {
+        return db.executeInTransaction(conn -> reviewOrder(conn, orderId));
+    }
+
+    private ReviewedOrder reviewOrder(Connection conn, long orderId) throws SQLException {
+        Order order = orderDao.findById(conn, orderId)
                 .orElseThrow(() -> new IllegalArgumentException("Order not found: " + orderId));
-        Customer customer = customerDao.findById(order.customerId())
+        Customer customer = customerDao.findById(conn, order.customerId())
                 .orElseThrow(() -> new IllegalArgumentException("Customer not found: " + order.customerId()));
-        List<OrderItem> orderItems = orderItemDao.findByOrderId(orderId);
-        TaxType effectiveTax = chosenTax != null ? chosenTax : resolveDefaultTaxForCustomer(customer);
+        return new ReviewedOrder(order, customer, orderItemDao.findByOrderId(conn, orderId));
+    }
+
+    public Invoice saveReviewedOrder(ReviewedOrder reviewed, TaxType chosenTax, long userId) {
+        Order order = reviewed.order();
+        Customer customer = reviewed.customer();
+        List<OrderItem> orderItems = reviewed.items();
+        Invoice prior = invoiceDao.findByOrderId(order.id()).orElse(null);
+        TaxType effectiveTax = chosenTax != null ? chosenTax
+                : prior != null ? financeConfigDao.findTaxTypeByCode(prior.effectiveTaxTypeCode())
+                        .orElseGet(() -> resolveDefaultTaxForCustomer(customer))
+                        : resolveDefaultTaxForCustomer(customer);
         BigDecimal vatRate = effectiveTax.ratePercent();
         String taxCode = effectiveTax.code();
-
         String cur = order.effectiveCurrencyCode();
         int decimals = financeConfigDao.decimalPlacesFor(cur);
-
-        Optional<Invoice> existingOpt = invoiceDao.findByOrderId(orderId);
-        if (existingOpt.isPresent()) {
-            Invoice existing = existingOpt.get();
-            if (existing.status() == InvoiceStatus.DRAFT || existing.status() == InvoiceStatus.ISSUED) {
-                TaxType syncTax = chosenTax != null ? chosenTax : financeConfigDao.findTaxTypeByCode(existing.effectiveTaxTypeCode())
-                        .orElse(effectiveTax);
-                syncOrderItemsIntoInvoice(existing.id(), orderItems, syncTax.ratePercent(), syncTax.code(), cur, decimals);
-                return invoiceDao.findById(existing.id()).orElseThrow();
-            }
-            return existing;
-        }
 
         BigDecimal netTotal = CurrencyDef.roundForScale(orderItems.stream()
                 .map(OrderItem::lineTotal)
@@ -136,48 +170,41 @@ public final class InvoiceService {
         LocalDate dueDate = today.plusDays(14);
         LocalDateTime now = LocalDateTime.now();
 
-        long invoiceId = db.executeInTransaction(conn -> {
+        return saveWithDocuments(conn -> {
+            Invoice existing = invoiceDao.findByOrderId(conn, order.id()).orElse(null);
+            if (existing != null && existing.status() != InvoiceStatus.DRAFT) return existing.id();
+            if (!reviewed.equals(reviewOrder(conn, order.id()))) throw new OrderChangedException();
+            if (order.deliveryDate() != null && order.status() != OrderStatus.SHIPPED) {
+                throw new IllegalStateException("Complete the verified order handover before invoicing.");
+            }
+            if (order.status() == OrderStatus.CANCELLED || orderItems.isEmpty()) {
+                throw new IllegalArgumentException("An active order with at least one line is required.");
+            }
+            if (existing != null) {
+                invoiceDao.deleteItemsByInvoiceId(conn, existing.id());
+                insertOrderLines(conn, existing.id(), orderItems, decimals);
+                invoiceDao.updateAmounts(conn, existing.id(), netTotal, vatRate, taxCode, vatAmount, grossAmount,
+                        cur, CurrencyCode.DEFAULT_EUR_HUF_RATE);
+                return existing.id();
+            }
             String invNo = invoiceDao.generateNextInvoiceNumber(conn, InvoiceDirection.OUTGOING);
             long id = invoiceDao.insert(conn, invNo, InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES,
                     order.id(), customer.id(), customer.name(), customer.taxNumber(), customer.address(),
                     customer.email(), InvoiceStatus.ISSUED, today, dueDate, null,
                     netTotal, vatRate, taxCode, vatAmount, grossAmount, cur,
                     CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, now);
-            for (OrderItem oi : orderItems) {
-                String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
-                invoiceDao.insertItem(conn, id, desc, oi.weightKg(), "kg",
-                        CurrencyDef.roundForScale(oi.pricePerKg(), decimals),
-                        CurrencyDef.roundForScale(oi.lineTotal(), decimals));
-            }
+            insertOrderLines(conn, id, orderItems, decimals);
             return id;
-        });
-
-        Invoice created = invoiceDao.findById(invoiceId).orElseThrow();
-        LOG.info("Created outgoing invoice {} ({} / {}) for order {}",
-                created.invoiceNumber(), cur, taxCode, order.orderNumber());
-        return created;
+        }, true, null, null);
     }
 
-    private void syncOrderItemsIntoInvoice(long invoiceId, List<OrderItem> orderItems,
-                                           BigDecimal vatRate, String taxCode, String cur, int decimals) {
-        BigDecimal netTotal = CurrencyDef.roundForScale(orderItems.stream()
-                .map(OrderItem::lineTotal)
-                .reduce(BigDecimal.ZERO, BigDecimal::add), decimals);
-        BigDecimal vatAmount = CurrencyDef.roundForScale(netTotal.multiply(vatRate)
-                .divide(BigDecimal.valueOf(100), 4, RoundingMode.HALF_UP), decimals);
-        BigDecimal grossAmount = CurrencyDef.roundForScale(netTotal.add(vatAmount), decimals);
-
-        db.runInTransaction(conn -> {
-            invoiceDao.deleteItemsByInvoiceId(conn, invoiceId);
-            for (OrderItem oi : orderItems) {
-                String desc = oi.packageQrCode() + " (" + oi.summaryEn() + ")";
-                invoiceDao.insertItem(conn, invoiceId, desc, oi.weightKg(), "kg",
-                        CurrencyDef.roundForScale(oi.pricePerKg(), decimals),
-                        CurrencyDef.roundForScale(oi.lineTotal(), decimals));
-            }
-            invoiceDao.updateAmounts(conn, invoiceId, netTotal, vatRate, taxCode, vatAmount, grossAmount,
-                    cur, CurrencyCode.DEFAULT_EUR_HUF_RATE);
-        });
+    private void insertOrderLines(Connection conn, long id, List<OrderItem> items, int decimals) throws SQLException {
+        for (OrderItem item : items) {
+            String desc = item.packageQrCode() + " (" + item.summaryEn() + ")";
+            invoiceDao.insertItem(conn, id, desc, item.weightKg(), "kg",
+                    CurrencyDef.roundForScale(item.pricePerKg(), decimals),
+                    CurrencyDef.roundForScale(item.lineTotal(), decimals));
+        }
     }
 
     public Invoice createManualInvoice(InvoiceDirection direction,
@@ -296,6 +323,35 @@ public final class InvoiceService {
                                                 LocalDate dueDate,
                                                 InvoiceStatus status,
                                                 long userId) {
+        return saveManualInvoice(direction, category, optionalInvoiceNumber,
+                new ManualPartner(partnerId, partnerName, partnerTaxNumber, partnerAddress, partnerEmail, null, false),
+                lines, vatRate, taxTypeCode, currencyCode, issueDate, dueDate, status, userId, false, null, null);
+    }
+
+    public Invoice saveManualEntry(ManualEntry entry, ReceiptVaultService receipts) throws IOException {
+        if (entry.tax() == null) throw new IllegalArgumentException("Choose a VAT type.");
+        List<InvoiceLineInput> lines = entry.lines() == null ? List.of() : entry.lines();
+        if (lines.isEmpty()) {
+            if (entry.totalNet() == null || entry.totalNet().signum() < 0) {
+                throw new IllegalArgumentException("Enter a non-negative net total or add invoice lines.");
+            }
+            lines = List.of(new InvoiceLineInput(entry.category().name(), BigDecimal.ONE, "db", entry.totalNet()));
+        }
+        try {
+            return saveManualInvoice(entry.direction(), entry.category(), entry.invoiceNumber(), entry.partner(), lines,
+                    entry.tax().ratePercent(), entry.tax().code(), entry.currency(), entry.issueDate(), entry.dueDate(),
+                    entry.status(), entry.userId(), true, receipts, entry.attachment());
+        } catch (DocumentWriteException ex) {
+            throw (IOException) ex.getCause();
+        }
+    }
+
+    private Invoice saveManualInvoice(InvoiceDirection direction, InvoiceCategory category, String optionalInvoiceNumber,
+                                   ManualPartner partner, List<InvoiceLineInput> lines, BigDecimal vatRate,
+                                   String taxTypeCode, String currencyCode, LocalDate issueDate, LocalDate dueDate,
+                                   InvoiceStatus status, long userId, boolean savePartner,
+                                   ReceiptVaultService receipts, Path attachment) {
+        String partnerName = partner.name();
         if (partnerName == null || partnerName.isBlank()) {
             throw new IllegalArgumentException("Partner name is required.");
         }
@@ -339,24 +395,87 @@ public final class InvoiceService {
         LocalDate paidDate = effStatus == InvoiceStatus.PAID ? effIssue : null;
 
         final BigDecimal finalNet = net;
-        long invoiceId = db.executeInTransaction(conn -> {
+        return saveWithDocuments(conn -> {
+            Long partnerId = partner.id();
+            if (savePartner) partnerId = linkManualPartner(conn, partner, direction, cur);
             String invNo = (optionalInvoiceNumber != null && !optionalInvoiceNumber.isBlank())
                     ? optionalInvoiceNumber.trim()
                     : invoiceDao.generateNextInvoiceNumber(conn, direction);
             long id = invoiceDao.insert(conn, invNo, direction, category, null, partnerId,
-                    partnerName.trim(), partnerTaxNumber, partnerAddress, partnerEmail,
+                    partnerName.trim(), partner.taxNumber(), partner.address(), partner.email(),
                     effStatus, effIssue, effDue, paidDate, finalNet, effectiveVat, effectiveTaxCode, vat, gross,
                     cur, CurrencyCode.DEFAULT_EUR_HUF_RATE, userId, LocalDateTime.now());
             for (ComputedLine cl : computed) {
                 invoiceDao.insertItem(conn, id, cl.desc(), cl.qty(), cl.unit(), cl.unitPrice(), cl.lineNet());
             }
             return id;
-        });
+        }, false, receipts, attachment);
+    }
 
-        Invoice created = invoiceDao.findById(invoiceId).orElseThrow();
-        LOG.info("Created {} invoice {} ({} line(s), {} / {})", direction, created.invoiceNumber(),
-                computed.size(), CurrencyDef.formatAmount(created.grossAmount(), cur, decimals), effectiveTaxCode);
-        return created;
+    private static final class DocumentWriteException extends IllegalStateException {
+        DocumentWriteException(IOException cause) {
+            super(cause.getMessage(), cause);
+        }
+    }
+
+    private static final class StoredDocuments {
+        String pdf;
+        String previousPdf;
+        String receipt;
+    }
+
+    private Invoice saveWithDocuments(DatabaseManager.SqlFunction<Long> save, boolean refreshDraft,
+                                      ReceiptVaultService receipts, Path attachment) {
+        var files = new StoredDocuments();
+        Invoice result;
+        try {
+            result = db.executeInTransaction(conn -> {
+                long id = save.apply(conn);
+                Invoice invoice = invoiceDao.findById(conn, id).orElseThrow();
+                try {
+                    if (attachment != null) {
+                        files.receipt = receipts.storeReceipt(invoice, attachment);
+                        if (!invoiceDao.replaceAttachmentPath(conn, id, null, files.receipt)) {
+                            throw new IllegalStateException("Could not link invoice receipt.");
+                        }
+                    }
+                    String previous = invoiceDao.findArchivedPdfPath(conn, id);
+                    if (archive.resolve(previous).isEmpty() || (refreshDraft && invoice.status() == InvoiceStatus.DRAFT)) {
+                        files.pdf = archive.store(invoice, invoiceDao.findItemsByInvoiceId(conn, id));
+                        invoiceDao.setArchivedPdfPath(conn, id, files.pdf);
+                        files.previousPdf = previous;
+                    }
+                } catch (IOException ex) {
+                    throw new DocumentWriteException(ex);
+                }
+                return files.receipt == null ? invoice : invoiceDao.findById(conn, id).orElseThrow();
+            });
+        } catch (RuntimeException ex) {
+            archive.delete(files.pdf);
+            if (receipts != null) receipts.deleteStoredReceipt(files.receipt);
+            throw ex;
+        }
+        archive.delete(files.previousPdf);
+        return result;
+    }
+
+    private long linkManualPartner(Connection conn, ManualPartner partner, InvoiceDirection direction,
+                                   String currency) throws SQLException {
+        PartnerType needed = direction == InvoiceDirection.OUTGOING ? PartnerType.CUSTOMER : PartnerType.SUPPLIER;
+        if (partner.id() == null) {
+            if (!customerDao.findByTaxNumber(conn, partner.taxNumber()).isEmpty()) {
+                throw new IllegalArgumentException("A partner already uses this tax number. Select that partner first.");
+            }
+            return customerDao.insert(conn, partner.name(), needed, null, partner.email(), null, partner.address(),
+                    partner.taxNumber(), partner.country(), currency, LocalDateTime.now());
+        }
+        Customer existing = customerDao.findById(conn, partner.id())
+                .filter(Customer::active).orElseThrow(() -> new IllegalArgumentException("Select an active partner."));
+        if (existing.partnerType() != needed && existing.partnerType() != PartnerType.BOTH) {
+            if (!partner.allowBoth()) throw new IllegalArgumentException("Confirm the additional partner role.");
+            customerDao.enableBothRoles(conn, existing.id());
+        }
+        return existing.id();
     }
 
     /**
@@ -369,24 +488,27 @@ public final class InvoiceService {
      * </ul>
      */
     public Invoice issueCreditNote(long originalInvoiceId, long userId) {
-        Invoice orig = invoiceDao.findById(originalInvoiceId)
-                .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + originalInvoiceId));
-        if (orig.category() == InvoiceCategory.CREDIT_NOTE) {
-            throw new IllegalStateException("Cannot issue a credit note for an existing credit note.");
-        }
-        if (orig.status() == InvoiceStatus.CANCELLED) {
-            throw new IllegalStateException("Invoice " + orig.invoiceNumber() + " is already cancelled.");
-        }
-        List<InvoiceItem> origItems = invoiceDao.findItemsByInvoiceId(originalInvoiceId);
-        boolean wasPaid = orig.status() == InvoiceStatus.PAID;
-        InvoiceDirection cnDir = wasPaid
-                ? (orig.direction() == InvoiceDirection.OUTGOING ? InvoiceDirection.INCOMING : InvoiceDirection.OUTGOING)
-                : orig.direction();
-        InvoiceStatus cnStatus = wasPaid ? InvoiceStatus.PAID : InvoiceStatus.CANCELLED;
-        LocalDate today = LocalDate.now();
-        LocalDate paidDate = wasPaid ? today : null;
-
-        long cnId = db.executeInTransaction(conn -> {
+        Invoice created = saveWithDocuments(conn -> {
+            Invoice orig = invoiceDao.findById(conn, originalInvoiceId)
+                    .orElseThrow(() -> new IllegalArgumentException("Invoice not found: " + originalInvoiceId));
+            if (orig.category() == InvoiceCategory.CREDIT_NOTE) {
+                throw new IllegalStateException("Cannot issue a credit note for an existing credit note.");
+            }
+            if (orig.status() == InvoiceStatus.CANCELLED) {
+                throw new IllegalStateException("Invoice " + orig.invoiceNumber() + " is already cancelled.");
+            }
+            String refPrefix = "CREDIT NOTE [Ref: " + orig.invoiceNumber() + "] — ";
+            if (invoiceDao.hasCreditNote(conn, refPrefix)) {
+                throw new IllegalStateException("Invoice " + orig.invoiceNumber() + " already has a credit note.");
+            }
+            List<InvoiceItem> origItems = invoiceDao.findItemsByInvoiceId(conn, originalInvoiceId);
+            boolean wasPaid = orig.status() == InvoiceStatus.PAID;
+            InvoiceDirection cnDir = wasPaid
+                    ? (orig.direction() == InvoiceDirection.OUTGOING ? InvoiceDirection.INCOMING : InvoiceDirection.OUTGOING)
+                    : orig.direction();
+            InvoiceStatus cnStatus = wasPaid ? InvoiceStatus.PAID : InvoiceStatus.CANCELLED;
+            LocalDate today = LocalDate.now();
+            LocalDate paidDate = wasPaid ? today : null;
             if (!wasPaid) {
                 invoiceDao.updateStatus(conn, originalInvoiceId, InvoiceStatus.CANCELLED, null);
             }
@@ -398,7 +520,6 @@ public final class InvoiceService {
                     orig.netAmount(), orig.vatRate(), orig.effectiveTaxTypeCode(),
                     orig.vatAmount(), orig.grossAmount(), orig.effectiveCurrencyCode(),
                     orig.exchangeRate(), userId, LocalDateTime.now());
-            String refPrefix = "CREDIT NOTE [Ref: " + orig.invoiceNumber() + "] — ";
             if (origItems.isEmpty()) {
                 invoiceDao.insertItem(conn, id, refPrefix + orig.category().name(),
                         BigDecimal.ONE, "db", orig.netAmount(), orig.netAmount());
@@ -409,10 +530,8 @@ public final class InvoiceService {
                 }
             }
             return id;
-        });
-
-        Invoice created = invoiceDao.findById(cnId).orElseThrow();
-        LOG.info("Issued credit note {} reversing {} (wasPaid={})", created.invoiceNumber(), orig.invoiceNumber(), wasPaid);
+        }, false, null, null);
+        LOG.info("Issued credit note {} reversing invoice id={}", created.invoiceNumber(), originalInvoiceId);
         return created;
     }
 
@@ -454,7 +573,7 @@ public final class InvoiceService {
         String recipient = inv.partnerEmail() != null ? inv.partnerEmail().trim() : "";
 
         String subject = i18n.t("invoice.reminder.subject", inv.invoiceNumber(), amountStr);
-        String body = i18n.t("invoice.reminder.body",
+        String body = i18n.t(iban.isBlank() ? "invoice.reminder.body_no_iban" : "invoice.reminder.body",
                 inv.partnerName(),
                 inv.invoiceNumber(),
                 amountStr,

@@ -93,6 +93,7 @@ public final class DemoDataSeeder {
         } else {
             LOG.debug("Database already populated; skipping core demo data seed.");
         }
+        new SortingDemoSeeder(db).seedForDemoWorkspace();
         seedStarterInvoicesIfEmpty();
         seedStarterEmailsAndChatsIfEmpty();
     }
@@ -302,7 +303,7 @@ public final class DemoDataSeeder {
         long superAdminRoleId = roleDao.insert(conn, RoleCode.SUPER_ADMIN, "Super Administrator");
         long adminRoleId = roleDao.insert(conn, RoleCode.ADMIN, "Administrator");
         long managerRoleId = roleDao.insert(conn, RoleCode.MANAGER, "Warehouse Manager");
-        long operatorRoleId = roleDao.insert(conn, RoleCode.OPERATOR, "Sorting Operator");
+        long operatorRoleId = roleDao.insert(conn, RoleCode.OPERATOR, "Station Manager");
         long forkliftRoleId = roleDao.insert(conn, RoleCode.FORKLIFT, "Forklift Driver");
 
         // 2. Demo Users (BCrypt) with auto-populated @rewear-wms.hu corporate emails

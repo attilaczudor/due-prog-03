@@ -118,7 +118,7 @@ public final class LocationsView extends JPanel implements NavigableView {
         });
 
         reprintStoredBtn.addActionListener(e -> {
-            int row = storedTable.getSelectedRow();
+            int row = TableSorting.selectedModelRow(storedTable);
             if (row >= 0 && row < storedPackages.size()) {
                 Window owner = SwingUtilities.getWindowAncestor(this);
                 PrintPreviewDialog.showPreview(owner, ctx, List.of(storedPackages.get(row)), LabelPreset.THERMAL_100X150);
@@ -129,7 +129,7 @@ public final class LocationsView extends JPanel implements NavigableView {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
-                    int row = storedTable.getSelectedRow();
+                    int row = TableSorting.selectedModelRow(storedTable);
                     if (row >= 0 && row < storedPackages.size()) {
                         Window owner = SwingUtilities.getWindowAncestor(LocationsView.this);
                         if (EditPackageDialog.showDialog(owner, ctx, storedPackages.get(row)) != null) {
@@ -142,7 +142,7 @@ public final class LocationsView extends JPanel implements NavigableView {
     }
 
     private WarehouseLocation getSelectedLocation() {
-        int row = locTable.getSelectedRow();
+        int row = TableSorting.selectedModelRow(locTable);
         return (row >= 0 && row < locations.size()) ? locations.get(row) : null;
     }
 
@@ -277,7 +277,7 @@ public final class LocationsView extends JPanel implements NavigableView {
             locTable.getColumnModel().getColumn(7).setCellRenderer(new OccupancyBarRenderer());
             locTable.getColumnModel().getColumn(7).setPreferredWidth(180);
         }
-        if (!locations.isEmpty() && locTable.getSelectedRow() < 0) {
+        if (!locations.isEmpty() && TableSorting.selectedModelRow(locTable) < 0) {
             locTable.setRowSelectionInterval(0, 0);
         }
         loadStoredPackagesForSelected();

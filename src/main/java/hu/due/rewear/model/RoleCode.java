@@ -1,13 +1,16 @@
 package hu.due.rewear.model;
 
-/**
- * Hierarchical RBAC role codes: immutable {@code SUPER_ADMIN}, {@code ADMIN}, {@code MANAGER},
- * {@code OPERATOR}, and {@code FORKLIFT} (in-house transporter).
- */
+/** Warehouse roles. OPERATOR is the persisted code for the station manager. */
 public enum RoleCode {
     SUPER_ADMIN,
     ADMIN,
     MANAGER,
     OPERATOR,
-    FORKLIFT
+    SORTER,
+    SORTING_HELPER,
+    FORKLIFT;
+
+    public boolean usesInternalMailOnly() {
+        return this == OPERATOR || this == SORTER || this == SORTING_HELPER || this == FORKLIFT;
+    }
 }

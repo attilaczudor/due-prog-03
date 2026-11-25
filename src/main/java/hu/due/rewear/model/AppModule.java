@@ -7,11 +7,12 @@ import java.util.Set;
 /**
  * First-class registry of every menu module in ReWear WMS.
  * {@link RoleCode#SUPER_ADMIN} always has full access to every module and can toggle
- * individual modules ON or OFF per role ({@code ADMIN}, {@code MANAGER}, {@code OPERATOR}, {@code FORKLIFT}).
+ * configurable modules for each eligible role.
  */
 public enum AppModule {
     DASHBOARD("dashboard", "nav.dashboard", Category.CORE, true),
     TODO("todo", "nav.todo", Category.CORE, false),
+    SORTING("sorting", "nav.sorting", Category.OPERATIONS, false),
     INTAKE("intake", "nav.intake", Category.OPERATIONS, false),
     PUTAWAY("putaway", "nav.putaway", Category.OPERATIONS, false),
     STAGING("staging", "nav.staging", Category.OPERATIONS, false),
@@ -22,6 +23,7 @@ public enum AppModule {
     CUSTOMERS("customers", "nav.customers", Category.MANAGEMENT, false),
     ORDERS("orders", "nav.orders", Category.MANAGEMENT, false),
     INVOICES("invoices", "nav.invoices", Category.MANAGEMENT, false),
+    PAYROLL("payroll", "nav.payroll", Category.MANAGEMENT, false),
     NOTIFICATIONS("notifications", "nav.notifications", Category.COMMUNICATIONS, false),
     MESSAGES("messages", "nav.messages", Category.COMMUNICATIONS, false),
     EMAIL("email", "nav.email", Category.COMMUNICATIONS, false),
@@ -74,8 +76,12 @@ public enum AppModule {
         return alwaysEnabled;
     }
 
+    public boolean allowsRole(RoleCode role) {
+        return this != PAYROLL || role == RoleCode.ADMIN || role == RoleCode.SUPER_ADMIN;
+    }
+
     public boolean defaultEnabledFor(RoleCode role) {
-        if (role == null) {
+        if (role == null || !allowsRole(role)) {
             return false;
         }
         if (alwaysEnabled || role == RoleCode.SUPER_ADMIN) {
@@ -84,9 +90,11 @@ public enum AppModule {
         return switch (role) {
             case ADMIN -> true;
             case MANAGER -> this != ADMIN;
-            case OPERATOR -> this == TODO || this == INTAKE || this == SCANNER || this == INVENTORY
+            case OPERATOR -> this == TODO || this == SORTING || this == INTAKE || this == SCANNER || this == INVENTORY
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
-            case FORKLIFT -> this == TODO || this == PUTAWAY || this == STAGING || this == INVENTORY
+            case SORTER, SORTING_HELPER -> this == TODO || this == SORTING
+                    || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
+            case FORKLIFT -> this == TODO || this == SORTING || this == PUTAWAY || this == STAGING || this == INVENTORY
                     || this == NOTIFICATIONS || this == MESSAGES || this == EMAIL;
             case SUPER_ADMIN -> true;
         };

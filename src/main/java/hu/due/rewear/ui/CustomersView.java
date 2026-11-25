@@ -137,7 +137,7 @@ public final class CustomersView extends JPanel implements NavigableView {
     }
 
     private Customer getSelectedCustomer() {
-        int r = customerTable.getSelectedRow();
+        int r = TableSorting.selectedModelRow(customerTable);
         return (r >= 0 && r < customers.size()) ? customers.get(r) : null;
     }
 
@@ -349,7 +349,7 @@ public final class CustomersView extends JPanel implements NavigableView {
                     c.active() ? i18n.t("common.yes").toUpperCase(Locale.ROOT) : i18n.t("common.no").toUpperCase(Locale.ROOT)
             });
         }
-        if (!customers.isEmpty() && customerTable.getSelectedRow() < 0) {
+        if (!customers.isEmpty() && TableSorting.selectedModelRow(customerTable) < 0) {
             customerTable.setRowSelectionInterval(0, 0);
         }
         loadHistoryForSelectedPartner();

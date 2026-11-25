@@ -6,10 +6,21 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.RoleCode;
+import hu.due.rewear.ui.AdminModulesPanel;
+import hu.due.rewear.ui.AdminView;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
+import javax.swing.SwingUtilities;
+import javax.swing.JCheckBox;
+import javax.swing.JToggleButton;
+import java.awt.Component;
+import java.awt.Container;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
+import java.util.List;
+import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -24,7 +35,7 @@ class V25RoleModulePermissionsTest {
 
     private AppContext newCtx() {
         DatabaseManager db = new DatabaseManager(tempDir.resolve("v25-modules.db"));
-        return new AppContext(db, new AppPreferences(), I18nManager.getInstance());
+        return new AppContext(db, new AppPreferences(tempDir.resolve("app.properties")), new I18nManager());
     }
 
     @Test
@@ -77,5 +88,81 @@ class V25RoleModulePermissionsTest {
         svc.resetAllToDefaults();
         assertFalse(svc.isModuleEnabled(RoleCode.FORKLIFT, AppModule.SCANNER));
         assertTrue(svc.isModuleEnabled(RoleCode.OPERATOR, AppModule.EMAIL));
+    }
+
+    @Test
+    void adminMenuOrderPreservesSuperAdminAccess() throws Exception {
+        AppContext ctx = newCtx();
+        assertTrue(ctx.getAuthService().login("superadmin", "superadmin123".toCharArray()).isSuccess());
+        ctx.getI18n().setLanguage("hu");
+
+        SwingUtilities.invokeAndWait(() -> {
+            AdminView view = new AdminView(ctx);
+            view.refreshData();
+            assertEquals(List.of("Felhasználók", "Szerepkörök", "Számlabeállítások", "E-mail beállítások", "NAV-integráció", "Banki integráció", "Adatbázis",
+                    "Fordítások", "Log", "Rendszer"), menuLabels(view));
+            String label = ctx.getI18n().t("admin.tab.modules");
+            AdminModulesPanel matrix = components(view, AdminModulesPanel.class).findFirst().orElseThrow();
+            assertFalse(matrix.isVisible());
+            JToggleButton modules = components(view, JToggleButton.class)
+                    .filter(button -> label.equals(button.getAccessibleContext().getAccessibleName()))
+                    .findFirst().orElseThrow();
+            modules.doClick(0);
+            assertTrue(matrix.isVisible());
+        });
+
+        assertTrue(ctx.getAuthService().login("admin", "admin123".toCharArray()).isSuccess());
+        ctx.getI18n().setLanguage("en");
+        SwingUtilities.invokeAndWait(() -> {
+            AdminView view = new AdminView(ctx);
+            assertEquals(List.of("Users", "Invoice Settings", "NAV Integration", "Bank Integration", "Database", "Translations", "Log", "System"), menuLabels(view));
+            assertEquals(0, components(view, AdminModulesPanel.class).count());
+        });
+    }
+
+    @Test
+    void translationAlertsAreScopedDeduplicatedAndClearAfterReload() throws Exception {
+        var ctx = newCtx();
+        var i18n = ctx.getI18n();
+        var service = ctx.getNotificationService();
+        var admin = ctx.getUserDao().findByUsername("admin").orElseThrow();
+        var superAdmin = ctx.getUserDao().findByUsername("superadmin").orElseThrow();
+        var operator = ctx.getUserDao().findByUsername("operator").orElseThrow();
+        Path csv = tempDir.resolve("translations.csv");
+        Files.writeString(csv, "key,en,hu\ncustom.label,First,Első\n");
+        i18n.loadFromFile(csv);
+        assertEquals(0, service.checkTranslationUpdate(admin, i18n.externalSourceStatus(csv.toString()), i18n));
+
+        Files.writeString(csv, "key,en,hu\ncustom.label,Updated,Frissítve\n");
+        var changed = i18n.externalSourceStatus(csv.toString());
+        assertEquals(1, service.checkTranslationUpdate(admin, changed, i18n));
+        assertEquals(1, service.checkTranslationUpdate(admin, changed, i18n));
+        assertEquals(1, service.checkTranslationUpdate(superAdmin, changed, i18n));
+        assertEquals(0, service.checkTranslationUpdate(operator, changed, i18n));
+        var alerts = service.listForUser(admin.id(), 100).stream()
+                .filter(item -> NotificationService.TRANSLATIONS_TARGET.equals(item.targetView())).toList();
+        assertEquals(1, alerts.size());
+        assertEquals(i18n.t("admin.i18n.alert.changed"), alerts.get(0).message());
+        service.markRead(alerts.get(0).id());
+        assertEquals(0, service.checkTranslationUpdate(admin, changed, i18n));
+
+        i18n.loadFromFile(csv);
+        assertEquals(0, service.checkTranslationUpdate(superAdmin, i18n.externalSourceStatus(csv.toString()), i18n));
+        assertEquals(0, service.checkTranslationUpdate(admin, i18n.externalSourceStatus(csv.toString()), i18n));
+        Files.delete(csv);
+        assertEquals(1, service.checkTranslationUpdate(admin, i18n.externalSourceStatus(csv.toString()), i18n));
+    }
+
+    private static List<String> menuLabels(AdminView view) {
+        return components(view, JToggleButton.class)
+                .filter(button -> !(button instanceof JCheckBox))
+                .map(button -> button.getAccessibleContext().getAccessibleName()).toList();
+    }
+
+    private static <T extends Component> Stream<T> components(Container parent, Class<T> type) {
+        return Arrays.stream(parent.getComponents()).flatMap(child -> {
+            Stream<T> match = type.isInstance(child) ? Stream.of(type.cast(child)) : Stream.empty();
+            return child instanceof Container nested ? Stream.concat(match, components(nested, type)) : match;
+        });
     }
 }

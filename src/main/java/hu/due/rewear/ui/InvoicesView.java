@@ -11,10 +11,16 @@ import hu.due.rewear.model.InvoiceCategory;
 import hu.due.rewear.model.InvoiceDirection;
 import hu.due.rewear.model.InvoiceItem;
 import hu.due.rewear.model.InvoiceStatus;
+import hu.due.rewear.model.SmartFolder;
+import hu.due.rewear.model.SmartFolder.Field;
 import hu.due.rewear.service.DocumentPageSource;
 
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
+import javax.swing.JDialog;
+import javax.swing.KeyStroke;
 import javax.swing.Box;
+import javax.swing.JCheckBox;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JComboBox;
@@ -24,7 +30,6 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -33,100 +38,186 @@ import javax.swing.SwingUtilities;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableColumn;
 import java.awt.BorderLayout;
+import java.awt.Dialog;
+import java.awt.Dimension;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.GridLayout;
+import java.awt.Insets;
 import java.awt.Component;
 import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridLayout;
 import java.awt.Window;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.File;
 import java.net.URI;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.function.Function;
 
-/**
- * Brutalist Monochrome Invoices & Financial Overview workspace with two tabs:
- * <ul>
- *   <li><b>Tab 1 (Invoices):</b> strictly separated per-currency ledgers (HUF, EUR, USD, ...) with zero forced
- *       FX conversion, 4 KPI cards, filters, reversible status updates, A4 PDF Preview/Print/Email, and CSV export.</li>
- *   <li><b>Tab 2 (Invoice Settings):</b> delegated to {@link InvoiceSettingsPanel} for Tax Types and Currencies CRUD.</li>
- * </ul>
- * Creation dialogs are delegated to {@link InvoiceFormDialogs} to keep each UI unit focused and maintainable.
- */
+/** Finance workspace with a currency ledger, invoice folders, and per-invoice actions. */
 public final class InvoicesView extends JPanel implements NavigableView {
 
+    private static final String ALL_INVOICES = "all";
+
     private final AppContext ctx;
+    private final WorkspaceFolderRail folders;
+    private final JPanel listPanel = new JPanel(new BorderLayout(0, 10)) {
+        @Override public void doLayout() {
+            configureInvoiceColumns(getWidth());
+            super.doLayout();
+        }
+    };
+    private final JButton smartFoldersButton = new JButton(SidebarIcons.smartFolder(16));
 
-    private final JTabbedPane tabs = new JTabbedPane();
-    private final JPanel invoicesTab = new JPanel(new BorderLayout(0, 10));
-    private final InvoiceSettingsPanel settingsPanel;
+    private final JButton toggleFilters = new JButton(SidebarIcons.filter(17)) {
+        @Override protected void paintComponent(java.awt.Graphics g) {
+            super.paintComponent(g);
+            if (!filterCard.isVisible() && hasFilters()) {
+                var dot = (java.awt.Graphics2D) g.create();
+                dot.setRenderingHint(java.awt.RenderingHints.KEY_ANTIALIASING,
+                        java.awt.RenderingHints.VALUE_ANTIALIAS_ON);
+                dot.setColor(new java.awt.Color(0xDC2626));
+                dot.fillOval(getWidth() - 12, 4, 8, 8);
+                dot.dispose();
+            }
+        }
+    };
+    private boolean filtersOpen;
+    private String selectedFolder = ALL_INVOICES;
+    private List<SmartFolder> smartFolders = List.of();
+    private List<Invoice> ledgerInvoices = List.of();
 
-    // Separate per-currency ledger selector bar (no cross-currency conversion)
-    private final JPanel currencyLedgerBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
-    private final JLabel currencyLedgerLabel = new JLabel();
-    private final Map<String, JButton> ledgerButtons = new LinkedHashMap<>();
-    private String selectedLedgerCurrency = null; // null == ALL (displayed as separate lines per currency)
-
-    // 4 Financial KPI Cards
-    private final JPanel kpiCardIncome = new JPanel();
-    private final JPanel kpiCardExpense = new JPanel();
-    private final JPanel kpiCardBalance = new JPanel();
-    private final JPanel kpiCardUnpaid = new JPanel();
-
-    private final JLabel kpiTitleIncome = new JLabel();
-    private final JLabel kpiTitleExpense = new JLabel();
-    private final JLabel kpiTitleBalance = new JLabel();
-    private final JLabel kpiTitleUnpaid = new JLabel();
-
-    private final JLabel kpiValIncome = new JLabel("—");
-    private final JLabel kpiValExpense = new JLabel("—");
-    private final JLabel kpiValBalance = new JLabel("—");
-    private final JLabel kpiValUnpaid = new JLabel("—");
-
-    private final JLabel kpiSubIncome = new JLabel(" ");
-    private final JLabel kpiSubExpense = new JLabel(" ");
-    private final JLabel kpiSubBalance = new JLabel(" ");
-    private final JLabel kpiSubUnpaid = new JLabel(" ");
-
-    // Filters & Actions
-    private final JPanel filterCard = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
+    private final JPanel filterCard = new JPanel(new BorderLayout(0, 8));
+    private final JPanel filterOptions = new JPanel(new GridBagLayout());
     private final JTextField searchField = new JTextField(16);
-    private final JComboBox<FilterItem<InvoiceDirection>> directionFilter = new JComboBox<>();
-    private final JComboBox<FilterItem<InvoiceStatus>> statusFilter = new JComboBox<>();
-    private final JComboBox<FilterItem<InvoiceCategory>> categoryFilter = new JComboBox<>();
-
-    private final JPanel actionBar = new JPanel(new WrapLayout(FlowLayout.LEFT, 8, 5));
-    private final JButton newOutgoingBtn = new JButton();
-    private final JButton newIncomingBtn = new JButton();
-    private final JComboBox<StatusChoice> statusCombo = new JComboBox<>();
-    private final JButton applyStatusBtn = new JButton();
-    private final JButton previewDocBtn = new JButton();
-    private final JButton sendReminderBtn = new JButton();
-    private final JButton receiptBtn = new JButton();
-    private final JButton creditNoteBtn = new JButton();
-    private final JButton pnlReportBtn = new JButton();
-    private final JButton exportCsvBtn = new JButton();
+    private final FilterChoices<String> partnerFilter = new FilterChoices<>();
+    private final JTextField partnerSearch = new JTextField(14);
+    private final FilterChoices<String> currencyFilter = new FilterChoices<>();
+    private final FilterChoices<InvoiceStatus> statusFilter = new FilterChoices<>();
+    private final FilterChoices<InvoiceCategory> categoryFilter = new FilterChoices<>();
+    private final FilterChoices<InvoiceDirection> directionFilter = new FilterChoices<>();
+    private final JLabel directionLabel = new JLabel();
+    private final JLabel searchLabel = new JLabel();
+    private final JLabel partnerLabel = new JLabel();
+    private final JLabel currencyLabel = new JLabel();
+    private final JLabel statusLabel = new JLabel();
+    private final JLabel categoryLabel = new JLabel();
+    private final JButton clearFilters = new JButton();
+    private final JButton saveFilterFolder = new JButton();
+    private final JPanel saveFilterActions = new JPanel(new BorderLayout());
+    private final JPanel filterActionDivider = new JPanel();
+    private Map<String, InvoicePartnerOptions> partnerOptions = Map.of();
+    private final JButton moreActions = new JButton(SidebarIcons.moreVertical(17));
+    private final javax.swing.JPopupMenu exportMenu = new javax.swing.JPopupMenu();
+    private final javax.swing.JMenuItem pnlReportItem = new javax.swing.JMenuItem();
+    private final javax.swing.JMenuItem exportCsvItem = new javax.swing.JMenuItem();
+    private final JPanel headerActions = new JPanel(new FlowLayout(FlowLayout.RIGHT, 5, 0));
 
     private final DefaultTableModel tableModel = BrutalistStyle.nonEditableTableModel();
     private final JTable table = new JTable(tableModel);
+    private List<Integer> visibleColumns = List.of();
 
     private List<Invoice> allInvoices = List.of();
     private List<Invoice> filteredInvoices = List.of();
     private boolean updatingControls = false;
 
-    private record FilterItem<T>(T value, String label) {
-        @Override public String toString() { return label; }
+    private final class FilterChoices<T> extends JPanel {
+        private final Map<T, javax.swing.JCheckBox> options = new LinkedHashMap<>();
+        private final JCheckBox all = new JCheckBox();
+        private final JPanel choices = new JPanel();
+        private JLabel empty;
+
+        void addSearch(JTextField input) {
+            all.setText(ctx.getI18n().t("common.all"));
+            var header = new JPanel(new BorderLayout(0, 4));
+            header.add(all, BorderLayout.NORTH);
+            header.add(input, BorderLayout.CENTER);
+            add(header, BorderLayout.NORTH);
+            var scroller = new JScrollPane(choices, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                    JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+            scroller.setPreferredSize(new Dimension(0, 8 * all.getPreferredSize().height + 2));
+            scroller.getVerticalScrollBar().setUnitIncrement(18);
+            add(scroller, BorderLayout.CENTER);
+            empty = new JLabel();
+            empty.setVisible(false);
+        }
+
+        FilterChoices() {
+            super(new BorderLayout(0, 4));
+            setOpaque(false);
+            choices.setLayout(new BoxLayout(choices, BoxLayout.Y_AXIS));
+            add(all, BorderLayout.NORTH);
+            add(choices, BorderLayout.CENTER);
+            all.addActionListener(e -> {
+                clear();
+                filtersChanged();
+            });
+        }
+
+        void rebuild(List<T> values, Function<T, String> label) {
+            var previous = selected();
+            options.clear();
+            choices.removeAll();
+            all.setText(ctx.getI18n().t("common.all"));
+            for (T value : values) {
+                var box = new javax.swing.JCheckBox(label.apply(value), previous.contains(value));
+                box.setToolTipText(box.getText());
+                var size = box.getPreferredSize();
+                box.setPreferredSize(new Dimension(Math.min(190, size.width), size.height));
+                box.setMaximumSize(new Dimension(Integer.MAX_VALUE, size.height));
+                options.put(value, box);
+                choices.add(box);
+                box.addActionListener(e -> {
+                    all.setSelected(selected().isEmpty());
+                    filtersChanged();
+                });
+            }
+            if (empty != null) {
+                empty.setText(ctx.getI18n().t("smart.no_results"));
+                choices.add(empty);
+            }
+            all.setSelected(selected().isEmpty());
+            revalidate();
+            repaint();
+        }
+
+        void search(String query, Function<T, String> details) {
+            String term = InvoiceLookupField.normalize(query.strip());
+            options.forEach((key, box) -> box.setVisible(
+                    InvoiceLookupField.normalize(box.getText() + " " + details.apply(key)).contains(term)));
+            empty.setVisible(options.values().stream().noneMatch(Component::isVisible));
+            if (choices.getParent() instanceof javax.swing.JViewport viewport) {
+                viewport.setViewPosition(new java.awt.Point());
+            }
+            revalidate();
+            repaint();
+        }
+
+        java.util.Set<T> selected() {
+            var selected = new java.util.LinkedHashSet<T>();
+            options.forEach((value, box) -> {
+                if (box.isSelected()) selected.add(value);
+            });
+            return selected;
+        }
+
+        void clear() {
+            options.values().forEach(box -> box.setSelected(false));
+            all.setSelected(true);
+        }
     }
 
     private record StatusChoice(InvoiceStatus status, String label) {
@@ -135,234 +226,364 @@ public final class InvoicesView extends JPanel implements NavigableView {
 
     public InvoicesView(AppContext ctx) {
         this.ctx = ctx;
-        this.settingsPanel = new InvoiceSettingsPanel(ctx, this::refreshData);
+        this.folders = new WorkspaceFolderRail(ctx.getI18n(), "invoice.new", 236,
+                this::createInvoice, this::selectFolder);
 
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(12, 0));
         setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
+        folders.addFooterButton(smartFoldersButton);
+        add(folders, BorderLayout.WEST);
 
-        buildInvoicesTab();
-        tabs.addTab("", invoicesTab);
-        tabs.addTab("", settingsPanel);
-        add(tabs, BorderLayout.CENTER);
+        buildInvoiceList();
+        add(listPanel, BorderLayout.CENTER);
+        headerActions.setOpaque(false);
+        headerActions.add(moreActions);
+        headerActions.add(toggleFilters);
+        exportMenu.add(pnlReportItem);
+        exportMenu.add(exportCsvItem);
 
         wireEvents();
         applyTranslations();
         applyTheme();
     }
 
-    private void buildInvoicesTab() {
-        invoicesTab.setBorder(BorderFactory.createEmptyBorder(10, 0, 0, 0));
-
-        JPanel northStack = new JPanel();
-        northStack.setLayout(new BoxLayout(northStack, BoxLayout.Y_AXIS));
-        northStack.setOpaque(false);
-
-        // 0. Per-currency ledger switcher bar
-        currencyLedgerBar.setAlignmentX(LEFT_ALIGNMENT);
-        currencyLedgerLabel.setFont(ThemeManager.monoFont(Font.BOLD, 11.5f));
-        northStack.add(currencyLedgerBar);
-        northStack.add(Box.createVerticalStrut(8));
-
-        // 1. Financial KPI Cards
-        JPanel kpiGrid = new JPanel(new GridLayout(1, 4, 12, 0));
-        kpiGrid.setOpaque(false);
-        configureKpiCard(kpiCardIncome, kpiTitleIncome, kpiValIncome, kpiSubIncome);
-        configureKpiCard(kpiCardExpense, kpiTitleExpense, kpiValExpense, kpiSubExpense);
-        configureKpiCard(kpiCardBalance, kpiTitleBalance, kpiValBalance, kpiSubBalance);
-        configureKpiCard(kpiCardUnpaid, kpiTitleUnpaid, kpiValUnpaid, kpiSubUnpaid);
-        kpiGrid.add(kpiCardIncome);
-        kpiGrid.add(kpiCardExpense);
-        kpiGrid.add(kpiCardBalance);
-        kpiGrid.add(kpiCardUnpaid);
-        kpiGrid.setAlignmentX(LEFT_ALIGNMENT);
-        northStack.add(kpiGrid);
-        northStack.add(Box.createVerticalStrut(10));
-
-        // 2. Filter Bar
-        filterCard.setAlignmentX(LEFT_ALIGNMENT);
-        filterCard.add(searchField);
-        filterCard.add(directionFilter);
-        filterCard.add(statusFilter);
-        filterCard.add(categoryFilter);
-        northStack.add(filterCard);
-        northStack.add(Box.createVerticalStrut(8));
-
-        // 3. Action Bar
-        actionBar.setAlignmentX(LEFT_ALIGNMENT);
-        actionBar.setOpaque(false);
-        actionBar.add(newOutgoingBtn);
-        actionBar.add(newIncomingBtn);
-        actionBar.add(statusCombo);
-        actionBar.add(applyStatusBtn);
-        actionBar.add(previewDocBtn);
-        actionBar.add(sendReminderBtn);
-        actionBar.add(receiptBtn);
-        actionBar.add(creditNoteBtn);
-        actionBar.add(pnlReportBtn);
-        actionBar.add(exportCsvBtn);
-        northStack.add(actionBar);
-
-        invoicesTab.add(northStack, BorderLayout.NORTH);
-
-        // 4. Invoices Table
+    private void buildInvoiceList() {
         table.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        table.setAutoCreateColumnsFromModel(false);
         table.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         BrutalistStyle.styleTable(table);
-        invoicesTab.add(new JScrollPane(table), BorderLayout.CENTER);
+        listPanel.add(new JScrollPane(table), BorderLayout.CENTER);
 
-        invoicesTab.addComponentListener(new ComponentAdapter() {
-            @Override
-            public void componentResized(ComponentEvent e) {
-                currencyLedgerBar.revalidate();
-                filterCard.revalidate();
-                actionBar.revalidate();
-                northStack.revalidate();
-            }
-        });
+        GridBagConstraints row = new GridBagConstraints();
+        row.gridx = 0;
+        row.gridy = 0;
+        row.weightx = 1;
+        row.fill = GridBagConstraints.HORIZONTAL;
+        row.insets = new Insets(0, 0, 4, 0);
+        addFilter(row, searchLabel, searchField);
+        addFilter(row, currencyLabel, currencyFilter);
+        partnerFilter.addSearch(partnerSearch);
+        addFilter(row, partnerLabel, partnerFilter);
+        addFilter(row, statusLabel, statusFilter);
+        addFilter(row, directionLabel, directionFilter);
+        addFilter(row, categoryLabel, categoryFilter);
+        row.gridy++;
+        row.weighty = 1;
+        row.fill = GridBagConstraints.BOTH;
+        filterOptions.add(Box.createVerticalGlue(), row);
+        var filterScroll = new JScrollPane(filterOptions, JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED,
+                JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+        filterScroll.setBorder(BorderFactory.createEmptyBorder());
+        filterScroll.getVerticalScrollBar().setUnitIncrement(18);
+        filterCard.add(filterScroll, BorderLayout.CENTER);
+        var filterActions = new JPanel(new BorderLayout(0, 8));
+        filterActions.setOpaque(false);
+        filterActions.add(clearFilters, BorderLayout.NORTH);
+        saveFilterActions.setOpaque(false);
+        saveFilterActions.add(filterActionDivider, BorderLayout.NORTH);
+        saveFilterActions.add(saveFilterFolder, BorderLayout.CENTER);
+        filterActions.add(saveFilterActions, BorderLayout.CENTER);
+        filterCard.add(filterActions, BorderLayout.SOUTH);
+        filterCard.setPreferredSize(new Dimension(272, 0));
+        filterCard.setVisible(false);
+        add(filterCard, BorderLayout.EAST);
     }
 
-    private static void configureKpiCard(JPanel card, JLabel title, JLabel val, JLabel sub) {
-        card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
-        title.setFont(ThemeManager.monoFont(Font.BOLD, 10.5f));
-        val.setFont(ThemeManager.monoFont(Font.BOLD, 17f));
-        sub.setFont(ThemeManager.monoFont(Font.PLAIN, 10.5f));
-        card.add(title);
-        card.add(Box.createVerticalStrut(4));
-        card.add(val);
-        card.add(Box.createVerticalStrut(3));
-        card.add(sub);
+    private void sizeFilterCard() {
+        Insets padding = filterCard.getInsets();
+        int buttonWidth = saveFilterFolder.getPreferredSize().width + padding.left + padding.right;
+        filterCard.setPreferredSize(new Dimension(Math.max(272, buttonWidth), 0));
+    }
+
+    private void addFilter(GridBagConstraints row, JLabel label, JComponent field) {
+        label.setLabelFor(field);
+        filterOptions.add(label, row);
+        row.gridy++;
+        row.insets = new Insets(0, 0, 10, 0);
+        filterOptions.add(field, row);
+        row.gridy++;
+        row.insets = new Insets(0, 0, 4, 0);
+    }
+
+    private void configureInvoiceColumns(int width) {
+        if (tableModel.getColumnCount() < 11) return;
+        List<Integer> columns = width > 0 && width < 375 ? List.of(0, 2, 9)
+                : width > 0 && width < 600 ? List.of(0, 2, 9, 10)
+                : width > 0 && width < 900 ? List.of(0, 1, 2, 5, 9, 10)
+                : List.of(0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10);
+        if (visibleColumns.equals(columns)) return;
+        visibleColumns = columns;
+        var model = table.getColumnModel();
+        while (model.getColumnCount() > 0) model.removeColumn(model.getColumn(0));
+        int[] widths = {156, 113, 175, 120, 141, 107, 68, 128, 102, 111, 104};
+        for (int index : columns) {
+            var column = new TableColumn(index, widths[index]);
+            column.setHeaderValue(tableModel.getColumnName(index));
+            if (index == 1) column.setCellRenderer(new DirectionCellRenderer());
+            if (index == 10) column.setCellRenderer(new InvoiceStatusCellRenderer());
+            model.addColumn(column);
+        }
     }
 
     private void wireEvents() {
-        searchField.addActionListener(e -> applyFiltersAndRender());
-        directionFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
-        statusFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
-        categoryFilter.addActionListener(e -> { if (!updatingControls) applyFiltersAndRender(); });
-
-        newOutgoingBtn.addActionListener(e -> InvoiceFormDialogs
-                .showNewOutgoingDialog(this, ctx, selectedLedgerCurrency)
-                .ifPresent(inv -> refreshDataSelecting(inv.id())));
-        newIncomingBtn.addActionListener(e -> InvoiceFormDialogs
-                .showNewIncomingDialog(this, ctx, selectedLedgerCurrency)
-                .ifPresent(inv -> refreshDataSelecting(inv.id())));
-
-        applyStatusBtn.addActionListener(e -> handleStatusUpdate());
-        previewDocBtn.addActionListener(e -> openSelectedInvoicePreview());
-        sendReminderBtn.addActionListener(e -> handleSendPaymentReminder());
-        receiptBtn.addActionListener(e -> handleReceiptVault());
-        creditNoteBtn.addActionListener(e -> handleIssueCreditNote());
-        pnlReportBtn.addActionListener(e -> handlePreviewPnlReport());
-        exportCsvBtn.addActionListener(e -> handleExportCsv());
-
-        table.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
-                syncSelectedInvoiceControls();
-            }
+        SmartFolderEditor.onTextChange(searchField, this::filtersChanged);
+        SmartFolderEditor.onTextChange(partnerSearch, this::updatePartnerSearch);
+        saveFilterFolder.addActionListener(e -> SmartFolderEditor.createFromInvoiceFilters(
+                this, ctx, allInvoices, currentFilterRules(), id -> selectFolder(WorkspaceFolderRail.smartKey(id))));
+        clearFilters.addActionListener(e -> {
+            resetFilters();
+            applyFiltersAndRender();
         });
+        toggleFilters.addActionListener(e -> {
+            filtersOpen = !filtersOpen;
+            updateDrawer();
+            if (filtersOpen) searchField.requestFocusInWindow();
+        });
+        moreActions.addActionListener(e -> exportMenu.show(moreActions,
+                moreActions.getWidth() - exportMenu.getPreferredSize().width, moreActions.getHeight() + 6));
+        smartFoldersButton.addActionListener(e -> createSmartFolder());
+        folders.setFolderEditor(folder -> SmartFolderEditor.show(this, ctx, SmartFolder.Scope.INVOICE,
+                folder, allInvoices, id -> {
+                    if (id == 0 && !WorkspaceFolderRail.smartKey(folder.id()).equals(selectedFolder)) {
+                        refreshData();
+                    } else {
+                        selectFolder(id == 0 ? ALL_INVOICES : WorkspaceFolderRail.smartKey(id));
+                    }
+                }));
+        pnlReportItem.addActionListener(e -> handlePreviewPnlReport());
+        exportCsvItem.addActionListener(e -> handleExportCsv());
+
         table.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(e)) {
-                    openSelectedInvoicePreview();
+            @Override public void mouseClicked(MouseEvent event) {
+                int row = table.rowAtPoint(event.getPoint());
+                if (row >= 0 && event.getClickCount() == 2 && SwingUtilities.isLeftMouseButton(event)) {
+                    table.setRowSelectionInterval(row, row);
+                    openInvoiceDetails();
                 }
             }
         });
-    }
-
-    private void rebuildCurrencyLedgerBar() {
-        I18nManager i18n = ctx.getI18n();
-        currencyLedgerBar.removeAll();
-        ledgerButtons.clear();
-        currencyLedgerBar.add(currencyLedgerLabel);
-
-        JButton allBtn = new JButton(i18n.t("common.all").toUpperCase(Locale.ROOT));
-        allBtn.addActionListener(e -> {
-            selectedLedgerCurrency = null;
-            styleCurrencyLedgerButtons();
-            applyFiltersAndRender();
+        table.getInputMap(JComponent.WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(
+                KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "invoiceDetails");
+        table.getActionMap().put("invoiceDetails", new AbstractAction() {
+            @Override public void actionPerformed(ActionEvent e) { openInvoiceDetails(); }
         });
-        ledgerButtons.put("__ALL__", allBtn);
-        currencyLedgerBar.add(allBtn);
-
-        boolean stillValid = selectedLedgerCurrency == null;
-        for (CurrencyDef cur : ctx.getFinanceConfigDao().findCurrencies(true)) {
-            String code = cur.code();
-            if (code.equalsIgnoreCase(selectedLedgerCurrency)) {
-                stillValid = true;
-            }
-            JButton btn = new JButton(code);
-            btn.addActionListener(e -> {
-                selectedLedgerCurrency = code;
-                styleCurrencyLedgerButtons();
-                applyFiltersAndRender();
-            });
-            ledgerButtons.put(code, btn);
-            currencyLedgerBar.add(btn);
-        }
-        if (!stillValid) {
-            selectedLedgerCurrency = null;
-        }
-        styleCurrencyLedgerButtons();
-        currencyLedgerBar.revalidate();
-        currencyLedgerBar.repaint();
     }
 
-    private void styleCurrencyLedgerButtons() {
-        for (Map.Entry<String, JButton> e : ledgerButtons.entrySet()) {
-            boolean active = ("__ALL__".equals(e.getKey()) && selectedLedgerCurrency == null)
-                    || e.getKey().equalsIgnoreCase(selectedLedgerCurrency);
-            if (active) {
-                BrutalistStyle.stylePrimaryButton(e.getValue());
-            } else {
-                BrutalistStyle.styleSecondaryButton(e.getValue());
-            }
+    private void createSmartFolder() {
+        SmartFolderEditor.show(this, ctx, SmartFolder.Scope.INVOICE, null, allInvoices,
+                id -> selectFolder(WorkspaceFolderRail.smartKey(id)));
+    }
+
+    private void createInvoice() {
+        var i18n = ctx.getI18n();
+        String[] choices = {i18n.t("invoice.direction.OUTGOING"), i18n.t("invoice.direction.INCOMING"),
+                i18n.t("common.cancel")};
+        int chosen = JOptionPane.showOptionDialog(this, i18n.t("invoice.choose_direction"),
+                i18n.t("invoice.new"), JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE,
+                null, choices, choices[0]);
+        if (chosen == 0 || chosen == 1) {
+            var created = chosen == 0 ? InvoiceFormDialogs.showNewOutgoingDialog(this, ctx, singleCurrency())
+                    : InvoiceFormDialogs.showNewIncomingDialog(this, ctx, singleCurrency());
+            created.ifPresent(invoice -> {
+                selectFolder(ALL_INVOICES);
+                refreshDataSelecting(invoice.id());
+                if (invoice.orderId() != null) openInvoiceDetails(invoice);
+            });
         }
+    }
+
+    private SmartFolder currentSmartFolder() {
+        return smartFolders.stream().filter(folder -> WorkspaceFolderRail.smartKey(folder.id()).equals(selectedFolder))
+                .findFirst().orElse(null);
+    }
+
+    private void selectFolder(String key) {
+        selectedFolder = key;
+        loadFolders();
+        resetFilters();
+        refreshFolderRail();
+        applyFiltersAndRender();
+    }
+
+    private void loadFolders() {
+        smartFolders = ctx.getSession().getCurrentUser().map(user ->
+                ctx.getSmartFolderDao().find(user.id(), SmartFolder.Scope.INVOICE)).orElse(List.of());
+        if (selectedFolder.startsWith("smart:") && currentSmartFolder() == null) {
+            selectedFolder = ALL_INVOICES;
+        }
+    }
+
+    private void refreshFolderRail() {
+        var i18n = ctx.getI18n();
+        folders.setEntries(List.of(new WorkspaceFolderRail.Entry(ALL_INVOICES,
+                i18n.t("invoice.folder.all").toUpperCase(Locale.ROOT), SidebarIcons.forView(MainFrame.VIEW_INVOICES, 16))),
+                smartFolders, selectedFolder);
+    }
+
+    private void rebuildCurrencyOptions() {
+        var currencies = java.util.stream.Stream.concat(
+                ctx.getFinanceConfigDao().findCurrencies(true).stream().map(CurrencyDef::code),
+                allInvoices.stream().map(Invoice::effectiveCurrencyCode)).distinct().toList();
+        currencyFilter.rebuild(currencies, Function.identity());
+    }
+
+    private void rebuildPartnerOptions() {
+        partnerOptions = InvoicePartnerOptions.load(ctx, allInvoices);
+        partnerFilter.rebuild(List.copyOf(partnerOptions.keySet()), key -> partnerOptions.get(key).name());
+        updatePartnerSearch();
+    }
+
+    private void updatePartnerSearch() {
+        partnerFilter.search(partnerSearch.getText(), key -> partnerOptions.get(key).details());
+    }
+
+    private Map<Field, List<String>> currentFilterRules() {
+        var rules = new EnumMap<Field, List<String>>(Field.class);
+        rules.put(Field.SEARCH, SmartFolder.parseSearchTerms(searchField.getText()));
+        rules.put(Field.CURRENCY, List.copyOf(currencyFilter.selected()));
+        rules.put(Field.PARTNER, InvoicePartnerOptions.ruleKeys(partnerOptions, partnerFilter.selected()));
+        rules.put(Field.DIRECTION, directionFilter.selected().stream().map(Enum::name).toList());
+        rules.put(Field.STATUS, statusFilter.selected().stream().map(Enum::name).toList());
+        rules.put(Field.CATEGORY, categoryFilter.selected().stream().map(Enum::name).toList());
+        rules.values().removeIf(List::isEmpty);
+        return rules;
+    }
+
+    private String singleCurrency() {
+        var codes = currencyFilter.selected();
+        return codes.size() == 1 ? codes.iterator().next() : null;
+    }
+
+    private void updateDrawer() {
+        filterCard.setVisible(filtersOpen);
+        styleFilterToggle();
+        revalidate();
+        repaint();
     }
 
     private Invoice getSelectedInvoice() {
-        int r = table.getSelectedRow();
-        return (r >= 0 && r < filteredInvoices.size()) ? filteredInvoices.get(r) : null;
+        int row = table.getSelectedRow();
+        return row < 0 || row >= table.getRowCount() || table.convertRowIndexToModel(row) >= filteredInvoices.size()
+                ? null : filteredInvoices.get(table.convertRowIndexToModel(row));
     }
 
-    private void syncSelectedInvoiceControls() {
-        Invoice inv = getSelectedInvoice();
-        boolean hasSel = inv != null;
-        statusCombo.setEnabled(hasSel);
-        applyStatusBtn.setEnabled(hasSel);
-        previewDocBtn.setEnabled(hasSel);
-        boolean canRemind = inv != null
-                && inv.direction() == InvoiceDirection.OUTGOING
-                && (inv.status() == InvoiceStatus.ISSUED || inv.status() == InvoiceStatus.OVERDUE);
-        sendReminderBtn.setEnabled(canRemind);
-        boolean canCreditNote = inv != null
-                && inv.category() != InvoiceCategory.CREDIT_NOTE
-                && inv.status() != InvoiceStatus.CANCELLED;
-        creditNoteBtn.setEnabled(canCreditNote);
-        receiptBtn.setEnabled(hasSel);
-        if (hasSel) {
-            I18nManager i18n = ctx.getI18n();
-            receiptBtn.setText((inv.hasAttachment()
-                    ? "[PDF] " + i18n.t("invoice.receipt.view")
-                    : i18n.t("invoice.receipt.attach")).toUpperCase(Locale.ROOT));
+    private void openInvoiceDetails() {
+        Invoice selected = getSelectedInvoice();
+        if (selected != null) openInvoiceDetails(selected);
+    }
+
+    private void openInvoiceDetails(Invoice selected) {
+        var i18n = ctx.getI18n();
+        var dialog = new JDialog(SwingUtilities.getWindowAncestor(this),
+                i18n.t("invoice.details") + " — " + selected.invoiceNumber(), Dialog.ModalityType.APPLICATION_MODAL);
+        dialog.setDefaultCloseOperation(JDialog.DISPOSE_ON_CLOSE);
+        var body = new JPanel(new BorderLayout(0, 12));
+        body.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        var overview = new JPanel(new GridLayout(0, 1, 0, 4));
+        var partner = new JLabel(selected.partnerName());
+        partner.setFont(ThemeManager.monoFont(Font.BOLD, 15));
+        overview.add(partner);
+        overview.add(new JLabel(i18n.t("invoice.direction." + selected.direction().name()) + "  |  "
+                + i18n.t("invoice.category." + selected.category().name())));
+        overview.add(new JLabel(i18n.t("invoice.issue_date") + "  " + selected.issueDate() + "  |  "
+                + i18n.t("invoice.gross_amount") + "  " + selected.grossAmount() + " " + selected.effectiveCurrencyCode()));
+        overview.add(new JLabel(i18n.t("invoice.due_date") + "  "
+                + (selected.dueDate() == null ? "—" : selected.dueDate())));
+        overview.add(new JLabel(i18n.t("invoice.net_amount") + "  " + selected.netAmount() + " "
+                + selected.effectiveCurrencyCode() + "  |  " + i18n.t("invoice.vat") + "  "
+                + selected.effectiveTaxTypeCode() + " (" + selected.vatRate().stripTrailingZeros().toPlainString() + "%)"));
+        if (selected.orderNumber() != null) {
+            overview.add(new JLabel(i18n.t("orders.order_number") + "  " + selected.orderNumber()));
         }
-        if (inv != null) {
-            for (int i = 0; i < statusCombo.getItemCount(); i++) {
-                if (statusCombo.getItemAt(i).status() == inv.status()) {
-                    statusCombo.setSelectedIndex(i);
-                    break;
-                }
+        body.add(overview, BorderLayout.NORTH);
+        var items = BrutalistStyle.nonEditableTableModel();
+        items.setColumnIdentifiers(new Object[]{i18n.t("invoice.item.description"), i18n.t("invoice.item.qty"),
+                i18n.t("invoice.item.unit_price"), i18n.t("invoice.item.line_net")});
+        String currency = selected.effectiveCurrencyCode();
+        int decimals = ctx.getFinanceConfigDao().decimalPlacesFor(currency);
+        for (InvoiceItem item : ctx.getInvoiceService().findItems(selected.id())) {
+            items.addRow(new Object[]{item.description(), item.quantity() + " " + item.unit(),
+                    CurrencyDef.formatAmount(item.unitPrice(), currency, decimals),
+                    CurrencyDef.formatAmount(item.lineNet(), currency, decimals)});
+        }
+        JTable itemsTable = new JTable(items);
+        BrutalistStyle.styleTable(itemsTable);
+        itemsTable.setPreferredScrollableViewportSize(new Dimension(550, 145));
+        itemsTable.getColumnModel().getColumn(0).setPreferredWidth(220);
+        body.add(new JScrollPane(itemsTable), BorderLayout.CENTER);
+
+        var status = new JComboBox<StatusChoice>();
+        for (InvoiceStatus value : InvoiceStatus.values()) {
+            status.addItem(new StatusChoice(value, i18n.t("status.invoice." + value.name())));
+        }
+        var apply = new JButton(i18n.t("invoice.status_update"));
+        var preview = new JButton(i18n.t("invoice.preview_btn"));
+        var reminder = new JButton(i18n.t("invoice.reminder.btn"));
+        var receipt = new JButton();
+        var credit = new JButton(i18n.t("invoice.credit_note.btn"));
+        var close = new JButton(i18n.t("common.close"));
+        var actionPanel = new JPanel(new GridBagLayout());
+        GridBagConstraints pos = new GridBagConstraints();
+        pos.gridx = 0;
+        pos.gridy = 0;
+        pos.weightx = 1;
+        pos.fill = GridBagConstraints.HORIZONTAL;
+        pos.insets = new Insets(3, 0, 3, 6);
+        actionPanel.add(status, pos);
+        pos.gridx = 1;
+        actionPanel.add(apply, pos);
+        pos.gridx = 0; pos.gridy++; actionPanel.add(preview, pos);
+        pos.gridx = 1; actionPanel.add(receipt, pos);
+        pos.gridx = 0; pos.gridy++; actionPanel.add(reminder, pos);
+        pos.gridx = 1; actionPanel.add(credit, pos);
+        var actions = new JPanel(new BorderLayout(0, 8));
+        actions.add(actionPanel, BorderLayout.CENTER);
+        var dialogFooter = new JPanel(new FlowLayout(FlowLayout.RIGHT, 0, 0));
+        dialogFooter.add(close);
+        actions.add(dialogFooter, BorderLayout.SOUTH);
+        body.add(actions, BorderLayout.SOUTH);
+
+        java.util.function.Supplier<Invoice> find = () -> ctx.getInvoiceDao().findById(selected.id()).orElse(selected);
+        Runnable refreshActions = () -> {
+            Invoice invoice = find.get();
+            status.setSelectedIndex(invoice.status().ordinal());
+            reminder.setEnabled(invoice.direction() == InvoiceDirection.OUTGOING
+                    && (invoice.status() == InvoiceStatus.ISSUED || invoice.status() == InvoiceStatus.OVERDUE));
+            credit.setEnabled(invoice.category() != InvoiceCategory.CREDIT_NOTE
+                    && invoice.status() != InvoiceStatus.CANCELLED);
+            receipt.setText(i18n.t(invoice.hasAttachment() ? "invoice.receipt.view" : "invoice.receipt.attach"));
+        };
+        apply.addActionListener(e -> {
+            if (status.getSelectedItem() instanceof StatusChoice choice) {
+                handleStatusUpdate(dialog, find.get(), choice.status());
+                refreshActions.run();
             }
-        }
+        });
+        preview.addActionListener(e -> openInvoicePreview(dialog, find.get()));
+        reminder.addActionListener(e -> handleSendPaymentReminder(dialog, find.get()));
+        receipt.addActionListener(e -> {
+            handleReceiptVault(dialog, find.get());
+            refreshActions.run();
+        });
+        credit.addActionListener(e -> {
+            handleIssueCreditNote(dialog, find.get());
+            refreshActions.run();
+        });
+        close.addActionListener(e -> dialog.dispose());
+        BrutalistStyle.stylePrimaryButton(preview);
+        BrutalistStyle.styleSecondaryButtons(apply, reminder, receipt, credit, close);
+        refreshActions.run();
+        dialog.setContentPane(body);
+        BrutalistStyle.installEscapeToClose(dialog);
+        dialog.pack();
+        dialog.setLocationRelativeTo(this);
+        dialog.setVisible(true);
     }
 
-    private void handleSendPaymentReminder() {
-        Invoice inv = getSelectedInvoice();
-        if (inv == null) {
-            return;
-        }
+    private void handleSendPaymentReminder(Window owner, Invoice inv) {
         I18nManager i18n = ctx.getI18n();
         if (inv.partnerEmail() == null || inv.partnerEmail().isBlank()) {
-            JOptionPane.showMessageDialog(this, i18n.t("invoice.reminder.no_email"),
+            JOptionPane.showMessageDialog(owner, i18n.t("invoice.reminder.no_email"),
                     i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
             return;
         }
@@ -371,23 +592,19 @@ public final class InvoicesView extends JPanel implements NavigableView {
             String mailto = ctx.getInvoiceService().buildPaymentReminderMailtoUri(inv, company, i18n);
             if (Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.MAIL)) {
                 Desktop.getDesktop().mail(URI.create(mailto));
-                JOptionPane.showMessageDialog(this, i18n.t("invoice.reminder.opened"),
+                JOptionPane.showMessageDialog(owner, i18n.t("invoice.reminder.opened"),
                         i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
             } else {
-                JOptionPane.showMessageDialog(this, mailto,
+                JOptionPane.showMessageDialog(owner, mailto,
                         i18n.t("invoice.reminder.btn"), JOptionPane.INFORMATION_MESSAGE);
             }
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(),
+            JOptionPane.showMessageDialog(owner, ex.getMessage(),
                     i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private void handleReceiptVault() {
-        Invoice inv = getSelectedInvoice();
-        if (inv == null) {
-            return;
-        }
+    private void handleReceiptVault(Window owner, Invoice inv) {
         I18nManager i18n = ctx.getI18n();
         var existingPath = ctx.getReceiptVaultService().resolveAttachment(inv);
         if (existingPath.isPresent()) {
@@ -397,7 +614,7 @@ public final class InvoicesView extends JPanel implements NavigableView {
                     i18n.t("invoice.receipt.remove"),
                     i18n.t("common.cancel")
             };
-            int picked = JOptionPane.showOptionDialog(this,
+            int picked = JOptionPane.showOptionDialog(owner,
                     inv.invoiceNumber() + " — " + existingPath.get().getFileName(),
                     i18n.t("invoice.receipt.view"),
                     JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, choices, choices[0]);
@@ -405,46 +622,42 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 if (picked == 0 && Desktop.isDesktopSupported() && Desktop.getDesktop().isSupported(Desktop.Action.OPEN)) {
                     Desktop.getDesktop().open(existingPath.get().toFile());
                 } else if (picked == 1) {
-                    chooseAndAttachReceipt(inv);
+                    chooseAndAttachReceipt(owner, inv);
                 } else if (picked == 2) {
                     ctx.getReceiptVaultService().removeAttachment(inv.id());
                     refreshDataSelecting(inv.id());
-                    JOptionPane.showMessageDialog(this, i18n.t("invoice.receipt.removed"),
+                    JOptionPane.showMessageDialog(owner, i18n.t("invoice.receipt.removed"),
                             i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
                 }
             } catch (Exception ex) {
-                JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+                JOptionPane.showMessageDialog(owner, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
             }
         } else {
-            chooseAndAttachReceipt(inv);
+            chooseAndAttachReceipt(owner, inv);
         }
     }
 
-    private void chooseAndAttachReceipt(Invoice inv) {
+    private void chooseAndAttachReceipt(Window owner, Invoice inv) {
         I18nManager i18n = ctx.getI18n();
         JFileChooser chooser = new JFileChooser();
         chooser.setDialogTitle(i18n.t("invoice.receipt.attach"));
         chooser.setFileFilter(new FileNameExtensionFilter("Receipt (PDF, PNG, JPG)", "pdf", "png", "jpg", "jpeg"));
-        if (chooser.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) {
+        if (chooser.showOpenDialog(owner) != JFileChooser.APPROVE_OPTION) {
             return;
         }
         try {
             Invoice updated = ctx.getReceiptVaultService().attachReceipt(inv.id(), chooser.getSelectedFile().toPath());
             refreshDataSelecting(updated.id());
-            JOptionPane.showMessageDialog(this, i18n.t("invoice.receipt.attached", updated.attachmentPath()),
+            JOptionPane.showMessageDialog(owner, i18n.t("invoice.receipt.attached", updated.attachmentPath()),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
+            JOptionPane.showMessageDialog(owner, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private void handleIssueCreditNote() {
-        Invoice inv = getSelectedInvoice();
-        if (inv == null) {
-            return;
-        }
+    private void handleIssueCreditNote(Window owner, Invoice inv) {
         I18nManager i18n = ctx.getI18n();
-        if (JOptionPane.showConfirmDialog(this, i18n.t("invoice.credit_note.confirm", inv.invoiceNumber()),
+        if (JOptionPane.showConfirmDialog(owner, i18n.t("invoice.credit_note.confirm", inv.invoiceNumber()),
                 i18n.t("common.confirm"), JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
@@ -452,50 +665,44 @@ public final class InvoicesView extends JPanel implements NavigableView {
             long userId = ctx.getSession().requireCurrentUser().id();
             Invoice cn = ctx.getInvoiceService().issueCreditNote(inv.id(), userId);
             refreshDataSelecting(cn.id());
-            JOptionPane.showMessageDialog(this,
+            JOptionPane.showMessageDialog(owner,
                     i18n.t("invoice.credit_note.created", cn.invoiceNumber(), inv.invoiceNumber()),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(),
+            JOptionPane.showMessageDialog(owner, ex.getMessage(),
                     i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
     private void handlePreviewPnlReport() {
         I18nManager i18n = ctx.getI18n();
-        FinancialSummary summary = ctx.getInvoiceService().computeSummary(filteredInvoices);
+        FinancialSummary summary = currencySummary();
         var valuation = ctx.getPackageDao().sumInStockValuation();
         Map<String, Integer> decByCur = ctx.getFinanceConfigDao().decimalPlacesMap();
-        String scope = selectedLedgerCurrency != null
-                ? selectedLedgerCurrency
+        var currencies = currencyFilter.selected();
+        String scope = !currencies.isEmpty()
+                ? String.join(", ", currencies)
                 : i18n.t("common.all").toUpperCase(Locale.ROOT);
         DocumentPageSource report = ctx.getFinancialReportPdfExporter().createPageSource(
-                scope, summary, valuation, filteredInvoices, decByCur);
+                scope, summary, valuation, ledgerInvoices, decByCur);
         Window owner = SwingUtilities.getWindowAncestor(this);
         DocumentPreviewDialog.showDocuments(owner, ctx, List.of(report),
                 ctx.getSettingsDao().getCompanyProfile().email(),
                 i18n.t("invoice.report.pdf_title"));
     }
 
-    private void handleStatusUpdate() {
-        Invoice inv = getSelectedInvoice();
-        if (inv == null || !(statusCombo.getSelectedItem() instanceof StatusChoice choice) || inv.status() == choice.status()) {
-            return;
-        }
+    private void handleStatusUpdate(Window owner, Invoice inv, InvoiceStatus status) {
+        if (inv.status() == status) return;
         try {
-            ctx.getInvoiceService().changeStatus(inv.id(), choice.status());
+            ctx.getInvoiceService().changeStatus(inv.id(), status);
             refreshDataSelecting(inv.id());
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(),
+            JOptionPane.showMessageDialog(owner, ex.getMessage(),
                     ctx.getI18n().t("common.error"), JOptionPane.ERROR_MESSAGE);
         }
     }
 
-    private void openSelectedInvoicePreview() {
-        Invoice inv = getSelectedInvoice();
-        if (inv == null) {
-            return;
-        }
+    private void openInvoicePreview(Window owner, Invoice inv) {
         List<InvoiceItem> items = ctx.getInvoiceService().findItems(inv.id());
         List<DocumentPageSource> docs = new ArrayList<>();
         docs.add(ctx.getInvoicePdfExporter().createPageSource(inv, items));
@@ -509,7 +716,6 @@ public final class InvoicesView extends JPanel implements NavigableView {
             });
         }
 
-        Window owner = SwingUtilities.getWindowAncestor(this);
         DocumentPreviewDialog.showDocuments(owner, ctx, docs, inv.partnerEmail(),
                 ctx.getI18n().t("invoice.pdf.title") + " — " + inv.invoiceNumber());
     }
@@ -537,118 +743,81 @@ public final class InvoicesView extends JPanel implements NavigableView {
         }
     }
 
-    private void populateFilterCombos() {
+    private void resetFilters() {
         updatingControls = true;
         try {
-            I18nManager i18n = ctx.getI18n();
-            directionFilter.removeAllItems();
-            directionFilter.addItem(new FilterItem<>(null, i18n.t("invoice.direction") + ": " + i18n.t("common.all")));
-            for (InvoiceDirection d : InvoiceDirection.values()) {
-                directionFilter.addItem(new FilterItem<>(d, i18n.t("invoice.direction." + d.name())));
-            }
-
-            statusFilter.removeAllItems();
-            statusFilter.addItem(new FilterItem<>(null, i18n.t("common.status") + ": " + i18n.t("common.all")));
-            for (InvoiceStatus s : InvoiceStatus.values()) {
-                statusFilter.addItem(new FilterItem<>(s, i18n.t("status.invoice." + s.name())));
-            }
-
-            categoryFilter.removeAllItems();
-            categoryFilter.addItem(new FilterItem<>(null, i18n.t("invoice.category") + ": " + i18n.t("common.all")));
-            for (InvoiceCategory c : InvoiceCategory.values()) {
-                categoryFilter.addItem(new FilterItem<>(c, i18n.t("invoice.category." + c.name())));
-            }
-
-            statusCombo.removeAllItems();
-            for (InvoiceStatus s : InvoiceStatus.values()) {
-                statusCombo.addItem(new StatusChoice(s, i18n.t("status.invoice." + s.name())));
-            }
+            searchField.setText("");
+            currencyFilter.clear();
+            partnerFilter.clear();
+            partnerSearch.setText("");
+            statusFilter.clear();
+            directionFilter.clear();
+            categoryFilter.clear();
         } finally {
             updatingControls = false;
         }
     }
 
-    private void applyFiltersAndRender() {
-        I18nManager i18n = ctx.getI18n();
-        String q = searchField.getText().trim().toLowerCase(Locale.ROOT);
-        @SuppressWarnings("unchecked")
-        InvoiceDirection selDir = directionFilter.getSelectedItem() instanceof FilterItem<?> fi
-                ? (InvoiceDirection) fi.value() : null;
-        @SuppressWarnings("unchecked")
-        InvoiceStatus selStatus = statusFilter.getSelectedItem() instanceof FilterItem<?> fi
-                ? (InvoiceStatus) fi.value() : null;
-        @SuppressWarnings("unchecked")
-        InvoiceCategory selCat = categoryFilter.getSelectedItem() instanceof FilterItem<?> fi
-                ? (InvoiceCategory) fi.value() : null;
-
-        List<Invoice> result = new ArrayList<>();
-        for (Invoice inv : allInvoices) {
-            if (selectedLedgerCurrency != null && !inv.effectiveCurrencyCode().equalsIgnoreCase(selectedLedgerCurrency)) {
-                continue;
-            }
-            if (selDir != null && inv.direction() != selDir) continue;
-            if (selStatus != null && inv.status() != selStatus) continue;
-            if (selCat != null && inv.category() != selCat) continue;
-            if (!q.isEmpty()) {
-                String hay = (inv.invoiceNumber() + " " + inv.partnerName() + " " + inv.effectiveCurrencyCode() + " "
-                        + inv.effectiveTaxTypeCode() + " "
-                        + (inv.orderNumber() != null ? inv.orderNumber() : "")).toLowerCase(Locale.ROOT);
-                if (!hay.contains(q)) continue;
-            }
-            result.add(inv);
-        }
-        filteredInvoices = result;
-
-        renderKpis(ctx.getInvoiceService().computeSummary(filteredInvoices), i18n);
-        renderTable(i18n);
-        syncSelectedInvoiceControls();
+    private void filtersChanged() {
+        if (!updatingControls) applyFiltersAndRender();
     }
 
-    private void renderKpis(FinancialSummary summary, I18nManager i18n) {
-        if (selectedLedgerCurrency != null) {
-            int dec = ctx.getFinanceConfigDao().decimalPlacesFor(selectedLedgerCurrency);
-            FinancialSummary.CurrencyTotals t = summary.forCurrency(selectedLedgerCurrency, dec);
-            kpiValIncome.setText("+" + CurrencyDef.formatAmount(t.totalIncome(), t.currency(), t.decimalPlaces()));
-            kpiSubIncome.setText(i18n.t("invoice.kpi.paid_sub",
-                    CurrencyDef.formatAmount(t.paidIncome(), t.currency(), t.decimalPlaces())));
+    private boolean hasFilters() {
+        return !currentFilterRules().isEmpty();
+    }
 
-            kpiValExpense.setText("-" + CurrencyDef.formatAmount(t.totalExpenses(), t.currency(), t.decimalPlaces()));
-            kpiSubExpense.setText(i18n.t("invoice.kpi.paid_sub",
-                    CurrencyDef.formatAmount(t.paidExpenses(), t.currency(), t.decimalPlaces())));
-
-            kpiValBalance.setText(CurrencyDef.formatSignedAmount(t.netBalance(), t.currency(), t.decimalPlaces()));
-            kpiSubBalance.setText(t.currency() + "  |  " + i18n.t("invoice.direction.short.OUTGOING")
-                    + " / " + i18n.t("invoice.direction.short.INCOMING"));
-
-            kpiValUnpaid.setText(CurrencyDef.formatAmount(t.unpaidAmount(), t.currency(), t.decimalPlaces()));
-            kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", t.unpaidCount()));
-        } else {
-            List<FinancialSummary.CurrencyTotals> visible = summary.byCurrency().values().stream()
-                    .filter(t -> t.totalIncome().signum() != 0 || t.totalExpenses().signum() != 0 || t.unpaidCount() > 0)
-                    .toList();
-            if (visible.isEmpty()) {
-                visible = summary.byCurrency().values().stream().limit(2).toList();
-            }
-            kpiValIncome.setText(buildMultiCurrencyHtml(visible, t ->
-                    "+" + CurrencyDef.formatAmount(t.totalIncome(), t.currency(), t.decimalPlaces())));
-            kpiSubIncome.setText(buildMultiCurrencyInline(visible, t ->
-                    CurrencyDef.formatAmount(t.paidIncome(), t.currency(), t.decimalPlaces()), i18n.t("status.invoice.PAID")));
-
-            kpiValExpense.setText(buildMultiCurrencyHtml(visible, t ->
-                    "-" + CurrencyDef.formatAmount(t.totalExpenses(), t.currency(), t.decimalPlaces())));
-            kpiSubExpense.setText(buildMultiCurrencyInline(visible, t ->
-                    CurrencyDef.formatAmount(t.paidExpenses(), t.currency(), t.decimalPlaces()), i18n.t("status.invoice.PAID")));
-
-            kpiValBalance.setText(buildMultiCurrencyHtml(visible, t ->
-                    CurrencyDef.formatSignedAmount(t.netBalance(), t.currency(), t.decimalPlaces())));
-            kpiSubBalance.setText(i18n.t("invoice.direction.short.OUTGOING") + " / "
-                    + i18n.t("invoice.direction.short.INCOMING"));
-
-            int totalUnpaidCount = visible.stream().mapToInt(FinancialSummary.CurrencyTotals::unpaidCount).sum();
-            kpiValUnpaid.setText(buildMultiCurrencyHtml(visible, t ->
-                    CurrencyDef.formatAmount(t.unpaidAmount(), t.currency(), t.decimalPlaces())));
-            kpiSubUnpaid.setText(i18n.t("invoice.kpi.unpaid_sub", totalUnpaidCount));
+    private void styleFilterToggle() {
+        var i18n = ctx.getI18n();
+        WorkspaceFolderRail.styleIconButton(toggleFilters);
+        if (filterCard.isVisible()) {
+            BrutalistStyle.stylePrimaryButton(toggleFilters);
+            toggleFilters.setBorder(BorderFactory.createLineBorder(ThemeManager.border()));
         }
+        WorkspaceFolderRail.labelIconButton(toggleFilters, i18n.t(filterCard.isVisible() ? "invoice.filters.hide"
+                : hasFilters() ? "invoice.filters.active" : "invoice.filters.show"));
+        toggleFilters.repaint();
+    }
+
+    private void applyFiltersAndRender() {
+        var i18n = ctx.getI18n();
+        Invoice oldSelection = getSelectedInvoice();
+        var terms = SmartFolder.parseSearchTerms(searchField.getText()).stream()
+                .map(term -> term.toLowerCase(Locale.ROOT)).toList();
+        var partners = InvoicePartnerOptions.ruleKeys(partnerOptions, partnerFilter.selected());
+        var directions = directionFilter.selected();
+        var statuses = statusFilter.selected();
+        var categories = categoryFilter.selected();
+        var currencies = currencyFilter.selected();
+        SmartFolder smart = currentSmartFolder();
+        ledgerInvoices = allInvoices.stream()
+                .filter(inv -> currencies.isEmpty() || currencies.contains(inv.effectiveCurrencyCode())).toList();
+        List<Invoice> result = new ArrayList<>();
+        for (Invoice invoice : ledgerInvoices) {
+            if (!directions.isEmpty() && !directions.contains(invoice.direction())) continue;
+            if (!statuses.isEmpty() && !statuses.contains(invoice.status())) continue;
+            if (!categories.isEmpty() && !categories.contains(invoice.category())) continue;
+            if (!partners.isEmpty() && !partners.contains(SmartFolder.invoicePartnerKey(invoice))) continue;
+            if (smart != null && !smart.matches(invoice)) continue;
+            String text = SmartFolder.invoiceSearchText(invoice).toLowerCase(Locale.ROOT);
+            if (!terms.stream().allMatch(text::contains)) continue;
+            result.add(invoice);
+        }
+        filteredInvoices = List.copyOf(result);
+        renderTable(i18n);
+        if (oldSelection != null) selectInvoiceRow(oldSelection.id());
+        saveFilterActions.setVisible(hasFilters());
+        styleFilterToggle();
+    }
+
+    private FinancialSummary currencySummary() {
+        FinancialSummary summary = ctx.getInvoiceService().computeSummary(ledgerInvoices);
+        var currencies = currencyFilter.selected();
+        if (currencies.isEmpty()) return summary;
+        var totals = new LinkedHashMap<String, FinancialSummary.CurrencyTotals>();
+        for (String code : currencies) {
+            totals.put(code, summary.forCurrency(code, CurrencyDef.defaultDecimalsFor(code)));
+        }
+        return new FinancialSummary(totals);
     }
 
     private void renderTable(I18nManager i18n) {
@@ -672,48 +841,27 @@ public final class InvoicesView extends JPanel implements NavigableView {
                     inv.status()
             });
         }
-        if (table.getColumnCount() >= 11) {
-            table.getColumnModel().getColumn(1).setCellRenderer(new DirectionCellRenderer());
-            table.getColumnModel().getColumn(10).setCellRenderer(new InvoiceStatusCellRenderer());
-        }
-    }
-
-    private static String buildMultiCurrencyHtml(List<FinancialSummary.CurrencyTotals> list,
-                                                 Function<FinancialSummary.CurrencyTotals, String> fmt) {
-        if (list.isEmpty()) return "—";
-        if (list.size() == 1) return fmt.apply(list.get(0));
-        StringBuilder sb = new StringBuilder("<html>");
-        for (int i = 0; i < list.size(); i++) {
-            if (i > 0) sb.append("<br>");
-            sb.append(fmt.apply(list.get(i)));
-        }
-        sb.append("</html>");
-        return sb.toString();
-    }
-
-    private static String buildMultiCurrencyInline(List<FinancialSummary.CurrencyTotals> list,
-                                                   Function<FinancialSummary.CurrencyTotals, String> fmt,
-                                                   String prefix) {
-        if (list.isEmpty()) return " ";
-        StringBuilder sb = new StringBuilder(prefix).append(": ");
-        for (int i = 0; i < list.size(); i++) {
-            if (i > 0) sb.append(" | ");
-            sb.append(fmt.apply(list.get(i)));
-        }
-        return sb.toString();
     }
 
     private void refreshDataSelecting(long invoiceId) {
         allInvoices = ctx.getInvoiceDao().findAll();
-        rebuildCurrencyLedgerBar();
         applyFiltersAndRender();
+        selectInvoiceRow(invoiceId);
+    }
+
+    private void selectInvoiceRow(long invoiceId) {
         for (int i = 0; i < filteredInvoices.size(); i++) {
             if (filteredInvoices.get(i).id() == invoiceId) {
-                table.setRowSelectionInterval(i, i);
+                int row = table.convertRowIndexToView(i);
+                if (row >= 0) table.setRowSelectionInterval(row, row);
                 break;
             }
         }
-        syncSelectedInvoiceControls();
+    }
+
+    @Override
+    public JComponent getHeaderActions() {
+        return headerActions;
     }
 
     @Override
@@ -734,39 +882,40 @@ public final class InvoicesView extends JPanel implements NavigableView {
     @Override
     public void refreshData() {
         ctx.getInvoiceService().syncOverdueStatuses();
-        settingsPanel.refreshTables();
-        rebuildCurrencyLedgerBar();
         allInvoices = ctx.getInvoiceDao().findAll();
+        loadFolders();
+        rebuildCurrencyOptions();
+        rebuildPartnerOptions();
+        refreshFolderRail();
         applyFiltersAndRender();
     }
 
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
-        tabs.setTitleAt(0, i18n.t("invoice.tab.list").toUpperCase(Locale.ROOT));
-        tabs.setTitleAt(1, i18n.t("invoice.tab.settings").toUpperCase(Locale.ROOT));
+        WorkspaceFolderRail.labelIconButton(smartFoldersButton, i18n.t("smart.manage"));
+        searchLabel.setText(i18n.t("common.search"));
+        partnerLabel.setText(i18n.t("invoice.filters.partners"));
+        partnerSearch.putClientProperty("JTextField.placeholderText", i18n.t("invoice.entry.search_partner"));
+        partnerSearch.getAccessibleContext().setAccessibleName(i18n.t("invoice.entry.search_partner"));
+        saveFilterFolder.setText(i18n.t("invoice.filters.save_folder"));
+        sizeFilterCard();
+        currencyLabel.setText(i18n.t("currency.label"));
+        statusLabel.setText(i18n.t("common.status"));
+        categoryLabel.setText(i18n.t("invoice.category"));
+        directionLabel.setText(i18n.t("invoice.filter.direction"));
+        clearFilters.setText(i18n.t("common.clear"));
+        WorkspaceFolderRail.labelIconButton(moreActions, i18n.t("invoice.export_menu"));
+        pnlReportItem.setText(i18n.t("invoice.report.btn"));
+        exportCsvItem.setText(i18n.t("common.export.csv"));
 
-        currencyLedgerLabel.setText(i18n.t("invoice.currency_view").toUpperCase(Locale.ROOT) + ":");
-        kpiTitleIncome.setText(i18n.t("invoice.kpi.income").toUpperCase(Locale.ROOT));
-        kpiTitleExpense.setText(i18n.t("invoice.kpi.expenses").toUpperCase(Locale.ROOT));
-        kpiTitleBalance.setText(i18n.t("invoice.kpi.balance").toUpperCase(Locale.ROOT));
-        kpiTitleUnpaid.setText(i18n.t("invoice.kpi.unpaid").toUpperCase(Locale.ROOT));
-
-        newOutgoingBtn.setText("+ " + i18n.t("invoice.new_outgoing").toUpperCase(Locale.ROOT));
-        newIncomingBtn.setText("+ " + i18n.t("invoice.new_incoming").toUpperCase(Locale.ROOT));
-        applyStatusBtn.setText(i18n.t("invoice.status_update").toUpperCase(Locale.ROOT));
-        previewDocBtn.setText(i18n.t("invoice.preview_btn").toUpperCase(Locale.ROOT));
-        sendReminderBtn.setText(i18n.t("invoice.reminder.btn").toUpperCase(Locale.ROOT));
-        receiptBtn.setText(i18n.t("invoice.receipt.attach").toUpperCase(Locale.ROOT));
-        creditNoteBtn.setText(i18n.t("invoice.credit_note.btn").toUpperCase(Locale.ROOT));
-        pnlReportBtn.setText(i18n.t("invoice.report.btn").toUpperCase(Locale.ROOT));
-        exportCsvBtn.setText(i18n.t("common.export.csv").toUpperCase(Locale.ROOT));
-
-        populateFilterCombos();
+        statusFilter.rebuild(List.of(InvoiceStatus.values()), status -> i18n.t("status.invoice." + status.name()));
+        directionFilter.rebuild(List.of(InvoiceDirection.values()), direction -> i18n.t("invoice.direction." + direction.name()));
+        categoryFilter.rebuild(List.of(InvoiceCategory.values()), category -> i18n.t("invoice.category." + category.name()));
 
         tableModel.setColumnIdentifiers(new Object[]{
                 i18n.t("invoice.number").toUpperCase(Locale.ROOT),
-                i18n.t("invoice.direction").toUpperCase(Locale.ROOT),
+                i18n.t("invoice.filter.direction").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.partner").toUpperCase(Locale.ROOT),
                 i18n.t("invoice.category").toUpperCase(Locale.ROOT),
                 i18n.t("orders.order_number").toUpperCase(Locale.ROOT),
@@ -777,39 +926,31 @@ public final class InvoicesView extends JPanel implements NavigableView {
                 i18n.t("invoice.gross_amount").toUpperCase(Locale.ROOT),
                 i18n.t("common.status").toUpperCase(Locale.ROOT)
         });
+        visibleColumns = List.of();
+        configureInvoiceColumns(listPanel.getWidth());
 
-        settingsPanel.applyTranslations();
         refreshData();
     }
 
     @Override
     public void applyTheme() {
+        folders.render();
         setBackground(ThemeManager.bg());
-        invoicesTab.setBackground(ThemeManager.bg());
 
-        BrutalistStyle.applyBoxCard(currencyLedgerBar, 6, 10);
-        currencyLedgerLabel.setForeground(ThemeManager.fg());
-        styleCurrencyLedgerButtons();
+        styleFilterToggle();
 
-        for (JPanel card : List.of(kpiCardIncome, kpiCardExpense, kpiCardBalance, kpiCardUnpaid)) {
-            BrutalistStyle.applyBoxCard(card, 12, 14);
+        BrutalistStyle.applyBoxCard(filterCard, 10, 10);
+        BrutalistStyle.styleSecondaryButtons(clearFilters, saveFilterFolder);
+        sizeFilterCard();
+        filterActionDivider.setBorder(BrutalistStyle.hairlineTopRule(4, 0));
+        WorkspaceFolderRail.styleIconButton(moreActions);
+        exportMenu.setBorder(BrutalistStyle.boxBorder(4, 4));
+        exportMenu.setBackground(ThemeManager.bg());
+        for (var item : List.of(pnlReportItem, exportCsvItem)) {
+            item.setBorder(BorderFactory.createEmptyBorder(9, 14, 9, 16));
         }
-        for (JLabel t : List.of(kpiTitleIncome, kpiTitleExpense, kpiTitleBalance, kpiTitleUnpaid,
-                kpiSubIncome, kpiSubExpense, kpiSubBalance, kpiSubUnpaid)) {
-            t.setForeground(ThemeManager.muted());
-        }
-        for (JLabel v : List.of(kpiValIncome, kpiValExpense, kpiValBalance, kpiValUnpaid)) {
-            v.setForeground(ThemeManager.fg());
-        }
-
-        BrutalistStyle.applyBoxCard(filterCard, 6, 8);
-        BrutalistStyle.stylePrimaryButton(newOutgoingBtn);
-        BrutalistStyle.stylePrimaryButton(previewDocBtn);
-        BrutalistStyle.styleSecondaryButtons(
-                newIncomingBtn, applyStatusBtn, sendReminderBtn, receiptBtn, creditNoteBtn, pnlReportBtn, exportCsvBtn);
         BrutalistStyle.styleTable(table);
 
-        settingsPanel.applyTheme();
         table.repaint();
     }
 

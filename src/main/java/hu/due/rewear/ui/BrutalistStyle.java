@@ -12,10 +12,12 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
 import javax.swing.JTable;
+import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
 import javax.swing.border.Border;
 import javax.swing.table.DefaultTableModel;
 import java.awt.Component;
+import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
 import java.awt.GridBagConstraints;
@@ -118,6 +120,29 @@ public final class BrutalistStyle {
         ));
     }
 
+    static void styleRailToggle(JToggleButton button, boolean collapsed) {
+        boolean dark = ThemeManager.isDarkMode();
+        boolean selected = button.isSelected();
+        String bg = dark ? "#000000" : "#FFFFFF";
+        String fg = dark ? "#FFFFFF" : "#000000";
+        String normalBg = selected ? fg : bg;
+        String normalFg = selected ? bg : fg;
+        String hoverBg = selected ? fg : dark ? "#1C1C1C" : "#EAEAEA";
+        String pressedBg = selected ? fg : dark ? "#333333" : "#CFCFCF";
+        int pad = collapsed ? 0 : 10;
+
+        button.setCursor(Cursor.getPredefinedCursor(selected ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
+        button.setBorder(boxBorder(6, pad));
+        button.setBackground(selected ? ThemeManager.fg() : ThemeManager.bg());
+        button.setForeground(selected ? ThemeManager.bg() : ThemeManager.fg());
+        button.putClientProperty(FlatClientProperties.STYLE,
+                "background:" + normalBg + "; foreground:" + normalFg
+                        + "; selectedBackground:" + fg + "; selectedForeground:" + bg
+                        + "; hoverBackground:" + hoverBg + "; hoverForeground:" + normalFg
+                        + "; pressedBackground:" + pressedBg + "; pressedForeground:" + normalFg
+                        + "; focusedBackground:" + normalBg + "; focusedForeground:" + normalFg);
+    }
+
     /** Convenience batch overload to apply {@link #styleSecondaryButton(JButton)} across a toolbar or dialog. */
     public static void styleSecondaryButtons(JButton... buttons) {
         if (buttons == null) {
@@ -177,6 +202,7 @@ public final class BrutalistStyle {
         table.setSelectionBackground(ThemeManager.fg());
         table.setSelectionForeground(ThemeManager.bg());
         table.setGridColor(ThemeManager.grid());
+        TableSorting.install(table);
         table.getTableHeader().setReorderingAllowed(false);
         table.getTableHeader().setBackground(ThemeManager.bg());
         table.getTableHeader().setForeground(ThemeManager.fg());

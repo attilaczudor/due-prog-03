@@ -8,7 +8,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
+import java.nio.file.attribute.BasicFileAttributes;
+import java.nio.file.attribute.FileTime;
 import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -34,7 +37,21 @@ public final class I18nManager {
     private final List<LanguageChangeListener> listeners = new CopyOnWriteArrayList<>();
 
     private CsvTranslationLoader.TranslationBundle bundle;
+    private CsvTranslationLoader.TranslationBundle bundled;
     private String activeLanguage = FALLBACK_LANGUAGE;
+    private ExternalSource loadedSource;
+
+    public enum ExternalSourceStatus { CURRENT, RELOAD_REQUIRED, UNAVAILABLE }
+
+    private record ExternalSource(Path path, FileTime modified, long size, Object fileKey) {
+        static ExternalSource read(Path path) throws IOException {
+            var attrs = Files.readAttributes(path, BasicFileAttributes.class);
+            if (!attrs.isRegularFile() || !Files.isReadable(path)) {
+                throw new IOException("Translation source is not a readable file: " + path);
+            }
+            return new ExternalSource(path, attrs.lastModifiedTime(), attrs.size(), attrs.fileKey());
+        }
+    }
 
     public I18nManager() {
         loadBundledDefault();
@@ -63,7 +80,9 @@ public final class I18nManager {
             if (is == null) {
                 throw new IllegalStateException("Bundled translation resource not found: " + DEFAULT_RESOURCE);
             }
-            this.bundle = loader.load(is);
+            this.bundled = loader.load(is);
+            this.bundle = bundled;
+            this.loadedSource = null;
             if (!bundle.languages().contains(activeLanguage)) {
                 this.activeLanguage = bundle.languages().contains(FALLBACK_LANGUAGE)
                         ? FALLBACK_LANGUAGE
@@ -77,8 +96,11 @@ public final class I18nManager {
 
     public synchronized void loadFromFile(Path csvPath) throws IOException {
         Objects.requireNonNull(csvPath, "csvPath");
-        CsvTranslationLoader.TranslationBundle loaded = loader.load(csvPath);
+        Path path = csvPath.toAbsolutePath().normalize();
+        ExternalSource source = ExternalSource.read(path);
+        CsvTranslationLoader.TranslationBundle loaded = loader.load(path);
         this.bundle = loaded;
+        this.loadedSource = source;
         if (!bundle.languages().contains(activeLanguage)) {
             this.activeLanguage = bundle.languages().contains(FALLBACK_LANGUAGE)
                     ? FALLBACK_LANGUAGE
@@ -87,6 +109,16 @@ public final class I18nManager {
         LOG.info("Loaded external translations from {} ({} keys, languages={})",
                 csvPath, bundle.entries().size(), bundle.languages());
         notifyListeners();
+    }
+
+    public synchronized ExternalSourceStatus externalSourceStatus(String configuredPath) {
+        if (configuredPath == null || configuredPath.isBlank()) return ExternalSourceStatus.CURRENT;
+        try {
+            ExternalSource current = ExternalSource.read(Path.of(configuredPath).toAbsolutePath().normalize());
+            return current.equals(loadedSource) ? ExternalSourceStatus.CURRENT : ExternalSourceStatus.RELOAD_REQUIRED;
+        } catch (IOException | InvalidPathException ex) {
+            return ExternalSourceStatus.UNAVAILABLE;
+        }
     }
 
     public synchronized void exportToFile(Path targetPath) throws IOException {
@@ -148,6 +180,7 @@ public final class I18nManager {
             return "";
         }
         Map<String, String> perLang = bundle.entries().get(key);
+        if (perLang == null && bundled != null) perLang = bundled.entries().get(key);
         if (perLang == null) {
             LOG.warn("Missing translation key: {}", key);
             return "[" + key + "]";

@@ -133,6 +133,8 @@ class V22CommsAndForkliftWorkflowTest {
                 "smtp.rewear-logistics.hu", 587, "STARTTLS", "postmaster@rewear-logistics.hu", "secret",
                 "imap.rewear-logistics.hu", 993, "SSL/TLS", "postmaster@rewear-logistics.hu", "secret", true);
         ctx.getEmailService().saveSettings(updated);
+        assertThrows(IllegalStateException.class, ctx.getEmailService()::syncAllUserEmailsToDomain);
+        ctx.getSession().login(superAdmin);
         int synced = ctx.getEmailService().syncAllUserEmailsToDomain();
         assertTrue(synced >= 5);
 
@@ -143,13 +145,14 @@ class V22CommsAndForkliftWorkflowTest {
 
         // Send internal + external email simultaneously
         int mgrUnreadBefore = ctx.getEmailService().countUnreadInbox(refreshedMgr.id());
-        ctx.getEmailService().sendEmail(refreshedSuper,
+        assertTrue(ctx.getEmailService().sendEmail(refreshedSuper,
                 refreshedMgr.email() + ", office@alpinesecondhand.at", "",
-                "Weekly Dispatch Sync", "Please prepare DOCK-01 for Austria shipment.", null);
+                "Weekly Dispatch Sync", "Please prepare DOCK-01 for Austria shipment.", null));
 
         assertEquals(mgrUnreadBefore + 1, ctx.getEmailService().countUnreadInbox(refreshedMgr.id()));
         List<EmailMessage> sent = ctx.getEmailService().listFolder(refreshedSuper.id(), EmailMessage.FOLDER_SENT);
-        assertTrue(sent.stream().anyMatch(m -> m.subject().equals("Weekly Dispatch Sync") && m.external()));
+        assertTrue(sent.stream().anyMatch(m -> m.subject().equals("Weekly Dispatch Sync")
+                && m.external() && m.deliveryStatus().contains("SIMULATED")));
 
         // Operator & Forklift Driver are strictly internal-only (cannot send or receive external emails)
         User operator = ctx.getUserDao().findByUsername("operator").orElseThrow();

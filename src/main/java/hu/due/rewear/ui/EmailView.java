@@ -1,43 +1,32 @@
 package hu.due.rewear.ui;
 
-import com.formdev.flatlaf.FlatClientProperties;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
-import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.EmailMessage;
+import hu.due.rewear.model.SmartFolder;
 import hu.due.rewear.model.User;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JComponent;
-import javax.swing.JFileChooser;
 import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JSeparator;
 import javax.swing.JSplitPane;
 import javax.swing.JTable;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
-import javax.swing.JToggleButton;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.table.DefaultTableModel;
 import java.awt.BorderLayout;
-import java.awt.Cursor;
 import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
-import java.io.File;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.format.DateTimeFormatter;
@@ -53,25 +42,15 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private static final DateTimeFormatter DT_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
 
-    private static final int RAIL_EXPANDED_WIDTH = 210;
-    private static final int RAIL_COLLAPSED_WIDTH = 62;
-
     private final AppContext ctx;
 
-    private final JPanel folderPanel = new JPanel();
-    private final JSeparator folderSeparator = new JSeparator(SwingConstants.HORIZONTAL);
-    private final JSeparator footerSeparator = new JSeparator(SwingConstants.HORIZONTAL);
-    private final JPanel collapseHost = new JPanel(new BorderLayout());
-    private final JButton collapseRailBtn = new JButton();
-    private boolean folderRailCollapsed = false;
+    private static final List<String> MAILBOXES = List.of(EmailMessage.FOLDER_INBOX, EmailMessage.FOLDER_SENT,
+            EmailMessage.FOLDER_DRAFTS, EmailMessage.FOLDER_TRASH);
 
-    private final JToggleButton inboxBtn = new JToggleButton();
-    private final JToggleButton sentBtn = new JToggleButton();
-    private final JToggleButton draftsBtn = new JToggleButton();
-    private final JToggleButton trashBtn = new JToggleButton();
-    private final ButtonGroup folderGroup = new ButtonGroup();
+    private final WorkspaceFolderRail folders;
+    private final JButton smartFoldersButton = new JButton(SidebarIcons.smartFolder(16));
+    private List<SmartFolder> smartFolders = List.of();
 
-    private final JButton composeBtn = new JButton();
     private final JButton replyBtn = new JButton();
     private final JButton forwardBtn = new JButton();
     private final JButton toggleReadBtn = new JButton();
@@ -89,9 +68,12 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private String activeFolder = EmailMessage.FOLDER_INBOX;
     private List<EmailMessage> currentEmails = List.of();
+    private boolean updatingMailbox;
 
     public EmailView(AppContext ctx) {
         this.ctx = ctx;
+        folders = new WorkspaceFolderRail(ctx.getI18n(), "email.compose", 210,
+                () -> openComposeDialog("", "", "", ""), this::switchFolder);
         setLayout(new BorderLayout(12, 10));
         setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
         buildUi();
@@ -101,66 +83,9 @@ public final class EmailView extends JPanel implements NavigableView {
     }
 
     private void buildUi() {
-        // Left collapsible folder rail (+ New Email -> padded horizontal rule -> Folders -> bottom collapse arrow)
-        folderPanel.setLayout(new BoxLayout(folderPanel, BoxLayout.Y_AXIS));
-        folderPanel.setPreferredSize(new Dimension(RAIL_EXPANDED_WIDTH, 0));
-        BrutalistStyle.applyBoxCard(folderPanel, 10, 10);
-
-        composeBtn.setAlignmentX(LEFT_ALIGNMENT);
-        composeBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        composeBtn.setPreferredSize(new Dimension(180, 36));
-        composeBtn.setIconTextGap(8);
-        folderPanel.add(composeBtn);
-
-        folderPanel.add(Box.createVerticalStrut(10));
-        folderSeparator.setAlignmentX(LEFT_ALIGNMENT);
-        folderSeparator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-        folderPanel.add(folderSeparator);
-        folderPanel.add(Box.createVerticalStrut(10));
-
-        inboxBtn.setIcon(SidebarIcons.mailInbox(16));
-        sentBtn.setIcon(SidebarIcons.mailSent(16));
-        draftsBtn.setIcon(SidebarIcons.mailDrafts(16));
-        trashBtn.setIcon(SidebarIcons.mailTrash(16));
-
-        for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
-            btn.setHorizontalAlignment(SwingConstants.LEFT);
-            btn.setIconTextGap(10);
-            btn.setAlignmentX(LEFT_ALIGNMENT);
-            btn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 34));
-            btn.setPreferredSize(new Dimension(180, 34));
-            btn.setFocusPainted(false);
-            folderGroup.add(btn);
-            folderPanel.add(btn);
-            folderPanel.add(Box.createVerticalStrut(4));
-        }
-        inboxBtn.setSelected(true);
-        folderPanel.add(Box.createVerticalGlue());
-
-        simIncomingBtn.setAlignmentX(LEFT_ALIGNMENT);
-        simIncomingBtn.setMaximumSize(new Dimension(Integer.MAX_VALUE, 32));
-        simIncomingBtn.setPreferredSize(new Dimension(180, 32));
-        folderPanel.add(simIncomingBtn);
-        folderPanel.add(Box.createVerticalStrut(8));
-
-        footerSeparator.setAlignmentX(LEFT_ALIGNMENT);
-        footerSeparator.setMaximumSize(new Dimension(Integer.MAX_VALUE, 1));
-        folderPanel.add(footerSeparator);
-        folderPanel.add(Box.createVerticalStrut(8));
-
-        Dimension sq = new Dimension(34, 34);
-        collapseRailBtn.setPreferredSize(sq);
-        collapseRailBtn.setMinimumSize(sq);
-        collapseRailBtn.setMaximumSize(sq);
-        collapseRailBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-        collapseRailBtn.setFocusPainted(false);
-        collapseRailBtn.setMargin(new Insets(0, 0, 0, 0));
-
-        collapseHost.setOpaque(false);
-        collapseHost.setAlignmentX(LEFT_ALIGNMENT);
-        collapseHost.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-        folderPanel.add(collapseHost);
-        add(folderPanel, BorderLayout.WEST);
+        folders.addUtility(simIncomingBtn);
+        folders.addFooterButton(smartFoldersButton);
+        add(folders, BorderLayout.WEST);
 
         // Center split: list + reader
         BrutalistStyle.styleTable(listTable);
@@ -202,17 +127,16 @@ public final class EmailView extends JPanel implements NavigableView {
     }
 
     private void wireEvents() {
-        inboxBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_INBOX));
-        sentBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_SENT));
-        draftsBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_DRAFTS));
-        trashBtn.addActionListener(e -> switchFolder(EmailMessage.FOLDER_TRASH));
-        collapseRailBtn.addActionListener(e -> {
-            folderRailCollapsed = !folderRailCollapsed;
-            applyFolderRailState();
-            applyTheme();
-        });
-
-        composeBtn.addActionListener(e -> openComposeDialog("", "", "", ""));
+        smartFoldersButton.addActionListener(e -> SmartFolderEditor.show(this, ctx, SmartFolder.Scope.MAIL,
+                null, List.of(), id -> switchFolder(id == 0 ? EmailMessage.FOLDER_INBOX : WorkspaceFolderRail.smartKey(id))));
+        folders.setFolderEditor(folder -> SmartFolderEditor.show(this, ctx, SmartFolder.Scope.MAIL,
+                folder, List.of(), id -> {
+                    if (id == 0 && !WorkspaceFolderRail.smartKey(folder.id()).equals(activeFolder)) {
+                        refreshData();
+                    } else {
+                        switchFolder(id == 0 ? EmailMessage.FOLDER_INBOX : WorkspaceFolderRail.smartKey(id));
+                    }
+                }));
         replyBtn.addActionListener(e -> {
             EmailMessage m = getSelectedEmail();
             if (m != null) {
@@ -246,8 +170,16 @@ public final class EmailView extends JPanel implements NavigableView {
         simIncomingBtn.addActionListener(e -> handleSimulateExternalIncoming());
 
         listTable.getSelectionModel().addListSelectionListener(e -> {
-            if (!e.getValueIsAdjusting()) {
+            if (!e.getValueIsAdjusting() && !updatingMailbox) {
                 renderSelectedEmail();
+            }
+        });
+        listTable.addMouseListener(new java.awt.event.MouseAdapter() {
+            @Override
+            public void mouseClicked(java.awt.event.MouseEvent event) {
+                if (javax.swing.SwingUtilities.isLeftMouseButton(event) && listTable.rowAtPoint(event.getPoint()) >= 0) {
+                    renderSelectedEmail();
+                }
             }
         });
 
@@ -272,12 +204,11 @@ public final class EmailView extends JPanel implements NavigableView {
 
     private void switchFolder(String folder) {
         this.activeFolder = folder;
-        updateFolderButtonStyles();
         refreshData();
     }
 
     private EmailMessage getSelectedEmail() {
-        int r = listTable.getSelectedRow();
+        int r = TableSorting.selectedModelRow(listTable);
         return (r >= 0 && r < currentEmails.size()) ? currentEmails.get(r) : null;
     }
 
@@ -296,9 +227,14 @@ public final class EmailView extends JPanel implements NavigableView {
             openAttachmentBtn.setVisible(false);
             return;
         }
-        if (!m.read() && EmailMessage.FOLDER_INBOX.equalsIgnoreCase(m.folder())) {
+        if (!updatingMailbox && !m.read() && EmailMessage.FOLDER_INBOX.equalsIgnoreCase(m.folder())) {
             ctx.getEmailService().markRead(m.id(), true);
-            refreshFolderBadges();
+            int row = TableSorting.selectedModelRow(listTable);
+            var updated = new ArrayList<>(currentEmails);
+            updated.set(row, m.withRead(true));
+            currentEmails = List.copyOf(updated);
+            listModel.setValueAt("✓", row, 0);
+            refreshFolderRail(ctx.getSession().requireCurrentUser().id());
         }
         readerSubjectLabel.setText(m.subject());
         String ts = m.createdAt() != null ? DT_FMT.format(m.createdAt()) : "";
@@ -321,92 +257,7 @@ public final class EmailView extends JPanel implements NavigableView {
     }
 
     private void openComposeDialog(String initialTo, String initialCc, String initialSubject, String initialBody) {
-        I18nManager i18n = ctx.getI18n();
-        boolean externalAllowed = ctx.getSession().canUseExternalEmail();
-
-        // Build searchable recipient directory (company teammates; B2B partners only for external-capable roles)
-        List<RecipientMultiSelectField.ContactOption> contacts = new ArrayList<>();
-        for (User u : ctx.getUserDao().findAll()) {
-            if (u.email() != null && !u.email().isBlank()) {
-                contacts.add(new RecipientMultiSelectField.ContactOption(u.displayName(), u.email()));
-            }
-        }
-        if (externalAllowed) {
-            for (Customer c : ctx.getCustomerDao().findAll(true)) {
-                if (c.email() != null && !c.email().isBlank()) {
-                    contacts.add(new RecipientMultiSelectField.ContactOption(c.name(), c.email()));
-                }
-            }
-        }
-
-        String searchPlaceholder = i18n.t("email.recipient_search_placeholder");
-        RecipientMultiSelectField toField = new RecipientMultiSelectField(
-                contacts, externalAllowed, searchPlaceholder, initialTo);
-        RecipientMultiSelectField ccField = new RecipientMultiSelectField(
-                contacts, externalAllowed, searchPlaceholder, initialCc);
-
-        JTextField subjField = new JTextField(initialSubject, 34);
-        subjField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
-        subjField.setPreferredSize(new Dimension(subjField.getPreferredSize().width, 32));
-        subjField.setMinimumSize(new Dimension(0, 32));
-        JTextArea bodyArea = new JTextArea(initialBody, 10, 34);
-        bodyArea.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
-        bodyArea.setLineWrap(true);
-        bodyArea.setWrapStyleWord(true);
-        JTextField attachField = new JTextField("", 24);
-        attachField.setFont(ThemeManager.monoFont(Font.PLAIN, 12.5f));
-        attachField.setEditable(false);
-        attachField.setPreferredSize(new Dimension(attachField.getPreferredSize().width, 32));
-        attachField.setMinimumSize(new Dimension(0, 32));
-        JButton browseBtn = new JButton(i18n.t("email.attach"));
-        BrutalistStyle.styleSecondaryButton(browseBtn);
-        browseBtn.setPreferredSize(new Dimension(browseBtn.getPreferredSize().width, 32));
-        browseBtn.setMinimumSize(new Dimension(browseBtn.getPreferredSize().width, 32));
-        browseBtn.addActionListener(e -> {
-            JFileChooser fc = new JFileChooser();
-            if (fc.showOpenDialog(this) == JFileChooser.APPROVE_OPTION) {
-                File f = fc.getSelectedFile();
-                attachField.setText(f.getAbsolutePath());
-            }
-        });
-
-        JPanel form = new JPanel(new GridBagLayout());
-        form.setPreferredSize(new Dimension(540, 420));
-        GridBagConstraints gbc = new GridBagConstraints();
-        gbc.insets = new Insets(4, 4, 4, 4);
-        gbc.fill = GridBagConstraints.HORIZONTAL;
-        int r = 0;
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("email.to") + " *", toField);
-        BrutalistStyle.addFormRow(form, gbc, r++, "CC", ccField);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("email.subject") + " *", subjField);
-        JPanel attachRow = new JPanel(new BorderLayout(6, 0));
-        attachRow.add(attachField, BorderLayout.CENTER);
-        attachRow.add(browseBtn, BorderLayout.EAST);
-        BrutalistStyle.addFormRow(form, gbc, r++, i18n.t("email.attachment"), attachRow);
-        gbc.gridx = 0; gbc.gridy = r; gbc.gridwidth = 2; gbc.weightx = 1; gbc.weighty = 1;
-        gbc.fill = GridBagConstraints.BOTH;
-        form.add(new JScrollPane(bodyArea), gbc);
-
-        String[] options = {i18n.t("email.send"), i18n.t("email.save_draft"), i18n.t("common.cancel")};
-        int res = JOptionPane.showOptionDialog(this, form, i18n.t("email.compose"),
-                JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, options, options[0]);
-        User me = ctx.getSession().requireCurrentUser();
-        String attach = attachField.getText().isBlank() ? null : attachField.getText().trim();
-        try {
-            if (res == 0) {
-                ctx.getEmailService().sendEmail(me, toField.getSelectedAddressesCsv(), ccField.getSelectedAddressesCsv(),
-                        subjField.getText(), bodyArea.getText(), attach);
-                refreshData();
-                JOptionPane.showMessageDialog(this, i18n.t("email.sent_ok"),
-                        i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-            } else if (res == 1) {
-                ctx.getEmailService().saveDraft(me, toField.getSelectedAddressesCsv(), ccField.getSelectedAddressesCsv(),
-                        subjField.getText(), bodyArea.getText(), attach);
-                refreshData();
-            }
-        } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
-        }
+        EmailComposeDialog.show(this, ctx, initialTo, initialCc, initialSubject, initialBody, null, this::refreshData);
     }
 
     private void handleSimulateExternalIncoming() {
@@ -419,117 +270,26 @@ public final class EmailView extends JPanel implements NavigableView {
                         + "We would like to book 6 compressed bales (Grade A) for Friday pickup at DOCK-01.\n"
                         + "Please reply with availability and your EUR 0% EU-0 proforma.\n\n"
                         + "Best regards,\nJana Nováková — GreenLoop Second-Hand S.R.O.");
-        activeFolder = EmailMessage.FOLDER_INBOX;
-        inboxBtn.setSelected(true);
-        refreshData();
+        switchFolder(EmailMessage.FOLDER_INBOX);
         JOptionPane.showMessageDialog(this, i18n.t("email.sim_received"),
                 i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private void refreshFolderBadges() {
-        I18nManager i18n = ctx.getI18n();
-        long uid = ctx.getSession().requireCurrentUser().id();
-        int unread = ctx.getEmailService().countUnreadInbox(uid);
-        String inboxFull = i18n.t("email.folder.inbox").toUpperCase(Locale.ROOT)
-                + (unread > 0 ? "  [" + unread + "]" : "");
-        String sentFull = i18n.t("email.folder.sent").toUpperCase(Locale.ROOT);
-        String draftsFull = i18n.t("email.folder.drafts").toUpperCase(Locale.ROOT);
-        String trashFull = i18n.t("email.folder.trash").toUpperCase(Locale.ROOT);
-
-        inboxBtn.setToolTipText(inboxFull);
-        sentBtn.setToolTipText(sentFull);
-        draftsBtn.setToolTipText(draftsFull);
-        trashBtn.setToolTipText(trashFull);
-
-        if (folderRailCollapsed) {
-            inboxBtn.setText("");
-            sentBtn.setText("");
-            draftsBtn.setText("");
-            trashBtn.setText("");
-        } else {
-            inboxBtn.setText(inboxFull);
-            sentBtn.setText(sentFull);
-            draftsBtn.setText(draftsFull);
-            trashBtn.setText(trashFull);
-        }
+    private SmartFolder currentSmartFolder() {
+        return smartFolders.stream().filter(folder -> WorkspaceFolderRail.smartKey(folder.id()).equals(activeFolder))
+                .findFirst().orElse(null);
     }
 
-    private void applyFolderRailState() {
-        I18nManager i18n = ctx.getI18n();
-        int railW = folderRailCollapsed ? RAIL_COLLAPSED_WIDTH : RAIL_EXPANDED_WIDTH;
-        folderPanel.setPreferredSize(new Dimension(railW, 0));
-        BrutalistStyle.applyBoxCard(folderPanel, 10, folderRailCollapsed ? 8 : 10);
-
-        String composeFull = "+ " + i18n.t("email.compose").toUpperCase(Locale.ROOT);
-        composeBtn.setToolTipText(composeFull);
-        if (folderRailCollapsed) {
-            composeBtn.setText("");
-            composeBtn.setIcon(SidebarIcons.mailCompose(16));
-            composeBtn.setHorizontalAlignment(SwingConstants.CENTER);
-        } else {
-            composeBtn.setIcon(null);
-            composeBtn.setText(composeFull);
-            composeBtn.setHorizontalAlignment(SwingConstants.CENTER);
-        }
-
-        for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
-            btn.setHorizontalAlignment(folderRailCollapsed ? SwingConstants.CENTER : SwingConstants.LEFT);
-            btn.setIconTextGap(folderRailCollapsed ? 0 : 10);
-        }
-        refreshFolderBadges();
-
-        boolean externalAllowed = ctx.getSession().isAuthenticated() && ctx.getSession().canUseExternalEmail();
-        simIncomingBtn.setVisible(externalAllowed && !folderRailCollapsed);
-
-        collapseRailBtn.setIcon(folderRailCollapsed ? SidebarIcons.arrowRight(16) : SidebarIcons.arrowLeft(16));
-        collapseRailBtn.setToolTipText(i18n.t(folderRailCollapsed ? "sidebar.expand" : "sidebar.collapse"));
-
-        collapseHost.removeAll();
-        collapseHost.add(collapseRailBtn, folderRailCollapsed ? BorderLayout.CENTER : BorderLayout.EAST);
-
-        updateFolderButtonStyles();
-        folderPanel.revalidate();
-        folderPanel.repaint();
-        revalidate();
-    }
-
-    private void updateFolderButtonStyles() {
-        boolean dark = ThemeManager.isDarkMode();
-        String selBg = dark ? "#FFFFFF" : "#000000";
-        String selFg = dark ? "#000000" : "#FFFFFF";
-        String unselBg = dark ? "#000000" : "#FFFFFF";
-        String unselFg = dark ? "#FFFFFF" : "#000000";
-        String unselHover = dark ? "#1C1C1C" : "#EAEAEA";
-        String unselPress = dark ? "#333333" : "#CFCFCF";
-        int padH = folderRailCollapsed ? 0 : 10;
-
-        for (JToggleButton btn : List.of(inboxBtn, sentBtn, draftsBtn, trashBtn)) {
-            boolean selected = btn.isSelected();
-            btn.setCursor(Cursor.getPredefinedCursor(selected ? Cursor.DEFAULT_CURSOR : Cursor.HAND_CURSOR));
-            btn.setBorder(BorderFactory.createCompoundBorder(
-                    BorderFactory.createLineBorder(ThemeManager.border(), 1),
-                    BorderFactory.createEmptyBorder(6, padH, 6, padH)
-            ));
-            if (selected) {
-                btn.setBackground(ThemeManager.fg());
-                btn.setForeground(ThemeManager.bg());
-                btn.putClientProperty(FlatClientProperties.STYLE,
-                        "background:" + selBg + "; foreground:" + selFg
-                                + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + selBg + "; hoverForeground:" + selFg
-                                + "; pressedBackground:" + selBg + "; pressedForeground:" + selFg
-                                + "; focusedBackground:" + selBg + "; focusedForeground:" + selFg);
-            } else {
-                btn.setBackground(ThemeManager.bg());
-                btn.setForeground(ThemeManager.fg());
-                btn.putClientProperty(FlatClientProperties.STYLE,
-                        "background:" + unselBg + "; foreground:" + unselFg
-                                + "; selectedBackground:" + selBg + "; selectedForeground:" + selFg
-                                + "; hoverBackground:" + unselHover + "; hoverForeground:" + unselFg
-                                + "; pressedBackground:" + unselPress + "; pressedForeground:" + unselFg
-                                + "; focusedBackground:" + unselBg + "; focusedForeground:" + unselFg);
-            }
-        }
+    private void refreshFolderRail(long userId) {
+        var i18n = ctx.getI18n();
+        int unread = ctx.getEmailService().countUnreadInbox(userId);
+        var inbox = i18n.t("email.folder.inbox").toUpperCase(Locale.ROOT) + (unread == 0 ? "" : "  [" + unread + "]");
+        folders.setEntries(List.of(
+                new WorkspaceFolderRail.Entry(EmailMessage.FOLDER_INBOX, inbox, SidebarIcons.mailInbox(16)),
+                new WorkspaceFolderRail.Entry(EmailMessage.FOLDER_SENT, i18n.t("email.folder.sent").toUpperCase(Locale.ROOT), SidebarIcons.mailSent(16)),
+                new WorkspaceFolderRail.Entry(EmailMessage.FOLDER_DRAFTS, i18n.t("email.folder.drafts").toUpperCase(Locale.ROOT), SidebarIcons.mailDrafts(16)),
+                new WorkspaceFolderRail.Entry(EmailMessage.FOLDER_TRASH, i18n.t("email.folder.trash").toUpperCase(Locale.ROOT), SidebarIcons.mailTrash(16))
+        ), smartFolders, activeFolder);
     }
 
     @Override
@@ -549,18 +309,36 @@ public final class EmailView extends JPanel implements NavigableView {
 
     @Override
     public void refreshData() {
-        User me = ctx.getSession().requireCurrentUser();
-        boolean externalAllowed = ctx.getSession().canUseExternalEmail();
-        simIncomingBtn.setVisible(externalAllowed && !folderRailCollapsed);
-        refreshFolderBadges();
+        updatingMailbox = true;
+        try {
+            loadMailbox();
+        } finally {
+            updatingMailbox = false;
+        }
+    }
 
-        currentEmails = ctx.getEmailService().listFolder(me.id(), activeFolder);
+    private void loadMailbox() {
+        User me = ctx.getSession().requireCurrentUser();
+        simIncomingBtn.setVisible(ctx.getSession().canUseExternalEmail());
+        smartFolders = ctx.getSmartFolderDao().find(me.id(), SmartFolder.Scope.MAIL);
+        SmartFolder smart = currentSmartFolder();
+        if (smart == null && !MAILBOXES.contains(activeFolder)) {
+            activeFolder = EmailMessage.FOLDER_INBOX;
+        }
+        refreshFolderRail(me.id());
+
+        EmailMessage previous = getSelectedEmail();
+        currentEmails = smart == null ? ctx.getEmailService().listFolder(me.id(), activeFolder)
+                : ctx.getEmailService().listFolders(me.id(), smart.rules().getOrDefault(SmartFolder.Field.MAILBOX,
+                        List.of(EmailMessage.FOLDER_INBOX, EmailMessage.FOLDER_SENT)))
+                        .stream().filter(smart::matches).toList();
         listModel.setRowCount(0);
-        for (EmailMessage m : currentEmails) {
-            String peer = EmailMessage.FOLDER_SENT.equalsIgnoreCase(activeFolder)
-                    || EmailMessage.FOLDER_DRAFTS.equalsIgnoreCase(activeFolder)
-                    ? m.toAddresses()
-                    : m.fromAddress();
+        int selectedIndex = 0;
+        for (int index = 0; index < currentEmails.size(); index++) {
+            EmailMessage m = currentEmails.get(index);
+            if (previous != null && m.id() == previous.id()) selectedIndex = index;
+            String peer = EmailMessage.FOLDER_SENT.equals(m.folder()) || EmailMessage.FOLDER_DRAFTS.equals(m.folder())
+                    ? m.toAddresses() : m.fromAddress();
             String badge = m.read() ? "✓" : "●";
             String subj = (m.hasAttachment() ? "[PDF] " : "") + m.subject();
             listModel.addRow(new Object[]{
@@ -573,10 +351,9 @@ public final class EmailView extends JPanel implements NavigableView {
         }
         configureTableColumnWidths();
         if (!currentEmails.isEmpty()) {
-            listTable.setRowSelectionInterval(0, 0);
-        } else {
-            renderSelectedEmail();
+            TableSorting.selectModelRow(listTable, selectedIndex);
         }
+        renderSelectedEmail();
     }
 
     private void configureTableColumnWidths() {
@@ -599,7 +376,7 @@ public final class EmailView extends JPanel implements NavigableView {
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
-        composeBtn.setText("+ " + i18n.t("email.compose").toUpperCase(Locale.ROOT));
+        WorkspaceFolderRail.labelIconButton(smartFoldersButton, i18n.t("smart.manage"));
         replyBtn.setText(i18n.t("email.reply").toUpperCase(Locale.ROOT));
         forwardBtn.setText(i18n.t("email.forward").toUpperCase(Locale.ROOT));
         toggleReadBtn.setText(i18n.t("email.toggle_read").toUpperCase(Locale.ROOT));
@@ -614,34 +391,15 @@ public final class EmailView extends JPanel implements NavigableView {
                 i18n.t("common.date").toUpperCase(Locale.ROOT)
         });
         configureTableColumnWidths();
-        applyFolderRailState();
+        ctx.getSession().getCurrentUser().ifPresent(user -> refreshFolderRail(user.id()));
         applyTheme();
     }
 
     @Override
     public void applyTheme() {
-        BrutalistStyle.stylePrimaryButton(composeBtn);
+        folders.render();
         BrutalistStyle.styleSecondaryButtons(replyBtn, forwardBtn, toggleReadBtn, deleteBtn,
                 simIncomingBtn, openAttachmentBtn);
-        boolean dark = ThemeManager.isDarkMode();
-        String bg = dark ? "#000000" : "#FFFFFF";
-        String fg = dark ? "#FFFFFF" : "#000000";
-        String hov = dark ? "#1C1C1C" : "#EAEAEA";
-        String prs = dark ? "#333333" : "#CFCFCF";
-        collapseRailBtn.setBackground(ThemeManager.bg());
-        collapseRailBtn.setForeground(ThemeManager.fg());
-        collapseRailBtn.setBorder(BorderFactory.createLineBorder(ThemeManager.border(), 1));
-        collapseRailBtn.putClientProperty(FlatClientProperties.STYLE,
-                "background:" + bg + "; foreground:" + fg
-                        + "; hoverBackground:" + hov + "; hoverForeground:" + fg
-                        + "; pressedBackground:" + prs + "; pressedForeground:" + fg
-                        + "; focusedBackground:" + bg + "; focusedForeground:" + fg);
-        folderSeparator.setForeground(ThemeManager.border());
-        folderSeparator.setBackground(ThemeManager.border());
-        footerSeparator.setForeground(ThemeManager.border());
-        footerSeparator.setBackground(ThemeManager.border());
-        BrutalistStyle.applyBoxCard(folderPanel, 10, folderRailCollapsed ? 8 : 10);
-        updateFolderButtonStyles();
         BrutalistStyle.applyBoxCard(readerCard, 10, 12);
         BrutalistStyle.styleTable(listTable);
         readerBodyArea.setBackground(ThemeManager.bg());

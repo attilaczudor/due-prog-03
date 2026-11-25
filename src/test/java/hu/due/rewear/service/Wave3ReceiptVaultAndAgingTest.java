@@ -3,6 +3,7 @@ package hu.due.rewear.service;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.AppPreferences;
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.dao.DaoException;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.Customer;
 import hu.due.rewear.model.Invoice;
@@ -24,6 +25,7 @@ import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class Wave3ReceiptVaultAndAgingTest {
@@ -44,12 +46,26 @@ class Wave3ReceiptVaultAndAgingTest {
 
     @Test
     void attachesResolvesAndRemovesReceiptsInPortableVault() throws Exception {
+        LocalDate issueDate = LocalDate.of(2025, 3, 9);
+        var archive = ctx.getInvoiceArchiveService();
+        var vault = ctx.getReceiptVaultService();
+        assertTrue(Files.isDirectory(archive.getDirectory()));
+        assertTrue(Files.isDirectory(vault.getReceiptsDir()));
         Invoice expense = ctx.getInvoiceService().createManualInvoice(
                 InvoiceDirection.INCOMING, InvoiceCategory.UTILITIES, null, null,
                 "MVM Next Zrt.", "26713111-2-44", "1081 Budapest", "szamlazas@mvm.hu",
                 "Monthly Electricity", BigDecimal.ONE, "hó", new BigDecimal("42000"),
                 new BigDecimal("27"), "HU-27", "HUF",
-                LocalDate.now(), LocalDate.now().plusDays(14), InvoiceStatus.ISSUED, adminId);
+                issueDate, issueDate.plusDays(14), InvoiceStatus.ISSUED, adminId);
+
+        String datedPath = "2025/03/2025-03-09-MVM-Next-Zrt-53340";
+        try (var conn = ctx.getDatabaseManager().getConnection()) {
+            assertEquals(datedPath + ".pdf", ctx.getInvoiceDao().findArchivedPdfPath(conn, expense.id()));
+        }
+        try (var pdf = Files.newInputStream(archive.getDirectory().resolve(datedPath + ".pdf"))) {
+            assertEquals("%PDF-", new String(pdf.readNBytes(5), StandardCharsets.US_ASCII));
+        }
+        assertEquals(1, archive.countInvoices());
 
         assertFalse(expense.hasAttachment());
         assertEquals(0L, ctx.getReceiptVaultService().countVaultFiles());
@@ -60,18 +76,45 @@ class Wave3ReceiptVaultAndAgingTest {
 
         Invoice attached = ctx.getReceiptVaultService().attachReceipt(expense.id(), sourceReceipt);
         assertTrue(attached.hasAttachment());
-        assertTrue(attached.attachmentPath().endsWith("-receipt.pdf"));
+        assertEquals(datedPath + ".pdf", attached.attachmentPath());
         assertEquals(1L, ctx.getReceiptVaultService().countVaultFiles());
 
         Path resolved = ctx.getReceiptVaultService().resolveAttachment(attached).orElseThrow();
         assertTrue(Files.isRegularFile(resolved));
         assertTrue(resolved.startsWith(ctx.getReceiptVaultService().getReceiptsDir()));
 
+        Path replacement = tempDir.resolve("replacement.pdf");
+        Files.writeString(replacement, "%PDF-1.4 replacement receipt", StandardCharsets.UTF_8);
+        try (var conn = ctx.getDatabaseManager().getConnection(); var statement = conn.createStatement()) {
+            statement.execute("""
+                    CREATE TRIGGER reject_receipt_update BEFORE UPDATE OF attachment_path ON invoices
+                    BEGIN SELECT RAISE(ABORT, 'Simulated database write failure'); END
+                    """);
+            assertThrows(DaoException.class,
+                    () -> ctx.getReceiptVaultService().attachReceipt(expense.id(), replacement));
+            assertEquals(attached.attachmentPath(), ctx.getInvoiceDao().findById(expense.id()).orElseThrow().attachmentPath());
+            assertEquals(Files.readString(sourceReceipt), Files.readString(resolved));
+            assertEquals(1L, ctx.getReceiptVaultService().countVaultFiles());
+            statement.execute("DROP TRIGGER reject_receipt_update");
+        }
+        Invoice replaced = ctx.getReceiptVaultService().attachReceipt(expense.id(), replacement);
+        assertEquals(datedPath + "-" + expense.invoiceNumber() + ".pdf", replaced.attachmentPath());
+        assertEquals(Files.readString(replacement),
+                Files.readString(ctx.getReceiptVaultService().resolveAttachment(replaced).orElseThrow()));
+        assertFalse(Files.exists(resolved));
+        assertEquals(1L, ctx.getReceiptVaultService().countVaultFiles());
+
         // Remove attachment -> cleans both DB reference and file on disk
         Invoice removed = ctx.getReceiptVaultService().removeAttachment(expense.id());
         assertFalse(removed.hasAttachment());
         assertTrue(ctx.getReceiptVaultService().resolveAttachment(removed).isEmpty());
         assertEquals(0L, ctx.getReceiptVaultService().countVaultFiles());
+
+        Path legacy = Files.copy(sourceReceipt, vault.getReceiptsDir().resolve("legacy.pdf"));
+        assertTrue(ctx.getInvoiceDao().replaceAttachmentPath(expense.id(), null, "legacy.pdf"));
+        assertEquals(legacy, vault.resolveAttachment(ctx.getInvoiceDao().findById(expense.id()).orElseThrow()).orElseThrow());
+        assertTrue(ctx.getInvoiceDao().replaceAttachmentPath(expense.id(), "legacy.pdf", "../mvm-bill-nov.pdf"));
+        assertTrue(vault.resolveAttachment(ctx.getInvoiceDao().findById(expense.id()).orElseThrow()).isEmpty());
     }
 
     @Test

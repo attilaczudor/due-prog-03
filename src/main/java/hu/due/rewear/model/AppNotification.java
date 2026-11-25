@@ -16,6 +16,7 @@ public record AppNotification(
         boolean read,
         LocalDateTime createdAt
 ) {
+    public static final String CAT_SORTING = "SORTING";
     public static final String CAT_PUTAWAY = "PUTAWAY";
     public static final String CAT_ORDER_STAGING = "ORDER_STAGING";
     public static final String CAT_ORDER_READY = "ORDER_READY";

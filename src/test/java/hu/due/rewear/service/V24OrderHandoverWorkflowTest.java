@@ -3,9 +3,11 @@ package hu.due.rewear.service;
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.AppPreferences;
 import hu.due.rewear.config.DatabaseManager;
+import hu.due.rewear.config.SchemaInitializer;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.LocationType;
+import hu.due.rewear.model.MovementType;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderStatus;
 import hu.due.rewear.model.PackageFilter;
@@ -21,6 +23,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -67,18 +70,46 @@ class V24OrderHandoverWorkflowTest {
         assertTrue(fkTasks.stream().anyMatch(t -> t.packageId() == p1.id()));
         assertTrue(fkTasks.stream().anyMatch(t -> t.packageId() == p2.id()));
 
+        long smallerDockId = ctx.getLocationDao().insert("DOCK-SMALL", "D", "1", "1",
+                LocationType.DISPATCH_ZONE, BigDecimal.ONE);
+        ctx.getOrderService().assignForkliftAndDock(order.id(), forklift.id(), smallerDockId);
+        assertThrows(IllegalStateException.class, () ->
+                ctx.getTransportService().scanAndCollectForOrder(p1.qrCode(), dock.id(), forklift.id(), true));
+        assertEquals(OrderStatus.DRAFT, ctx.getOrderDao().findById(order.id()).orElseThrow().status());
+        assertEquals(p1.locationId(), ctx.getPackageDao().findById(p1.id()).orElseThrow().locationId());
+        ctx.getOrderService().assignForkliftAndDock(order.id(), forklift.id(), dock.id());
+
+        assertThrows(IllegalStateException.class, () ->
+                ctx.getOrderService().changeOrderStatus(order.id(), OrderStatus.SHIPPED, manager.id()));
+
+        assertThrows(IllegalArgumentException.class, () ->
+                ctx.getTransportService().stageToDispatchZone(List.of(p1.id()), smallerDockId, forklift.id(), true));
+        assertThrows(IllegalStateException.class, () ->
+                ctx.getInventoryService().discardPackage(p1.id(), "Still allocated", manager.id()));
+        int pendingBefore = ctx.getTransportService().countPendingStaging(forklift.id());
+        int mgrAlertsBeforeStaging = ctx.getNotificationService().countUnread(manager.id());
+
         TransportService.StagingTask t1 = ctx.getTransportService().scanAndCollectForOrder(p1.qrCode(), dock.id(), forklift.id(), true);
         assertTrue(t1.isAtDispatchZone());
         assertEquals(OrderStatus.PACKING, ctx.getOrderDao().findById(order.id()).orElseThrow().status(),
                 "Scanning first package should automatically advance DRAFT -> PACKING");
+        assertEquals(pendingBefore - 1, ctx.getTransportService().countPendingStaging(forklift.id()));
+        assertEquals(mgrAlertsBeforeStaging, ctx.getNotificationService().countUnread(manager.id()));
 
         TransportService.StagingTask t2 = ctx.getTransportService().scanAndCollectForOrder(p2.qrCode(), dock.id(), forklift.id(), true);
         assertTrue(t2.isAtDispatchZone());
+        assertEquals(pendingBefore - 2, ctx.getTransportService().countPendingStaging(forklift.id()));
+        assertEquals(mgrAlertsBeforeStaging + 1, ctx.getNotificationService().countUnread(manager.id()));
+        ctx.getTransportService().scanAndCollectForOrder(p2.qrCode(), dock.id(), forklift.id(), true);
+        assertEquals(mgrAlertsBeforeStaging + 1, ctx.getNotificationService().countUnread(manager.id()));
 
         // 3. Customer arrives -> triggers high-priority notification to Manager & Forklift
         int mgrNotifsBefore = ctx.getNotificationService().countUnread(manager.id());
         Order arrived = ctx.getOrderService().markCustomerArrived(order.id());
         assertTrue(arrived.isCustomerArrived());
+        assertEquals(mgrNotifsBefore + 1, ctx.getNotificationService().countUnread(manager.id()));
+        assertEquals(arrived.customerArrivedAt(),
+                ctx.getOrderService().markCustomerArrived(order.id()).customerArrivedAt());
         assertEquals(mgrNotifsBefore + 1, ctx.getNotificationService().countUnread(manager.id()));
 
         // 4. Manager verified customer handover:
@@ -92,6 +123,9 @@ class V24OrderHandoverWorkflowTest {
         //    - Scan first package (still blocked because 1 remaining)
         var s1 = ctx.getOrderService().scanOrderItemForHandover(order.id(), p1.qrCode(), manager.id());
         assertTrue(s1.handoverScanned());
+        ctx.getOrderService().scanOrderItemForHandover(order.id(), p1.qrCode(), manager.id());
+        assertEquals(1L, ctx.getMovementDao().findByPackageId(p1.id()).stream()
+                .filter(move -> move.movementType() == MovementType.SCAN_VERIFY).count());
         assertThrows(IllegalStateException.class, () ->
                 ctx.getOrderService().completeVerifiedHandover(order.id(), manager.id()));
 
@@ -104,5 +138,20 @@ class V24OrderHandoverWorkflowTest {
         assertFalse(ctx.getPackageDao().findById(p1.id()).orElseThrow().status() == PackageStatus.RESERVED);
         assertEquals(PackageStatus.SHIPPED, ctx.getPackageDao().findById(p1.id()).orElseThrow().status());
         assertEquals(PackageStatus.SHIPPED, ctx.getPackageDao().findById(p2.id()).orElseThrow().status());
+
+        Order reopened = ctx.getOrderService().changeOrderStatus(order.id(), OrderStatus.PACKING, manager.id());
+        assertFalse(reopened.isCustomerArrived());
+        assertTrue(ctx.getOrderItemDao().findByOrderId(order.id()).stream().noneMatch(item -> item.handoverScanned()));
+        assertThrows(IllegalStateException.class, () ->
+                ctx.getOrderService().changeOrderStatus(order.id(), OrderStatus.SHIPPED, manager.id()));
+
+        User operator = ctx.getUserDao().findByUsername("operator").orElseThrow();
+        ctx.getUserDao().updateAssignedStation(operator.id(), null);
+        ctx.getOrderService().assignForkliftAndDock(order.id(), null, null);
+        new SchemaInitializer(db).initialize();
+        assertNull(ctx.getUserDao().findById(operator.id()).orElseThrow().assignedStationId());
+        Order afterRestart = ctx.getOrderDao().findById(order.id()).orElseThrow();
+        assertNull(afterRestart.assignedForkliftId());
+        assertNull(afterRestart.dispatchLocationId());
     }
 }

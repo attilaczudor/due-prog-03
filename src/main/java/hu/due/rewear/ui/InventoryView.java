@@ -154,7 +154,6 @@ public final class InventoryView extends JPanel implements NavigableView {
         });
 
         // Table
-        table.setAutoCreateRowSorter(true);
         table.setRowHeight(26);
         table.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         table.setFillsViewportHeight(true);
@@ -412,6 +411,7 @@ public final class InventoryView extends JPanel implements NavigableView {
             });
         }
         JTable histTable = new JTable(histModel);
+        BrutalistStyle.styleTable(histTable);
         histTable.setRowHeight(24);
         root.add(new JScrollPane(histTable), BorderLayout.CENTER);
 

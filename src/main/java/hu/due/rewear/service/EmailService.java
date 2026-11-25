@@ -30,12 +30,15 @@ public final class EmailService {
     private final EmailDao emailDao;
     private final SettingsDao settingsDao;
     private final UserDao userDao;
+    private final SessionContext session;
 
-    public EmailService(DatabaseManager db, EmailDao emailDao, SettingsDao settingsDao, UserDao userDao) {
+    public EmailService(DatabaseManager db, EmailDao emailDao, SettingsDao settingsDao, UserDao userDao,
+                        SessionContext session) {
         this.db = db;
         this.emailDao = emailDao;
         this.settingsDao = settingsDao;
         this.userDao = userDao;
+        this.session = session;
     }
 
     public EmailSettings getSettings() {
@@ -56,6 +59,9 @@ public final class EmailService {
      * ({@code firstname.lastname@<domain>}) when invoked by Super Admin.
      */
     public int syncAllUserEmailsToDomain() {
+        if (!session.isSuperAdmin()) {
+            throw new IllegalStateException("Only Super Admin can synchronize user email addresses.");
+        }
         EmailSettings cfg = settingsDao.getEmailSettings();
         List<User> users = userDao.findAll();
         int updated = 0;
@@ -66,6 +72,7 @@ public final class EmailService {
                 updated++;
             }
         }
+        session.getCurrentUser().flatMap(u -> userDao.findById(u.id())).ifPresent(session::updateCurrentUser);
         LOG.info("Synced {} user email address(es) to domain @{}", updated, cfg.companyDomain());
         return updated;
     }
@@ -73,9 +80,9 @@ public final class EmailService {
     /**
      * Sends an email from {@code sender} to one or more comma/semicolon-separated addresses.
      * Matching internal company users receive an immediate {@code INBOX} copy in SQLite;
-     * external addresses are logged as transmitted via the configured SMTP gateway.
+     * external delivery is recorded as a simulation. Returns whether external recipients were present.
      */
-    public void sendEmail(User sender, String toRaw, String ccRaw, String subject, String body, String attachmentPath) {
+    public boolean sendEmail(User sender, String toRaw, String ccRaw, String subject, String body, String attachmentPath) {
         if (sender == null) {
             throw new IllegalArgumentException("Sender is required.");
         }
@@ -112,11 +119,7 @@ public final class EmailService {
                             + cfg.companyDomain() + ").");
         }
 
-        String status = hasExternal
-                ? (cfg.simulationMode()
-                        ? "SENT (SMTP DEMO: " + cfg.smtpHost() + ":" + cfg.smtpPort() + ")"
-                        : "SENT via SMTP (" + cfg.smtpHost() + ":" + cfg.smtpPort() + ")")
-                : "DELIVERED (INTERNAL)";
+        String status = hasExternal ? "SIMULATED (EXTERNAL SMTP)" : "DELIVERED (INTERNAL)";
         LocalDateTime now = LocalDateTime.now();
 
         final boolean externalFlag = hasExternal;
@@ -133,6 +136,7 @@ public final class EmailService {
                         cleanSubject, cleanBody, attachmentPath, false, false, "DELIVERED", now);
             }
         });
+        return hasExternal;
     }
 
     public void saveDraft(User owner, String toRaw, String ccRaw, String subject, String body, String attachmentPath) {
@@ -159,7 +163,7 @@ public final class EmailService {
         String toAddr = (recipient.email() != null && !recipient.email().isBlank())
                 ? recipient.email().trim()
                 : cfg.generateUserEmail(recipient.safeFirstName(), recipient.safeLastName(), recipient.username());
-        String status = "RECEIVED (IMAP: " + cfg.imapHost() + ":" + cfg.imapPort() + ")";
+        String status = "SIMULATED (EXTERNAL IMAP)";
         db.runInTransaction(conn -> emailDao.insert(conn, recipient.id(), EmailMessage.FOLDER_INBOX,
                 fromAddress, toAddr, "", subject, body, null, false, true, status, LocalDateTime.now()));
     }
@@ -178,7 +182,11 @@ public final class EmailService {
     }
 
     public List<EmailMessage> listFolder(long userId, String folder) {
-        List<EmailMessage> raw = emailDao.findByOwnerAndFolder(userId, folder);
+        return listFolders(userId, List.of(folder));
+    }
+
+    public List<EmailMessage> listFolders(long userId, List<String> folders) {
+        List<EmailMessage> raw = emailDao.findByOwnerAndFolders(userId, folders);
         boolean internalOnly = userDao.findById(userId)
                 .map(u -> isInternalOnlyRole(u.roleCode()))
                 .orElse(false);
@@ -189,7 +197,7 @@ public final class EmailService {
     }
 
     public static boolean isInternalOnlyRole(RoleCode role) {
-        return role == RoleCode.OPERATOR || role == RoleCode.FORKLIFT;
+        return role != null && role.usesInternalMailOnly();
     }
 
     public int countUnreadInbox(long userId) {

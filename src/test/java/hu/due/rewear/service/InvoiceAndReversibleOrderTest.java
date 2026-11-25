@@ -14,6 +14,7 @@ import hu.due.rewear.model.InvoiceStatus;
 import hu.due.rewear.model.Order;
 import hu.due.rewear.model.OrderItem;
 import hu.due.rewear.model.OrderStatus;
+import hu.due.rewear.model.PartnerType;
 import hu.due.rewear.model.PackageStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -29,6 +30,7 @@ import java.util.List;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class InvoiceAndReversibleOrderTest {
@@ -47,6 +49,84 @@ class InvoiceAndReversibleOrderTest {
         i18n.setLanguage("hu");
         ctx = new AppContext(db, prefs, i18n);
         userId = ctx.getUserDao().findByUsername("superadmin").orElseThrow().id();
+    }
+
+    @Test
+    void manualInvoicesSavePartnerVatAndReceiptTogether() throws Exception {
+        var service = ctx.getInvoiceService();
+        var vault = ctx.getReceiptVaultService();
+        var tax = ctx.getFinanceConfigDao().findTaxTypeByCode("HU-5").orElseThrow();
+        var supplier = new InvoiceService.ManualPartner(null, "Manual supplier", "TEST-2345", "", "", "HU", false);
+        Path receipt = Files.writeString(tempDir.resolve("receipt.pdf"), "%PDF-1.4\n", StandardCharsets.US_ASCII);
+        var today = LocalDate.now();
+        var expense = new InvoiceService.ManualEntry(InvoiceDirection.INCOMING, InvoiceCategory.OTHER_EXPENSE,
+                "EXP-RECEIPT-1", supplier, List.of(), new BigDecimal("100.00"), tax, "EUR",
+                today, today, InvoiceStatus.ISSUED, userId, receipt);
+        Invoice saved = service.saveManualEntry(expense, vault);
+        assertEquals(PartnerType.SUPPLIER, ctx.getCustomerDao().findById(saved.customerId()).orElseThrow().partnerType());
+        assertEquals("HU-5", saved.effectiveTaxTypeCode());
+        assertEquals(0, new BigDecimal("105.00").compareTo(saved.grossAmount()));
+        assertTrue(vault.resolveAttachment(saved).isPresent());
+        assertEquals(1, service.findItems(saved.id()).size());
+        assertEquals(1, ctx.getInvoiceArchiveService().countInvoices());
+
+        long totalPartners = ctx.getCustomerDao().findAll(false).size();
+        var other = new InvoiceService.ManualPartner(null, "Discarded supplier", "TEST-6789", "", "", "HU", false);
+        var duplicate = new InvoiceService.ManualEntry(expense.direction(), expense.category(), expense.invoiceNumber(),
+                other, List.of(), BigDecimal.TEN, tax, "EUR", today, today, expense.status(), userId, receipt);
+        assertThrows(hu.due.rewear.dao.DaoException.class, () -> service.saveManualEntry(duplicate, vault));
+        assertEquals(totalPartners, ctx.getCustomerDao().findAll(false).size());
+        assertEquals(1, vault.countVaultFiles());
+
+        var archiveFailure = new InvoiceService.ManualEntry(expense.direction(), expense.category(), "EXP-ARCHIVE-FAIL",
+                other, List.of(), BigDecimal.TEN, tax, "EUR", today, today, expense.status(), userId, receipt);
+        try (var conn = ctx.getDatabaseManager().getConnection(); var statement = conn.createStatement()) {
+            statement.execute("""
+                    CREATE TRIGGER reject_pdf_path BEFORE UPDATE OF archived_pdf_path ON invoices
+                    BEGIN SELECT RAISE(ABORT, 'Simulated archive link failure'); END
+                    """);
+            assertThrows(hu.due.rewear.dao.DaoException.class, () -> service.saveManualEntry(archiveFailure, vault));
+            statement.execute("DROP TRIGGER reject_pdf_path");
+        }
+        assertEquals(totalPartners, ctx.getCustomerDao().findAll(false).size());
+        assertEquals(1, ctx.getInvoiceArchiveService().countInvoices());
+        assertEquals(1, vault.countVaultFiles());
+
+        Path badFile = Files.writeString(tempDir.resolve("invalid.pdf"), "not a PDF");
+        var invalid = new InvoiceService.ManualEntry(expense.direction(), expense.category(), "EXP-INVALID",
+                other, List.of(), BigDecimal.TEN, tax, "EUR", today, today, expense.status(), userId, badFile);
+        assertThrows(java.io.IOException.class, () -> service.saveManualEntry(invalid, vault));
+        assertEquals(totalPartners, ctx.getCustomerDao().findAll(false).size());
+        assertEquals(1, vault.countVaultFiles());
+
+        var existing = new InvoiceService.ManualPartner(saved.customerId(), supplier.name(), supplier.taxNumber(),
+                supplier.address(), supplier.email(), supplier.country(), true);
+        var income = new InvoiceService.ManualEntry(InvoiceDirection.OUTGOING, InvoiceCategory.WHOLESALE_SALES,
+                null, existing, List.of(new InvoiceService.InvoiceLineInput("Item", BigDecimal.ONE, "db", BigDecimal.TEN)),
+                null, tax, "EUR", today, today, InvoiceStatus.ISSUED, userId, null);
+        Invoice linked = service.saveManualEntry(income, vault);
+        assertEquals(saved.customerId(), linked.customerId());
+        assertEquals(PartnerType.BOTH, ctx.getCustomerDao().findById(linked.customerId()).orElseThrow().partnerType());
+    }
+
+    @Test
+    void orderInvoiceRequiresLatestReviewedLinesAndReusesExistingInvoice() {
+        var partner = ctx.getCustomerDao().findBuyers(true).get(0);
+        var order = ctx.getOrderService().createOrder(partner.id(), "EUR", null, userId);
+        var pkg = ctx.getPackageDao().findByFilter(null).stream().filter(p -> p.status() == PackageStatus.IN_STOCK)
+                .findFirst().orElseThrow();
+        ctx.getOrderService().addPackageToOrder(order.id(), pkg.id(), BigDecimal.TEN, userId);
+        var service = ctx.getInvoiceService();
+        var reviewed = service.reviewOrder(order.id());
+        ctx.getOrderService().updateOrderItemPrice(order.id(), reviewed.items().get(0).id(), new BigDecimal("12.75"));
+        assertThrows(InvoiceService.OrderChangedException.class, () -> service.saveReviewedOrder(reviewed, null, userId));
+        assertTrue(ctx.getInvoiceDao().findByOrderId(order.id()).isEmpty());
+        var latest = service.reviewOrder(order.id());
+        Invoice saved = service.saveReviewedOrder(latest, null, userId);
+        assertEquals(partner.id(), saved.customerId());
+        assertEquals(0, latest.items().get(0).lineTotal().compareTo(saved.netAmount()));
+        assertEquals(saved.id(), service.saveReviewedOrder(latest, null, userId).id());
+        assertEquals(1, ctx.getInvoiceArchiveService().countInvoices());
     }
 
     @Test

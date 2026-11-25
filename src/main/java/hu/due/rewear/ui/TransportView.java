@@ -63,10 +63,12 @@ public final class TransportView extends JPanel implements NavigableView {
     // Tab 2: Order Collection (STORAGE -> DISPATCH_ZONE, with live QR/Barcode scan)
     private final JLabel scanCollectLabel = new JLabel();
     private final javax.swing.JTextField scanCollectField = new javax.swing.JTextField(24);
+    private final JLabel scanFeedbackLabel = new JLabel(" ");
     private final JButton scanCollectBtn = new JButton();
     private final JLabel stagingTargetLabel = new JLabel();
     private final JComboBox<LocChoice> dispatchCombo = new JComboBox<>();
     private final JButton moveToDispatchBtn = new JButton();
+    private final JButton loadOrderBtn = new JButton();
     private final DefaultTableModel stagingModel = BrutalistStyle.nonEditableTableModel();
     private final JTable stagingTable = new JTable(stagingModel);
     private final JLabel stagingSummaryLabel = new JLabel();
@@ -121,7 +123,11 @@ public final class TransportView extends JPanel implements NavigableView {
             stagingBar.add(stagingTargetLabel);
             stagingBar.add(dispatchCombo);
             stagingBar.add(moveToDispatchBtn);
-            stagingPanel.add(stagingBar, BorderLayout.NORTH);
+            stagingBar.add(loadOrderBtn);
+            JPanel stagingHeader = new JPanel(new BorderLayout());
+            stagingHeader.add(stagingBar, BorderLayout.NORTH);
+            stagingHeader.add(scanFeedbackLabel, BorderLayout.SOUTH);
+            stagingPanel.add(stagingHeader, BorderLayout.NORTH);
 
             BrutalistStyle.styleTable(stagingTable);
             stagingTable.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
@@ -135,8 +141,25 @@ public final class TransportView extends JPanel implements NavigableView {
     private void wireEvents() {
         moveToStorageBtn.addActionListener(e -> handleMoveToStorage());
         moveToDispatchBtn.addActionListener(e -> handleMoveToDispatch());
+        loadOrderBtn.setEnabled(false);
+        loadOrderBtn.addActionListener(e -> verifyVehicleLoading());
+        stagingTable.getSelectionModel().addListSelectionListener(e -> {
+            int row = TableSorting.selectedModelRow(stagingTable);
+            loadOrderBtn.setEnabled(row >= 0 && row < stagingRows.size() && stagingRows.get(row).customerArrived());
+        });
         scanCollectField.addActionListener(e -> handleScanCollect());
         scanCollectBtn.addActionListener(e -> handleScanCollect());
+    }
+
+    private void verifyVehicleLoading() {
+        int row = TableSorting.selectedModelRow(stagingTable);
+        if (row < 0 || row >= stagingRows.size()) return;
+        ctx.getOrderDao().findById(stagingRows.get(row).orderId()).ifPresent(order -> {
+            if (order.isCustomerArrived()) {
+                OrderHandoverDialog.showDialog(javax.swing.SwingUtilities.getWindowAncestor(this), ctx, order);
+                refreshData();
+            }
+        });
     }
 
     private void handleScanCollect() {
@@ -153,13 +176,12 @@ public final class TransportView extends JPanel implements NavigableView {
                     .scanAndCollectForOrder(code, fallbackDockId, me.id(), driverOnly);
             scanCollectField.setText("");
             refreshData();
-            JOptionPane.showMessageDialog(this,
-                    i18n.t("transport.scan_collected_ok", done.qrCode(), done.orderNumber(), done.currentLocationCode()),
-                    i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
-            scanCollectField.requestFocusInWindow();
+            scanFeedbackLabel.setText(i18n.t("transport.scan_collected_ok", done.qrCode(),
+                    done.orderNumber(), done.currentLocationCode()));
         } catch (Exception ex) {
-            JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            scanFeedbackLabel.setText(i18n.t("common.warning") + " — " + ex.getMessage());
             scanCollectField.selectAll();
+        } finally {
             scanCollectField.requestFocusInWindow();
         }
     }
@@ -184,10 +206,10 @@ public final class TransportView extends JPanel implements NavigableView {
         }
         try {
             long driverId = ctx.getSession().requireCurrentUser().id();
-            ctx.getTransportService().putawayToStorage(ids, choice.location().id(), driverId);
+            int moved = ctx.getTransportService().putawayToStorage(ids, choice.location().id(), driverId);
             refreshData();
             JOptionPane.showMessageDialog(this,
-                    i18n.t("transport.moved_success", ids.size(), choice.location().code()),
+                    i18n.t("transport.moved_success", moved, choice.location().code()),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -222,10 +244,11 @@ public final class TransportView extends JPanel implements NavigableView {
         }
         try {
             long driverId = ctx.getSession().requireCurrentUser().id();
-            ctx.getTransportService().stageToDispatchZone(ids, choice.location().id(), driverId);
+            int moved = ctx.getTransportService().stageToDispatchZone(ids, choice.location().id(), driverId,
+                    ctx.getSession().isForklift());
             refreshData();
             JOptionPane.showMessageDialog(this,
-                    i18n.t("transport.moved_success", ids.size(), choice.location().code()),
+                    i18n.t("transport.moved_success", moved, choice.location().code()),
                     i18n.t("common.success"), JOptionPane.INFORMATION_MESSAGE);
         } catch (Exception ex) {
             JOptionPane.showMessageDialog(this, ex.getMessage(), i18n.t("common.error"), JOptionPane.ERROR_MESSAGE);
@@ -253,12 +276,7 @@ public final class TransportView extends JPanel implements NavigableView {
         String lang = i18n.getActiveLanguage();
 
         if (mode == Mode.PUTAWAY) {
-            storageCombo.removeAllItems();
-            for (WarehouseLocation loc : ctx.getLocationDao().findByType(LocationType.STORAGE, true)) {
-                String lbl = loc.code() + " (" + FormatUtil.stripZeros(loc.usedWeightKg()) + " / "
-                        + FormatUtil.stripZeros(loc.maxCapacityKg()) + " kg)";
-                storageCombo.addItem(new LocChoice(loc, lbl));
-            }
+            refreshLocationChoices(storageCombo, LocationType.STORAGE);
 
             putawayRows = ctx.getTransportService().findPutawayQueue();
             putawayModel.setRowCount(0);
@@ -273,12 +291,7 @@ public final class TransportView extends JPanel implements NavigableView {
             }
             putawaySummaryLabel.setText(i18n.t("transport.putaway.summary", putawayRows.size()));
         } else {
-            dispatchCombo.removeAllItems();
-            for (WarehouseLocation loc : ctx.getLocationDao().findByType(LocationType.DISPATCH_ZONE, true)) {
-                String lbl = loc.code() + " (" + FormatUtil.stripZeros(loc.usedWeightKg()) + " / "
-                        + FormatUtil.stripZeros(loc.maxCapacityKg()) + " kg)";
-                dispatchCombo.addItem(new LocChoice(loc, lbl));
-            }
+            refreshLocationChoices(dispatchCombo, LocationType.DISPATCH_ZONE);
 
             Long driverFilter = ctx.getSession().isForklift()
                     ? ctx.getSession().requireCurrentUser().id()
@@ -306,6 +319,20 @@ public final class TransportView extends JPanel implements NavigableView {
         }
     }
 
+    private void refreshLocationChoices(JComboBox<LocChoice> combo, LocationType type) {
+        Long selection = combo.getSelectedItem() instanceof LocChoice choice ? choice.location().id() : null;
+        combo.removeAllItems();
+        for (WarehouseLocation location : ctx.getLocationDao().findByType(type, true)) {
+            String label = location.code() + " (" + FormatUtil.stripZeros(location.usedWeightKg()) + " / "
+                    + FormatUtil.stripZeros(location.maxCapacityKg()) + " kg)";
+            LocChoice choice = new LocChoice(location, label);
+            combo.addItem(choice);
+            if (selection != null && selection == location.id()) {
+                combo.setSelectedItem(choice);
+            }
+        }
+    }
+
     @Override
     public void applyTranslations() {
         I18nManager i18n = ctx.getI18n();
@@ -324,9 +351,10 @@ public final class TransportView extends JPanel implements NavigableView {
         scanCollectBtn.setText(i18n.t("transport.scan_collect_btn"));
         stagingTargetLabel.setText(i18n.t("transport.target_dock") + ":");
         moveToDispatchBtn.setText(i18n.t("transport.btn.move_dock"));
+        loadOrderBtn.setText(i18n.t("orders.load_order"));
         stagingModel.setColumnIdentifiers(new Object[]{
-                i18n.t("order.number"),
-                i18n.t("order.customer"),
+                i18n.t("orders.order_number"),
+                i18n.t("orders.customer"),
                 i18n.t("intake.generated_code"),
                 i18n.t("intake.weight_kg"),
                 i18n.t("intake.location"),
@@ -339,7 +367,7 @@ public final class TransportView extends JPanel implements NavigableView {
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(moveToStorageBtn);
         BrutalistStyle.stylePrimaryButton(scanCollectBtn);
-        BrutalistStyle.styleSecondaryButtons(moveToDispatchBtn);
+        BrutalistStyle.styleSecondaryButtons(moveToDispatchBtn, loadOrderBtn);
         BrutalistStyle.styleTable(putawayTable);
         BrutalistStyle.styleTable(stagingTable);
     }

@@ -141,7 +141,7 @@ public final class OrderHandoverDialog extends JDialog {
         scanField.addActionListener(e -> performScan(scanField.getText()));
         scanBtn.addActionListener(e -> performScan(scanField.getText()));
         scanSelectedBtn.addActionListener(e -> {
-            int row = itemsTable.getSelectedRow();
+            int row = TableSorting.selectedModelRow(itemsTable);
             if (row >= 0 && row < items.size()) {
                 performScan(items.get(row).packageQrCode());
             }

@@ -1,6 +1,8 @@
 package hu.due.rewear.service;
 
 import hu.due.rewear.dao.UserDao;
+import hu.due.rewear.model.Role;
+import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
@@ -97,13 +99,42 @@ public final class AuthService {
         return userDao.insert(username.trim(), hashPassword(plainPassword), fullName.trim(), roleId, active);
     }
 
-    public void resetPassword(long userId, String newPassword) {
-        userDao.updatePasswordHash(userId, hashPassword(newPassword));
-        LOG.info("Administrator reset password for userId={}", userId);
+    public void updateManagedUser(long userId, String lastName, String firstName, Role role, boolean active,
+                                  Long stationId, String email, char[] newPassword) {
+        try {
+            User actor = session.requireCurrentUser();
+            User target = userDao.findById(userId)
+                    .orElseThrow(() -> new IllegalArgumentException("User not found: " + userId));
+            boolean protectedAccount = target.roleCode() == RoleCode.SUPER_ADMIN;
+            if (!session.canManageUsersAndMaintenance()
+                    || (!session.isSuperAdmin() && (protectedAccount || email != null))
+                    || (!protectedAccount && role.code() == RoleCode.SUPER_ADMIN)) {
+                throw new IllegalArgumentException("ADMIN_USER_EDIT_DENIED");
+            }
+            if (actor.id() == userId && !active) {
+                throw new IllegalArgumentException("ADMIN_USER_CANNOT_DISABLE_SELF");
+            }
+            long roleId = protectedAccount ? target.roleId() : role.id();
+            boolean enabled = protectedAccount ? target.active() : active;
+            Long assignedStation = role.code() == RoleCode.OPERATOR && !protectedAccount ? stationId : null;
+            String passwordHash = newPassword.length == 0 ? null : hashPassword(new String(newPassword));
+            userDao.updateManagedAccount(userId, lastName, firstName, roleId, enabled, assignedStation, email, passwordHash);
+            if (actor.id() == userId) {
+                userDao.findById(userId).ifPresent(session::updateCurrentUser);
+            }
+            if (passwordHash != null) {
+                LOG.info("Administrator reset password for userId={}", userId);
+            }
+        } finally {
+            Arrays.fill(newPassword, '\0');
+        }
     }
 
     public User updateOwnProfile(long userId, String newHandle, String lastName, String firstName,
-                                 String email, String phone, byte[] avatarPng, Long newRoleId) {
+                                 String phone, byte[] avatarPng, Long newRoleId) {
+        if (session.requireCurrentUser().id() != userId) {
+            throw new IllegalArgumentException("Only your own profile can be updated here.");
+        }
         String ln = lastName == null ? "" : lastName.trim();
         String fn = firstName == null ? "" : firstName.trim();
         if (ln.isEmpty() || fn.isEmpty()) {
@@ -129,10 +160,10 @@ public final class AuthService {
         }
 
         // Super Administrator role is strictly immutable and cannot be changed in settings
-        Long effectiveRoleId = (existing.roleCode() == hu.due.rewear.model.RoleCode.SUPER_ADMIN)
+        Long effectiveRoleId = (existing.roleCode() == RoleCode.SUPER_ADMIN)
                 ? null
                 : (newRoleId != null && session.isAdmin() ? newRoleId : null);
-        userDao.updateAccountSettings(userId, normalizedHandle, ln, fn, email, phone, avatarPng, effectiveRoleId);
+        userDao.updateAccountSettings(userId, normalizedHandle, ln, fn, phone, avatarPng, effectiveRoleId);
         User updated = userDao.findById(userId)
                 .orElseThrow(() -> new IllegalStateException("Updated user not found: " + userId));
         session.updateCurrentUser(updated);

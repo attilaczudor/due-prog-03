@@ -34,24 +34,19 @@ import java.util.Set;
  */
 public final class AdminModulesPanel extends JPanel {
 
-    private static final RoleCode[] ROLE_COLUMNS = {
-            RoleCode.SUPER_ADMIN,
-            RoleCode.ADMIN,
-            RoleCode.MANAGER,
-            RoleCode.OPERATOR,
-            RoleCode.FORKLIFT
-    };
+    private static final RoleCode[] ROLE_COLUMNS = RoleCode.values();
 
     private final AppContext ctx;
     private final JLabel infoLabel = new JLabel();
     private final JButton resetDefaultsBtn = new JButton();
     private final ModuleMatrixModel matrixModel = new ModuleMatrixModel();
-    private final JTable matrixTable = new JTable(matrixModel);
+    private final JTable matrixTable;
 
     private Map<RoleCode, Set<AppModule>> matrix = new EnumMap<>(RoleCode.class);
 
     public AdminModulesPanel(AppContext ctx) {
         this.ctx = ctx;
+        this.matrixTable = new JTable(matrixModel);
         setLayout(new BorderLayout(0, 10));
         setBorder(BorderFactory.createEmptyBorder(10, 4, 4, 4));
         buildUi();
@@ -185,7 +180,7 @@ public final class AdminModulesPanel extends JPanel {
             }
             RoleCode role = ROLE_COLUMNS[columnIndex - 2];
             AppModule mod = modules[rowIndex];
-            if (role == RoleCode.SUPER_ADMIN || mod.isAlwaysEnabled()) {
+            if (role == RoleCode.SUPER_ADMIN || mod.isAlwaysEnabled() || !mod.allowsRole(role)) {
                 return false;
             }
             return ctx.getSession().isSuperAdmin();
@@ -206,6 +201,7 @@ public final class AdminModulesPanel extends JPanel {
             if (role == RoleCode.SUPER_ADMIN || mod.isAlwaysEnabled()) {
                 return Boolean.TRUE;
             }
+            if (!mod.allowsRole(role)) return Boolean.FALSE;
             Set<AppModule> set = matrix.getOrDefault(role, EnumSet.noneOf(AppModule.class));
             return set.contains(mod);
         }

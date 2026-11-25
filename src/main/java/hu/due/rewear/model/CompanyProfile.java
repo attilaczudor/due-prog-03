@@ -12,7 +12,7 @@ import java.util.Map;
  */
 public record CompanyProfile(
         String name,
-        String address,
+        Address addressParts,
         String taxNumber,
         String email,
         String phone,
@@ -26,22 +26,56 @@ public record CompanyProfile(
     public static final String DEFAULT_IBAN_HUF = "HU42 1177 3061 0023 4567 0000 0000";
     public static final String DEFAULT_IBAN_EUR = "HU88 1177 3061 0023 4567 0000 1111";
 
+    public record Address(String street, String city, String postalCode) {
+        public Address {
+            street = clean(street);
+            city = clean(city);
+            postalCode = clean(postalCode);
+        }
+
+        public static Address fromLegacy(String value) {
+            String text = clean(value);
+            var hungarianAddress = java.util.regex.Pattern.compile("^(\\d{4})\\s+([^,]+),\\s*(.+)$").matcher(text);
+            if (hungarianAddress.matches()) {
+                return new Address(hungarianAddress.group(3), hungarianAddress.group(2), hungarianAddress.group(1));
+            }
+            return new Address(text, "", "");
+        }
+
+        public String locality() { return (postalCode + " " + city).strip(); }
+
+        public String formatted() {
+            String locality = locality();
+            return locality.isEmpty() || street.isEmpty() ? locality + street : locality + ", " + street;
+        }
+
+        private static String clean(String value) { return value == null ? "" : value.strip(); }
+    }
+
+    public CompanyProfile(String name, String address, String taxNumber, String email, String phone,
+                          Map<String, String> ibansByCurrency) {
+        this(name, Address.fromLegacy(address == null || address.isBlank() ? DEFAULT_ADDRESS : address),
+                taxNumber, email, phone, ibansByCurrency);
+    }
+
     public CompanyProfile {
         name = (name == null || name.isBlank()) ? DEFAULT_NAME : name.trim();
-        address = (address == null || address.isBlank()) ? DEFAULT_ADDRESS : address.trim();
+        addressParts = addressParts == null ? Address.fromLegacy(DEFAULT_ADDRESS) : addressParts;
         taxNumber = (taxNumber == null || taxNumber.isBlank()) ? DEFAULT_TAX_NUMBER : taxNumber.trim();
         email = (email == null || email.isBlank()) ? DEFAULT_EMAIL : email.trim();
         phone = phone == null ? "" : phone.trim();
         Map<String, String> copy = new LinkedHashMap<>();
         if (ibansByCurrency != null) {
             for (Map.Entry<String, String> e : ibansByCurrency.entrySet()) {
-                if (e.getKey() != null && !e.getKey().isBlank() && e.getValue() != null && !e.getValue().isBlank()) {
+                if (e.getKey() != null && !e.getKey().isBlank() && e.getValue() != null) {
                     copy.put(e.getKey().trim().toUpperCase(Locale.ROOT), e.getValue().trim());
                 }
             }
         }
         ibansByCurrency = Collections.unmodifiableMap(copy);
     }
+
+    public String address() { return addressParts.formatted(); }
 
     public static CompanyProfile defaults() {
         Map<String, String> ibans = new LinkedHashMap<>();
@@ -51,20 +85,9 @@ public record CompanyProfile(
     }
 
     /**
-     * Resolves the bank account IBAN matching {@code currencyCode} (e.g. {@code HUF} or {@code EUR}),
-     * falling back to the first configured IBAN or the default HUF IBAN if none is set for that currency.
+     * Resolves the bank account for the invoice currency, or an empty string when it has none.
      */
     public String ibanForCurrency(String currencyCode) {
-        if (currencyCode != null && !currencyCode.isBlank()) {
-            String key = currencyCode.trim().toUpperCase(Locale.ROOT);
-            String exact = ibansByCurrency.get(key);
-            if (exact != null && !exact.isBlank()) {
-                return exact;
-            }
-        }
-        if (!ibansByCurrency.isEmpty()) {
-            return ibansByCurrency.values().iterator().next();
-        }
-        return "EUR".equalsIgnoreCase(currencyCode) ? DEFAULT_IBAN_EUR : DEFAULT_IBAN_HUF;
+        return currencyCode == null ? "" : ibansByCurrency.getOrDefault(currencyCode.strip().toUpperCase(Locale.ROOT), "");
     }
 }

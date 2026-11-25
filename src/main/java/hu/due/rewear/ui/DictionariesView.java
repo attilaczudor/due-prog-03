@@ -16,7 +16,6 @@ import javax.swing.JLabel;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
-import javax.swing.JTabbedPane;
 import javax.swing.JTable;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
@@ -30,15 +29,19 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Tabbed administration screen for all four QR code segment dictionaries:
+ * Administration screen for all four QR code segment dictionaries:
  * Target Groups, Product/Garment Types, Quality Grades, and Package Types.
  * Enforces QR code naming conventions and prevents deleting codes referenced by existing packages.
  */
 public final class DictionariesView extends JPanel implements NavigableView {
 
-    private final AppContext ctx;
+    private static final String TARGETS = "dictionaries.tab.targets";
+    private static final String GARMENTS = "dictionaries.tab.garments";
+    private static final String QUALITIES = "dictionaries.tab.qualities";
+    private static final String PACKAGES = "dictionaries.tab.packages";
 
-    private final JTabbedPane tabs = new JTabbedPane();
+    private final AppContext ctx;
+    private final SectionNavigation sections;
 
     private final JButton addBtn = new JButton();
     private final JButton editBtn = new JButton();
@@ -62,6 +65,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
 
     public DictionariesView(AppContext ctx) {
         this.ctx = ctx;
+        sections = new SectionNavigation(ctx.getI18n());
 
         setLayout(new BorderLayout(0, 10));
         setBorder(BorderFactory.createEmptyBorder(16, 20, 16, 20));
@@ -85,13 +89,13 @@ public final class DictionariesView extends JPanel implements NavigableView {
         toolbar.add(editBtn);
         toolbar.add(toggleActiveBtn);
         toolbar.add(deleteBtn);
-        add(toolbar, BorderLayout.NORTH);
+        sections.setContentHeader(toolbar);
 
-        tabs.addTab("", new JScrollPane(targetTable));
-        tabs.addTab("", new JScrollPane(garmentTable));
-        tabs.addTab("", new JScrollPane(qualityTable));
-        tabs.addTab("", new JScrollPane(packageTable));
-        add(tabs, BorderLayout.CENTER);
+        sections.addSection(TARGETS, SidebarIcons.forView(MainFrame.VIEW_CUSTOMERS, 16), new JScrollPane(targetTable));
+        sections.addSection(GARMENTS, SidebarIcons.forView(MainFrame.VIEW_DICTIONARIES, 16), new JScrollPane(garmentTable));
+        sections.addSection(QUALITIES, SidebarIcons.forView(MainFrame.VIEW_TODO, 16), new JScrollPane(qualityTable));
+        sections.addSection(PACKAGES, SidebarIcons.forView(MainFrame.VIEW_INTAKE, 16), new JScrollPane(packageTable));
+        add(sections, BorderLayout.CENTER);
     }
 
     private void wireEvents() {
@@ -102,31 +106,31 @@ public final class DictionariesView extends JPanel implements NavigableView {
     }
 
     private void handleAdd() {
-        switch (tabs.getSelectedIndex()) {
-            case 0 -> openTargetDialog(null);
-            case 1 -> openGarmentDialog(null);
-            case 2 -> openQualityDialog(null);
-            case 3 -> openPackageTypeDialog(null);
+        switch (sections.selectedKey()) {
+            case TARGETS -> openTargetDialog(null);
+            case GARMENTS -> openGarmentDialog(null);
+            case QUALITIES -> openQualityDialog(null);
+            case PACKAGES -> openPackageTypeDialog(null);
             default -> {}
         }
     }
 
     private void handleEdit() {
-        switch (tabs.getSelectedIndex()) {
-            case 0 -> {
-                int r = targetTable.getSelectedRow();
+        switch (sections.selectedKey()) {
+            case TARGETS -> {
+                int r = TableSorting.selectedModelRow(targetTable);
                 if (r >= 0 && r < targets.size()) openTargetDialog(targets.get(r));
             }
-            case 1 -> {
-                int r = garmentTable.getSelectedRow();
+            case GARMENTS -> {
+                int r = TableSorting.selectedModelRow(garmentTable);
                 if (r >= 0 && r < garments.size()) openGarmentDialog(garments.get(r));
             }
-            case 2 -> {
-                int r = qualityTable.getSelectedRow();
+            case QUALITIES -> {
+                int r = TableSorting.selectedModelRow(qualityTable);
                 if (r >= 0 && r < qualities.size()) openQualityDialog(qualities.get(r));
             }
-            case 3 -> {
-                int r = packageTable.getSelectedRow();
+            case PACKAGES -> {
+                int r = TableSorting.selectedModelRow(packageTable);
                 if (r >= 0 && r < packages.size()) openPackageTypeDialog(packages.get(r));
             }
             default -> {}
@@ -134,17 +138,17 @@ public final class DictionariesView extends JPanel implements NavigableView {
     }
 
     private void handleToggleActive() {
-        switch (tabs.getSelectedIndex()) {
-            case 0 -> {
-                int r = targetTable.getSelectedRow();
+        switch (sections.selectedKey()) {
+            case TARGETS -> {
+                int r = TableSorting.selectedModelRow(targetTable);
                 if (r >= 0 && r < targets.size()) {
                     TargetGroup g = targets.get(r);
                     ctx.getDictionaryDao().updateTargetGroup(g.id(), g.code(), g.nameEn(), g.nameHu(), !g.active());
                     refreshData();
                 }
             }
-            case 1 -> {
-                int r = garmentTable.getSelectedRow();
+            case GARMENTS -> {
+                int r = TableSorting.selectedModelRow(garmentTable);
                 if (r >= 0 && r < garments.size()) {
                     GarmentType g = garments.get(r);
                     ctx.getDictionaryDao().updateGarmentType(g.id(), g.code(), g.nameEn(), g.nameHu(),
@@ -152,8 +156,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                     refreshData();
                 }
             }
-            case 2 -> {
-                int r = qualityTable.getSelectedRow();
+            case QUALITIES -> {
+                int r = TableSorting.selectedModelRow(qualityTable);
                 if (r >= 0 && r < qualities.size()) {
                     QualityGrade q = qualities.get(r);
                     ctx.getDictionaryDao().updateQualityGrade(q.id(), q.code(), q.nameEn(), q.nameHu(),
@@ -161,8 +165,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                     refreshData();
                 }
             }
-            case 3 -> {
-                int r = packageTable.getSelectedRow();
+            case PACKAGES -> {
+                int r = TableSorting.selectedModelRow(packageTable);
                 if (r >= 0 && r < packages.size()) {
                     PackageType p = packages.get(r);
                     ctx.getDictionaryDao().updatePackageType(p.id(), p.code(), p.nameEn(), p.nameHu(), p.tareWeightKg(), p.maxWeightKg(), !p.active());
@@ -175,9 +179,9 @@ public final class DictionariesView extends JPanel implements NavigableView {
 
     private void handleDelete() {
         I18nManager i18n = ctx.getI18n();
-        switch (tabs.getSelectedIndex()) {
-            case 0 -> {
-                int r = targetTable.getSelectedRow();
+        switch (sections.selectedKey()) {
+            case TARGETS -> {
+                int r = TableSorting.selectedModelRow(targetTable);
                 if (r < 0 || r >= targets.size()) return;
                 TargetGroup g = targets.get(r);
                 if (ctx.getDictionaryDao().isTargetGroupReferenced(g.id())) {
@@ -190,8 +194,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                     refreshData();
                 }
             }
-            case 1 -> {
-                int r = garmentTable.getSelectedRow();
+            case GARMENTS -> {
+                int r = TableSorting.selectedModelRow(garmentTable);
                 if (r < 0 || r >= garments.size()) return;
                 GarmentType g = garments.get(r);
                 if (ctx.getDictionaryDao().isGarmentTypeReferenced(g.id())) {
@@ -204,8 +208,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                     refreshData();
                 }
             }
-            case 2 -> {
-                int r = qualityTable.getSelectedRow();
+            case QUALITIES -> {
+                int r = TableSorting.selectedModelRow(qualityTable);
                 if (r < 0 || r >= qualities.size()) return;
                 QualityGrade q = qualities.get(r);
                 if (ctx.getDictionaryDao().isQualityGradeReferenced(q.id())) {
@@ -218,8 +222,8 @@ public final class DictionariesView extends JPanel implements NavigableView {
                     refreshData();
                 }
             }
-            case 3 -> {
-                int r = packageTable.getSelectedRow();
+            case PACKAGES -> {
+                int r = TableSorting.selectedModelRow(packageTable);
                 if (r < 0 || r >= packages.size()) return;
                 PackageType p = packages.get(r);
                 if (ctx.getDictionaryDao().isPackageTypeReferenced(p.id())) {
@@ -536,10 +540,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
         toggleActiveBtn.setText(i18n.t("common.activate") + " / " + i18n.t("common.deactivate"));
         deleteBtn.setText(i18n.t("common.delete"));
 
-        tabs.setTitleAt(0, i18n.t("dictionaries.tab.targets"));
-        tabs.setTitleAt(1, i18n.t("dictionaries.tab.garments"));
-        tabs.setTitleAt(2, i18n.t("dictionaries.tab.qualities"));
-        tabs.setTitleAt(3, i18n.t("dictionaries.tab.packages"));
+        sections.applyTranslations();
 
         Object[] baseCols = new Object[]{i18n.t("common.code"), i18n.t("common.name.en"), i18n.t("common.name.hu"), i18n.t("common.status")};
         Object[] pricedCols = new Object[]{
@@ -560,6 +561,7 @@ public final class DictionariesView extends JPanel implements NavigableView {
 
     @Override
     public void applyTheme() {
+        sections.applyTheme();
         BrutalistStyle.stylePrimaryButton(addBtn);
         BrutalistStyle.styleSecondaryButtons(editBtn, toggleActiveBtn, deleteBtn);
         BrutalistStyle.styleTable(targetTable);

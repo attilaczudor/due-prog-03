@@ -66,15 +66,51 @@ public final class CustomerDao {
     }
 
     public Optional<Customer> findById(long id) {
+        try (Connection conn = db.getConnection()) {
+            return findById(conn, id);
+        } catch (SQLException e) {
+            throw new DaoException("Failed to find partner: " + id, e);
+        }
+    }
+
+    public Optional<Customer> findById(Connection conn, long id) throws SQLException {
         String sql = "SELECT " + SELECT_COLS + " FROM customers WHERE id = ?";
-        try (Connection conn = db.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setLong(1, id);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? Optional.of(mapRow(rs)) : Optional.empty();
             }
+        }
+    }
+
+    public List<Customer> findByTaxNumber(String taxNumber) {
+        try (Connection conn = db.getConnection()) {
+            return findByTaxNumber(conn, taxNumber);
         } catch (SQLException e) {
-            throw new DaoException("Failed to find partner: " + id, e);
+            throw new DaoException("Failed to match partner tax number", e);
+        }
+    }
+
+    public List<Customer> findByTaxNumber(Connection conn, String taxNumber) throws SQLException {
+        String normalized = taxNumber == null ? "" : taxNumber.strip().replace("-", "")
+                .replace(" ", "").toUpperCase(Locale.ROOT);
+        if (normalized.isEmpty()) return List.of();
+        String sql = "SELECT " + SELECT_COLS + " FROM customers "
+                + "WHERE upper(replace(replace(trim(tax_number), '-', ''), ' ', '')) = ? ORDER BY id";
+        try (var ps = conn.prepareStatement(sql)) {
+            ps.setString(1, normalized);
+            try (var rs = ps.executeQuery()) {
+                List<Customer> matches = new ArrayList<>();
+                while (rs.next()) matches.add(mapRow(rs));
+                return matches;
+            }
+        }
+    }
+
+    public void enableBothRoles(Connection conn, long id) throws SQLException {
+        try (var ps = conn.prepareStatement("UPDATE customers SET partner_type = 'BOTH' WHERE id = ?")) {
+            ps.setLong(1, id);
+            ps.executeUpdate();
         }
     }
 

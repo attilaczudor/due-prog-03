@@ -2,20 +2,24 @@
 
 **Adatbázis-kezelő rendszer:** Beágyazott SQLite 3 (JDBC `sqlite-jdbc`, `PRAGMA foreign_keys = ON`)  
 **Séma fájl:** `src/main/resources/db/schema.sql`  
-**Táblák száma:** **24 normalizált relációs tábla (3NF)** + **19 teljesítmény-index**  
+**Séma:** **41 alkalmazástábla**, **23 név szerint deklarált index** és a kulcsmegszorítások SQLite-indexei
 
 ---
 
 ## 1. Logikai csoportosítás
 
-Az adatbázis 24 táblája hat jól elkülöníthető logikai tartományra oszlik:
+Az alkalmazástáblák tíz logikai csoportot alkotnak.
 
 1. **Alkalmazás- és pénzügyi törzskonfiguráció (3 tábla):** `app_settings`, `currencies`, `tax_types`
 2. **Hitelesítés, szerepkörök és modul-jogosultsági mátrix (3 tábla):** `roles`, `users`, `role_module_permissions`
 3. **QR kódtörzsek — dinamikus szótártáblák (4 tábla):** `target_groups`, `garment_types`, `quality_grades`, `package_types` *(közvetlenül leképezik a QR termékkód szegmenseit és az alapértelmezett EUR/HUF kilónkénti árakat)*
 4. **Raktárkészlet és mozgásnapló (3 tábla):** `warehouse_locations`, `inventory_packages`, `stock_movements`
-5. **B2B partnerek, rendelések, átadás és többdevizás számlázás (5 tábla):** `customers`, `orders`, `order_items`, `invoices`, `invoice_items`
+5. **B2B partnerek, rendelések, átadás és többdevizás számlázás (7 tábla):** `customers`, `orders`, `order_requested_products`, `order_webshop_references`, `order_items`, `invoices`, `invoice_items`
 6. **Vállalati kommunikáció, értesítések és teendők (6 tábla):** `emails`, `chat_rooms`, `chat_room_members`, `chat_messages`, `notifications`, `user_todos`
+7. **Felhasználónként mentett számla- és e-mail-szűrések (2 tábla):** `smart_folders`, `smart_folder_rules`
+8. **Kézi és demó banki nyilvántartás (2 tábla):** `bank_accounts`, `bank_transactions`
+9. **Válogatás (7 tábla):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
+10. **Bérszámfejtési előkészítés (4 tábla):** `payroll_departments`, `payroll_worker_base`, `payroll_department_rates`, `payroll_shifts`
 
 ---
 
@@ -43,12 +47,16 @@ erDiagram
 
     customers ||--o{ orders : "megrendeli (1:N)"
     warehouse_locations ||--o{ orders : "kiadó zóna (0..N)"
+    orders ||--o{ order_requested_products : "termékigény"
+    orders ||--o| order_webshop_references : "webshop hivatkozás"
     orders ||--o{ order_items : "tételei (1:N)"
     inventory_packages ||--o{ order_items : "kiosztva (1:N)"
 
     orders ||--o{ invoices : "számlázva (0..N)"
     customers ||--o{ invoices : "partner (0..N)"
     invoices ||--o{ invoice_items : "számlasorok (1:N)"
+    currencies ||--o{ bank_accounts : "számladeviza (1:N)"
+    bank_accounts ||--o{ bank_transactions : "számlatörténet (1:N)"
 
     users ||--o{ emails : "postafiók (1:N)"
     users ||--o{ chat_rooms : "létrehozta (1:N)"
@@ -58,9 +66,36 @@ erDiagram
     users ||--o{ chat_messages : "küldő (1:N)"
     users ||--o{ notifications : "címzett (1:N)"
     users ||--o{ user_todos : "saját teendők (1:N)"
+    users ||--o{ smart_folders : "mentett nézet (1:N)"
+    smart_folders ||--o{ smart_folder_rules : "szűrési feltétel (1:N)"
 ```
 
-*(A konfigurációs törzstáblák — `app_settings`, `currencies`, `tax_types` — önálló referencia-/beállítástáblák, amelyekből az alkalmazás a devizakódokat, áfakulcs-szabályokat, a vállalati e-mail domaint/SMTP/IMAP beállításokat és az eladói cégprofilt tölti be.)*
+A válogatás és a bérszámfejtési előkészítés legfontosabb kapcsolatai külön ábrán szerepelnek.
+
+```mermaid
+erDiagram
+    warehouse_locations ||--o{ sorting_teams : "címkézőállomás"
+    users ||--o{ sorting_teams : "ellátó targoncás"
+    sorting_teams ||--o{ sorting_team_members : "válogatók"
+    users ||--o| sorting_team_members : "saját válogatócsapat"
+    sorting_teams ||--o{ sorting_team_helpers : "segédek"
+    users ||--o{ sorting_team_helpers : "segédtagság"
+    users ||--o{ sorting_requests : "igénylő / kijelölt targoncás"
+    sorting_teams ||--o{ sorting_requests : "rögzített csapat"
+    sorting_raw_lots o|--o{ sorting_requests : "átadott alapanyag"
+    sorting_requests ||--o{ sorting_request_helpers : "igényléskori segédek"
+    users ||--o{ sorting_request_helpers : "kijelölt segéd"
+    sorting_requests ||--o{ sorting_bags : "válogatott zsák"
+    users o|--o{ sorting_bags : "csomagolta"
+    inventory_packages o|--o| sorting_bags : "készletre vett csomag"
+    sorting_teams o|--o| payroll_departments : "kapcsolt részleg"
+    users ||--o{ payroll_worker_base : "havi bruttó referencia"
+    payroll_departments ||--o{ payroll_department_rates : "napi díjtétel"
+    payroll_departments ||--o{ payroll_shifts : "munkanap-rész"
+    users ||--o{ payroll_shifts : "dolgozó"
+    roles ||--o{ payroll_department_rates : "munkakör"
+    roles ||--o{ payroll_shifts : "aznap végzett munkakör"
+```
 
 ---
 
@@ -71,6 +106,12 @@ erDiagram
 |---|---|---|---|
 | `setting_key` | `TEXT` | `PRIMARY KEY` | Kulcs (pl. `company.name`, `company.iban.EUR`, `mail.domain`, `mail.smtp.host`, `ui.language`, `ui.theme`) |
 | `setting_value` | `TEXT` | `NOT NULL` | Beállítás értéke (hordozhatóan, a `.db` fájlban tárolva) |
+
+**Eladói cím és IBAN:** A `company.address.street`, `company.address.city` és `company.address.postal_code` külön tárolja a cím elemeit. A korábbi `company.address` mező beolvasáskor tartalék adatforrás. A `company.iban.<DEVIZA>` üres értéke törli az adott deviza IBAN-ját, az alapértelmezett számlaszámot is felülírva.
+
+**NAV demó:** A `nav.demo.*` kulcsok a környezetet és a szimuláció beállításait tárolják. A jelszó, az aláírókulcs és a cserekulcs nem kerül a fájlba.
+
+**Banki nyilvántartás:** A `bank_accounts` a bankot, számlanevet, IBAN-t vagy számlaszámot, BIC-et, devizát, nyitó dátumot és egyenleget tárolja. A `bank_transactions` számlánként rögzíti a könyvelési dátumot, előjeles összeget, partnert és közleményt. Az összegek decimális szövegként tárolódnak. A `(bank_name, account_reference, currency)` kombináció egyedi. Az `idx_bank_transactions_account_date` a történet lekérdezését gyorsítja.
 
 ### 3.2 `currencies` (Konfigurálható devizák)
 | Oszlop | Típus | Megszorítások | Leírás |
@@ -169,13 +210,14 @@ erDiagram
 | `assigned_forklift_id` | `INTEGER` | `NULL FK -> users(id)` | Kijelölt targoncás felhasználó |
 | `dispatch_location_id` | `INTEGER` | `NULL FK -> warehouse_locations(id)` | Kijelölt kiadó gyűjtőzóna (pl. `DOCK-01`) |
 | `customer_arrived_at` | `TEXT` | `NULL` | Vevő megérkezésének időpontja (riasztáshoz és átadáshoz) |
+| `delivery_date` | `TEXT` | `NULL` | Ütemezett átadási nap ISO-dátummal. A korábbi rendelés dátuma hiányozhat. |
 | `notes`, `created_by`, `created_at`, `shipped_at` | `TEXT / INTEGER` | `created_by FK` | Megjegyzés, létrehozó, időbélyegek |
 
 ### 3.16 `order_items` (Rendelési tételek — átadás-ellenőrzéssel)
 - `id`, `order_id` (`FK CASCADE`), `package_id` (`FK`), `price_per_kg`, `line_total`, `handover_scanned` (`INTEGER DEFAULT 0` — raktárvezetői QR-átadás ellenőrzés), `UNIQUE(order_id, package_id)`.
 
 ### 3.17–3.18 `invoices` és `invoice_items` (Többdevizás számlázás és bizonylattár)
-- **`invoices`:** `id`, `invoice_number` (`UNIQUE`), `direction` (`OUTGOING`/`INCOMING`), `category`, `order_id` (`FK`), `customer_id` (`FK`), partner pillanatfelvétel (`partner_name`, `partner_tax_number`, `partner_address`, `partner_email`), `status` (`DRAFT`, `ISSUED`, `PAID`, `OVERDUE`, `CANCELLED`), `issue_date`, `due_date`, `paid_date`, `net_amount`, `vat_rate`, `vat_amount`, `gross_amount`, `tax_type_code`, `currency`, `exchange_rate`, `attachment_path` (`./data/receipts/`), `created_by` (`FK`), `created_at`.
+- **`invoices`:** `id`, `invoice_number` (`UNIQUE`), `direction` (`OUTGOING`/`INCOMING`), `category`, `order_id` (`FK`), `customer_id` (`FK`), partner pillanatfelvétel (`partner_name`, `partner_tax_number`, `partner_address`, `partner_email`), `status` (`DRAFT`, `ISSUED`, `PAID`, `OVERDUE`, `CANCELLED`), `issue_date`, `due_date`, `paid_date`, `net_amount`, `vat_rate`, `vat_amount`, `gross_amount`, `tax_type_code`, `currency`, `exchange_rate`, `attachment_path` (`./data/receipts/` mappához viszonyítva), `archived_pdf_path` (`./data/invoices/` mappához viszonyítva), `created_by` (`FK`), `created_at`.
 - **`invoice_items`:** `id`, `invoice_id` (`FK CASCADE`), `description`, `quantity`, `unit`, `unit_price`, `line_net`.
 
 ### 3.19 `emails` (Vállalati postafiók üzenetek)
@@ -187,7 +229,7 @@ erDiagram
 | `from_address`, `to_addresses`, `cc_addresses`, `subject`, `body` | `TEXT` | `NOT NULL` | Levél fejléc és törzs |
 | `attachment_path` | `TEXT` | `NULL` | Opcionális csatolmány útvonal |
 | `is_read` | `INTEGER` | `NOT NULL DEFAULT 0 CHECK (0,1)` | Olvasott / olvasatlan jelző |
-| `delivery_status` | `TEXT` | `NOT NULL DEFAULT 'DELIVERED'` | Kézbesítési állapot (pl. `DELIVERED`, `SMTP_SENT`, `QUEUED_OFFLINE`) |
+| `delivery_status` | `TEXT` | `NOT NULL DEFAULT 'DELIVERED'` | Belső kézbesítés vagy szimulált külső SMTP-/IMAP-kézbesítés állapota |
 | `created_at` | `TEXT` | `NOT NULL` | Időbélyeg |
 
 ### 3.20–3.22 Element-stílusú belső chat (`chat_rooms`, `chat_room_members`, `chat_messages`)
@@ -201,12 +243,41 @@ erDiagram
 ### 3.24 `user_todos` (Privát felhasználói teendők)
 - `id`, `user_id` (`FK CASCADE`), `title`, `priority` (`HIGH`/`NORMAL`/`LOW`), `completed` (`0`/`1`), `created_at`, `completed_at`.
 
+
+### 3.25 `smart_folders` (Intelligens mappák)
+- `id` (`INTEGER PRIMARY KEY AUTOINCREMENT`), `owner_user_id` (`NOT NULL REFERENCES users(id) ON DELETE CASCADE`), `scope` (`INVOICE` vagy `MAIL`), `name` (1–80 karakter), `icon` (ikonazonosító).
+- A név egy felhasználó adott nézettípusán belül kis- és nagybetűtől függetlenül egyedi.
+
+### 3.26 `smart_folder_rules` (Intelligens mappák feltételei)
+- `folder_id` (`REFERENCES smart_folders(id) ON DELETE CASCADE`), `field` (feltételtípus), `value` (a feltétel egy értéke).
+- Összetett elsődleges kulcs: `(folder_id, field, value)`. A mappa és feltételei egy tranzakcióban mentődnek. A találatok forrása az eredeti számla- vagy levéltábla.
+
+### 3.27–3.28 Banki nyilvántartás
+
+- A `bank_accounts` a számlaadatokat, a devizát és a nyitóegyenleget, a `bank_transactions` a könyvelési dátumot és az előjeles tranzakciós összeget tárolja. Az összegek decimális szövegből, `BigDecimal` pontossággal összegezhetők.
+
+### 3.29–3.30 Rendelési igény és webshopforrás
+
+- Az `order_requested_products` a termékkombinációt és a csomagszámot tárolja. A fizikai csomagfoglalás az `order_items` táblába kerül.
+- Az `order_webshop_references` rendelésenként egy külső hivatkozást tárol. A forrás és a külső azonosító együtt egyedi.
+
+### 3.31–3.37 Válogatás
+
+- A `sorting_teams` a csapatot, az ellátó targoncást, az állomást és a napi célt tárolja. A két tagsági tábla egy saját csapatot enged válogatónként és több csapattagságot segédenként.
+- A `sorting_raw_lots` a beérkezett és elérhető alapanyag súlyát tárolja egész grammban. A `sorting_requests` az igénylést, az átadást, a ténylegesen feldolgozott súlyt és a lezárás napját rögzíti. A `sorting_request_helpers` az igényléskor érvényes segédtagságokat őrzi.
+- A `sorting_bags` tartalmazza az osztályozott kimenetet, a csomagolót és a csomagolás napját, valamint a készletbe vett csomagra mutató hivatkozást.
+
+### 3.38–3.41 Bérszámfejtési előkészítés
+
+- A `payroll_departments` részlege opcionálisan egy válogatócsapathoz kapcsolódik. A `payroll_worker_base` dolgozónként és hatálybalépési dátumonként tárol havi bruttó referenciaösszeget.
+- A `payroll_department_rates` részleg, munkakör és hatálybalépés alapján ad napi bruttó díjtételt és bónuszalapot. A `payroll_shifts` a tényleges részleget, munkakört, a munkanap arányát és a bónusz jóváhagyását rögzíti. A forintösszegek egészek, a százalékos arányok bázispontban tárolódnak.
+
 ---
 
 ## 4. Normalizálás igazolása (1NF → 2NF → 3NF)
 
 - **Első normálforma (1NF):** Minden attribútum atomi értéket tartalmaz (a raktárhely `zone`, `aisle`, `shelf` mezőkre bontott, a rendelési tételek az `order_items`, a számlasorok az `invoice_items`, a chatszoba-tagságok a `chat_room_members`, a modul-szabályok pedig a `role_module_permissions` kapcsolótáblában élnek). Minden tábla rendelkezik egyértelmű elsődleges kulccsal.
-- **Második normálforma (2NF):** Minden entitástábla egyoszlopos `id` (vagy `setting_key`) kulccsal bír; a két összetett kulcsú kapcsolótábla (`chat_room_members(room_id, user_id)` és `role_module_permissions(role_id, module_code)`) minden nem-kulcs attribútuma (`last_read_message_id`, `joined_at`, `enabled`, `updated_at`) a teljes összetett kulcstól függ.
+- **Második normálforma (2NF):** Minden entitástábla egyoszlopos `id` (vagy `setting_key`) kulccsal bír; az itt felsorolt összetett kulcsú kapcsolótáblák (`chat_room_members(room_id, user_id)` és `role_module_permissions(role_id, module_code)`) minden nem-kulcs attribútuma (`last_read_message_id`, `joined_at`, `enabled`, `updated_at`) a teljes összetett kulcstól függ. A `smart_folder_rules` minden oszlopa az összetett elsődleges kulcs része.
 - **Harmadik normálforma (3NF):** Minden nem-kulcs attribútum kizárólag a saját elsődleges kulcsától függ:
   - A csomag tulajdonságai (`target_groups`, `garment_types`, `quality_grades`, `package_types`), szerepkörök (`roles`), devizák (`currencies`) és adókulcsok (`tax_types`) külön törzstáblákba vannak kiszervezve.
   - A raktárhely-foglaltság (`used_weight_kg`) és a készletértékelés (`StockValuation`) nem tárolt redundáns mező, hanem SQL aggregációval számított érték.
@@ -216,6 +287,8 @@ erDiagram
 
 ## 5. Indexek, tranzakciók és adatbiztonság
 
-- **19 B-tree index:** Gyorsítja a QR-kód alapú keresést (`idx_packages_qr_code`), állapot- és helyszűrést (`idx_packages_status`, `idx_packages_location`, `idx_packages_created_at`), mozgásnaplót (`idx_movements_package`, `idx_movements_created_at`), rendeléseket és számlákat (`idx_orders_customer`, `idx_orders_status`, `idx_order_items_order`, `idx_order_items_package`, `idx_invoices_direction`, `idx_invoices_order`, `idx_invoices_customer`, `idx_invoice_items_invoice`), valamint a levelezést, belső chatet, értesítéseket és teendőket (`idx_emails_owner_folder`, `idx_chat_messages_room`, `idx_chat_members_user`, `idx_notifications_user_read`, `idx_user_todos_user`).
+- **23 deklarált index:** Gyorsítják a készlet, mozgásnapló, rendelések, számlák, üzenetek, értesítések, teendők, válogatási naplók és banki tranzakciók lekérdezéseit. A `idx_sorting_bag_inventory` egyediséget is biztosít a készlethez kapcsolt válogatott csomagokra.
 - **Tranzakciókezelés:** Minden összetett üzleti művelet (csomagfelvétel + `INTAKE`, kötegelt áthelyezés, targoncás komissiózás, ellenőrzött vevői kiadás + `SHIP`, számla + tételek + jóváíró számla) atomi tranzakcióban fut a `DatabaseManager.runInTransaction(...)` segítségével egyetlen megosztott JDBC kapcsolaton.
+- **Kiadás és bizonylatok:** Az összekészítés egy tranzakcióban frissíti a csomag helyét, a mozgásnaplót és a rendelés állapotát. A bizonylattár csak a teljes fájl másolása után cseréli le a számla fájlhivatkozását.
 - **Hivatkozási védelem és hordozható mentés:** `PRAGMA foreign_keys = ON` + `DictionaryDao` használat-ellenőrzés; rollback-journal mód + `BackupService` (`VACUUM INTO`) egyetlen hordozható `.db` mentési fájllal és visszaállítás előtti `.db.bak` biztonsági másolattal.
+- A mentés csak a kész SQLite-pillanatkép elkészülte után cseréli le a korábbi mentési fájlt. A fájlrendszerben tárolt számla-PDF-ek és bizonylatok külön mentendők a `data/invoices/` és `data/receipts/` könyvtárakból. Az új fájlok az év és a hónap szerinti almappákba kerülnek. A korábbi, közvetlenül a bizonylattár gyökerében tárolt csatolmányok továbbra is megnyithatók.

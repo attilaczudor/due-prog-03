@@ -1,6 +1,7 @@
 package hu.due.rewear.model;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Locale;
 
@@ -26,14 +27,15 @@ public record Order(
         String assignedForkliftName,
         Long dispatchLocationId,
         String dispatchLocationCode,
-        LocalDateTime customerArrivedAt
+        LocalDateTime customerArrivedAt,
+        LocalDate deliveryDate
 ) {
     /** Backward-compatible constructor defaulting assignment and arrival fields to {@code null}. */
     public Order(long id, String orderNumber, long customerId, String customerName, OrderStatus status,
                  String currency, BigDecimal totalWeightKg, BigDecimal totalPrice, String notes,
                  long createdBy, String createdByFullName, LocalDateTime createdAt, LocalDateTime shippedAt) {
         this(id, orderNumber, customerId, customerName, status, currency, totalWeightKg, totalPrice, notes,
-                createdBy, createdByFullName, createdAt, shippedAt, null, null, null, null, null);
+                createdBy, createdByFullName, createdAt, shippedAt, null, null, null, null, null, null);
     }
 
     public boolean isCustomerArrived() {

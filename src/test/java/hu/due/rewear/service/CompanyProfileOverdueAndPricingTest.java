@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -48,6 +49,9 @@ class CompanyProfileOverdueAndPricingTest {
 
     @Test
     void persistsCompanyProfileAndPerCurrencyIbansAndExportsPdf() throws Exception {
+        ctx.getSettingsDao().set("company.address", "2400 Dunaújváros, Régi út 12.");
+        assertEquals(new CompanyProfile.Address("Régi út 12.", "Dunaújváros", "2400"),
+                ctx.getSettingsDao().getCompanyProfile().addressParts());
         CompanyProfile saved = new CompanyProfile(
                 "Czudor Textile Export Kft.",
                 "2400 Dunaújváros, Vasmű út 10.",
@@ -68,6 +72,19 @@ class CompanyProfileOverdueAndPricingTest {
         assertEquals("HU11 1177 3061 0000 1111 2222 3333", reloaded.ibanForCurrency("HUF"));
         assertEquals("HU22 1177 3061 0000 4444 5555 6666", reloaded.ibanForCurrency("eur"));
         assertEquals("HU33 1177 3061 0000 7777 8888 9999", reloaded.ibanForCurrency("USD"));
+        assertEquals("", reloaded.ibanForCurrency("GBP"));
+
+        var updatedAddress = new CompanyProfile.Address("Vasmű út 10/A", "Dunaújváros", "2400");
+        String updatedEmail = "invoices@czudortextile.hu";
+        ctx.getSettingsDao().saveInvoiceCompanyProfile(saved.name(), updatedAddress, saved.taxNumber(),
+                updatedEmail, Map.of("EUR", ""));
+        CompanyProfile afterSettings = ctx.getSettingsDao().getCompanyProfile();
+        assertEquals(updatedAddress, afterSettings.addressParts());
+        assertEquals("2400 Dunaújváros, Vasmű út 10/A", afterSettings.address());
+        assertEquals(updatedEmail, afterSettings.email());
+        assertEquals(saved.phone(), afterSettings.phone());
+        assertEquals("", afterSettings.ibanForCurrency("EUR"));
+        assertEquals(saved.ibanForCurrency("USD"), afterSettings.ibanForCurrency("USD"));
 
         // Verify live PDF export uses the supplier cleanly without errors
         Invoice inv = ctx.getInvoiceService().createManualInvoice(
@@ -112,6 +129,12 @@ class CompanyProfileOverdueAndPricingTest {
         assertTrue(mailtoEn.contains(pastDue.invoiceNumber()));
         assertTrue(mailtoEn.contains("EUR"));
         assertTrue(mailtoEn.contains("HU88"));
+        ctx.getSettingsDao().saveInvoiceCompanyProfile(company.name(), company.addressParts(), company.taxNumber(), Map.of("EUR", ""));
+        var withoutEur = ctx.getSettingsDao().getCompanyProfile();
+        assertEquals(company.email(), withoutEur.email());
+        String reminderWithoutBank = ctx.getInvoiceService().buildPaymentReminderMailtoUri(pastDue, withoutEur, ctx.getI18n());
+        assertFalse(reminderWithoutBank.contains("IBAN"));
+        assertFalse(reminderWithoutBank.contains("HU42"));
     }
 
     @Test
@@ -122,18 +145,24 @@ class CompanyProfileOverdueAndPricingTest {
                 .findFirst().orElseThrow();
 
         Order ord = ctx.getOrderService().createOrder(buyer.id(), "EUR", null, adminId);
+        long orderId = ord.id();
+        assertThrows(IllegalArgumentException.class,
+                () -> ctx.getInvoiceService().ensureInvoiceForOrder(orderId, adminId));
         ord = ctx.getOrderService().addPackageToOrder(ord.id(), bale.id(), new BigDecimal("5.00"), adminId);
         List<OrderItem> items = ctx.getOrderItemDao().findByOrderId(ord.id());
         assertEquals(1, items.size());
+        Invoice issued = ctx.getInvoiceService().ensureInvoiceForOrder(orderId, adminId);
 
         // Negotiate unit price down to 4.25 EUR/kg
         Order updated = ctx.getOrderService().updateOrderItemPrice(ord.id(), items.get(0).id(), new BigDecimal("4.25"));
         BigDecimal expectedTotal = bale.weightKg().multiply(new BigDecimal("4.25")).setScale(2, java.math.RoundingMode.HALF_UP);
         assertEquals(0, expectedTotal.compareTo(updated.totalPrice()));
+        Invoice invoicedAgain = ctx.getInvoiceService().ensureInvoiceForOrder(orderId, adminId);
+        assertEquals(issued.id(), invoicedAgain.id());
+        assertEquals(issued.grossAmount(), invoicedAgain.grossAmount());
 
         // Ship order -> further price edits must be rejected with IllegalStateException
         ctx.getOrderService().changeOrderStatus(ord.id(), OrderStatus.SHIPPED, adminId);
-        long orderId = ord.id();
         long itemId = items.get(0).id();
         assertThrows(IllegalStateException.class,
                 () -> ctx.getOrderService().updateOrderItemPrice(orderId, itemId, new BigDecimal("3.00")));

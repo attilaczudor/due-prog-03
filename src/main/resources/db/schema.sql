@@ -1,4 +1,4 @@
--- ReWear WMS (due-prog-03) — 3NF SQLite Schema (23 Tables)
+-- ReWear WMS (due-prog-03) — SQLite schema
 PRAGMA foreign_keys = ON;
 
 -- 0. Portable Workspace Settings
@@ -166,6 +166,7 @@ CREATE TABLE IF NOT EXISTS orders (
     assigned_forklift_id INTEGER,
     dispatch_location_id INTEGER,
     customer_arrived_at TEXT,
+    delivery_date TEXT,
     created_at TEXT NOT NULL,
     shipped_at TEXT,
     FOREIGN KEY (customer_id) REFERENCES customers(id),
@@ -204,6 +205,33 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     FOREIGN KEY (user_id) REFERENCES users(id)
 );
 
+-- Offline bank accounts and movements
+CREATE TABLE IF NOT EXISTS bank_accounts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    bank_name TEXT NOT NULL,
+    account_name TEXT NOT NULL,
+    account_reference TEXT NOT NULL,
+    bic TEXT NOT NULL DEFAULT '',
+    currency TEXT NOT NULL,
+    opening_date TEXT NOT NULL,
+    opening_balance TEXT NOT NULL,
+    demo INTEGER NOT NULL DEFAULT 0 CHECK (demo IN (0, 1)),
+    UNIQUE(bank_name, account_reference, currency),
+    FOREIGN KEY (currency) REFERENCES currencies(code)
+);
+
+CREATE TABLE IF NOT EXISTS bank_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    account_id INTEGER NOT NULL,
+    booking_date TEXT NOT NULL,
+    amount TEXT NOT NULL,
+    counterparty TEXT NOT NULL DEFAULT '',
+    reference TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES bank_accounts(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_bank_transactions_account_date ON bank_transactions(account_id, booking_date, id);
+
 -- 13. Invoices (Outgoing Revenue & Incoming Expenses)
 CREATE TABLE IF NOT EXISTS invoices (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -229,6 +257,7 @@ CREATE TABLE IF NOT EXISTS invoices (
     currency TEXT NOT NULL DEFAULT 'EUR',
     exchange_rate REAL NOT NULL DEFAULT 400.0 CHECK (exchange_rate > 0),
     attachment_path TEXT,
+    archived_pdf_path TEXT,
     created_by INTEGER NOT NULL,
     created_at TEXT NOT NULL,
     FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
@@ -351,4 +380,155 @@ CREATE TABLE IF NOT EXISTS role_module_permissions (
     enabled     INTEGER NOT NULL DEFAULT 1,
     updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
     PRIMARY KEY (role_id, module_code)
+);
+
+CREATE TABLE IF NOT EXISTS smart_folders (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    owner_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    scope         TEXT NOT NULL CHECK (scope IN ('INVOICE', 'MAIL')),
+    name          TEXT NOT NULL CHECK (length(trim(name)) BETWEEN 1 AND 80),
+    icon          TEXT NOT NULL,
+    UNIQUE (owner_user_id, scope, name COLLATE NOCASE)
+);
+
+CREATE TABLE IF NOT EXISTS smart_folder_rules (
+    folder_id INTEGER NOT NULL REFERENCES smart_folders(id) ON DELETE CASCADE,
+    field     TEXT NOT NULL,
+    value     TEXT NOT NULL,
+    PRIMARY KEY (folder_id, field, value)
+);
+
+-- Sorting production. Raw and finished stock use separate records.
+CREATE TABLE IF NOT EXISTS sorting_teams (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    driver_id INTEGER NOT NULL REFERENCES users(id),
+    station_id INTEGER NOT NULL REFERENCES warehouse_locations(id),
+    target_grams INTEGER NOT NULL DEFAULT 1000000 CHECK (target_grams > 0),
+    bonus_basis_points INTEGER CHECK (bonus_basis_points BETWEEN 0 AND 10000)
+);
+
+CREATE TABLE IF NOT EXISTS sorting_team_members (
+    sorter_id INTEGER PRIMARY KEY REFERENCES users(id),
+    team_id INTEGER NOT NULL REFERENCES sorting_teams(id)
+);
+
+CREATE TABLE IF NOT EXISTS sorting_team_helpers (
+    team_id INTEGER NOT NULL REFERENCES sorting_teams(id),
+    helper_id INTEGER NOT NULL REFERENCES users(id),
+    PRIMARY KEY (team_id, helper_id)
+);
+
+CREATE TABLE IF NOT EXISTS sorting_raw_lots (
+    id INTEGER PRIMARY KEY,
+    reference TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    received_grams INTEGER NOT NULL CHECK (received_grams > 0),
+    available_grams INTEGER NOT NULL CHECK (available_grams >= 0 AND available_grams <= received_grams),
+    received_by INTEGER NOT NULL REFERENCES users(id),
+    received_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS sorting_requests (
+    id INTEGER PRIMARY KEY,
+    sorter_id INTEGER NOT NULL REFERENCES users(id),
+    team_id INTEGER NOT NULL REFERENCES sorting_teams(id),
+    driver_id INTEGER NOT NULL REFERENCES users(id),
+    station_id INTEGER NOT NULL REFERENCES warehouse_locations(id),
+    target_grams INTEGER NOT NULL CHECK (target_grams > 0),
+    bonus_basis_points INTEGER CHECK (bonus_basis_points BETWEEN 0 AND 10000),
+    requested_grams INTEGER NOT NULL CHECK (requested_grams > 0),
+    requested_at TEXT NOT NULL,
+    lot_id INTEGER REFERENCES sorting_raw_lots(id),
+    delivered_grams INTEGER CHECK (delivered_grams > 0 AND delivered_grams <= requested_grams),
+    delivered_at TEXT,
+    processed_grams INTEGER CHECK (processed_grams >= 0 AND processed_grams <= delivered_grams),
+    finished_at TEXT,
+    work_day TEXT,
+    cancelled_at TEXT,
+    CHECK ((lot_id IS NULL AND delivered_grams IS NULL AND delivered_at IS NULL)
+        OR (lot_id IS NOT NULL AND delivered_grams IS NOT NULL AND delivered_at IS NOT NULL)),
+    CHECK ((processed_grams IS NULL AND finished_at IS NULL AND work_day IS NULL)
+        OR (processed_grams IS NOT NULL AND finished_at IS NOT NULL AND work_day IS NOT NULL AND delivered_at IS NOT NULL))
+);
+
+CREATE TABLE IF NOT EXISTS sorting_request_helpers (
+    request_id INTEGER NOT NULL REFERENCES sorting_requests(id),
+    helper_id INTEGER NOT NULL REFERENCES users(id),
+    PRIMARY KEY (request_id, helper_id)
+);
+
+CREATE TABLE IF NOT EXISTS sorting_bags (
+    id INTEGER PRIMARY KEY,
+    request_id INTEGER NOT NULL REFERENCES sorting_requests(id),
+    target_group_id INTEGER NOT NULL REFERENCES target_groups(id),
+    garment_type_id INTEGER NOT NULL REFERENCES garment_types(id),
+    quality_grade_id INTEGER NOT NULL REFERENCES quality_grades(id),
+    weight_grams INTEGER NOT NULL CHECK (weight_grams > 0),
+    reported_at TEXT NOT NULL,
+    package_type_id INTEGER REFERENCES package_types(id),
+    packed_at TEXT,
+    packed_by INTEGER REFERENCES users(id),
+    pack_day TEXT,
+    inventory_package_id INTEGER REFERENCES inventory_packages(id) ON DELETE SET NULL,
+    registered_by INTEGER REFERENCES users(id),
+    registered_at TEXT,
+    CHECK ((package_type_id IS NULL AND packed_at IS NULL) OR (package_type_id IS NOT NULL AND packed_at IS NOT NULL))
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_sorting_bag_inventory ON sorting_bags(inventory_package_id);
+CREATE INDEX IF NOT EXISTS idx_sorting_requests_sorter_day ON sorting_requests(sorter_id, work_day);
+CREATE INDEX IF NOT EXISTS idx_sorting_bags_request ON sorting_bags(request_id);
+
+CREATE TABLE IF NOT EXISTS order_webshop_references (
+    order_id INTEGER PRIMARY KEY REFERENCES orders(id) ON DELETE CASCADE,
+    source TEXT NOT NULL COLLATE NOCASE,
+    external_id TEXT NOT NULL,
+    UNIQUE (source, external_id)
+);
+
+CREATE TABLE IF NOT EXISTS order_requested_products (
+    id INTEGER PRIMARY KEY,
+    order_id INTEGER NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
+    target_group_id INTEGER NOT NULL REFERENCES target_groups(id),
+    garment_type_id INTEGER NOT NULL REFERENCES garment_types(id),
+    quality_grade_id INTEGER NOT NULL REFERENCES quality_grades(id),
+    package_type_id INTEGER NOT NULL REFERENCES package_types(id),
+    quantity INTEGER NOT NULL CHECK (quantity > 0),
+    UNIQUE (order_id, target_group_id, garment_type_id, quality_grade_id, package_type_id)
+);
+
+CREATE TABLE IF NOT EXISTS payroll_departments (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL COLLATE NOCASE UNIQUE,
+    sorting_team_id INTEGER UNIQUE REFERENCES sorting_teams(id)
+);
+
+CREATE TABLE IF NOT EXISTS payroll_worker_base (
+    worker_id INTEGER NOT NULL REFERENCES users(id),
+    effective_from TEXT NOT NULL,
+    monthly_gross_huf INTEGER NOT NULL CHECK (monthly_gross_huf >= 0),
+    changed_by INTEGER NOT NULL REFERENCES users(id),
+    PRIMARY KEY (worker_id, effective_from)
+);
+
+CREATE TABLE IF NOT EXISTS payroll_department_rates (
+    department_id INTEGER NOT NULL REFERENCES payroll_departments(id),
+    role_code TEXT NOT NULL REFERENCES roles(code),
+    effective_from TEXT NOT NULL,
+    daily_gross_huf INTEGER NOT NULL CHECK (daily_gross_huf >= 0),
+    bonus_basis_points INTEGER NOT NULL CHECK (bonus_basis_points BETWEEN 0 AND 10000),
+    changed_by INTEGER NOT NULL REFERENCES users(id),
+    PRIMARY KEY (department_id, role_code, effective_from)
+);
+
+CREATE TABLE IF NOT EXISTS payroll_shifts (
+    id INTEGER PRIMARY KEY,
+    worker_id INTEGER NOT NULL REFERENCES users(id),
+    work_day TEXT NOT NULL,
+    department_id INTEGER NOT NULL REFERENCES payroll_departments(id),
+    role_code TEXT NOT NULL REFERENCES roles(code),
+    shift_basis_points INTEGER NOT NULL CHECK (shift_basis_points BETWEEN 1 AND 10000),
+    approved_bonus INTEGER NOT NULL DEFAULT 0 CHECK (approved_bonus IN (0, 1)),
+    saved_by INTEGER NOT NULL REFERENCES users(id),
+    UNIQUE (worker_id, work_day, department_id, role_code)
 );

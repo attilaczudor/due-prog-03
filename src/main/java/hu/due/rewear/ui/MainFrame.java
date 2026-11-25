@@ -8,6 +8,7 @@ import hu.due.rewear.i18n.LanguageChangeListener;
 import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.User;
 import hu.due.rewear.service.SessionContext;
+import hu.due.rewear.service.NotificationService;
 
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
@@ -20,9 +21,11 @@ import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JRootPane;
+import javax.swing.JScrollPane;
 import javax.swing.JSeparator;
 import javax.swing.JToggleButton;
 import javax.swing.KeyStroke;
+import javax.swing.Scrollable;
 import javax.swing.SwingConstants;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -30,8 +33,11 @@ import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
+import java.awt.Rectangle;
 import java.awt.Toolkit;
 import java.awt.event.ActionEvent;
+import java.awt.event.FocusAdapter;
+import java.awt.event.FocusEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
@@ -51,6 +57,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
     public static final String VIEW_DASHBOARD = "dashboard";
     public static final String VIEW_TODO = "todo";
+    public static final String VIEW_SORTING = "sorting";
     public static final String VIEW_INTAKE = "intake";
     public static final String VIEW_PUTAWAY = "putaway";
     public static final String VIEW_STAGING = "staging";
@@ -61,6 +68,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public static final String VIEW_DICTIONARIES = "dictionaries";
     public static final String VIEW_CUSTOMERS = "customers";
     public static final String VIEW_ORDERS = "orders";
+    public static final String VIEW_PAYROLL = "payroll";
     public static final String VIEW_INVOICES = "invoices";
     public static final String VIEW_EMAIL = "email";
     public static final String VIEW_NOTIFICATIONS = "notifications";
@@ -83,7 +91,9 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JPanel sidebar = new JPanel(new BorderLayout());
     private final JPanel brandPanel = new JPanel();
     private final JLabel brandLogoLabel = new JLabel("", SwingConstants.CENTER);
-    private final JPanel navList = new JPanel();
+    private final SidebarNavList navList = new SidebarNavList();
+    private final JScrollPane navScroll = new JScrollPane(navList,
+            JScrollPane.VERTICAL_SCROLLBAR_AS_NEEDED, JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
 
     // Sidebar bottom footer (rebuilt cleanly for Expanded vs. Collapsed rail)
     private final JPanel sidebarFooter = new JPanel();
@@ -95,14 +105,19 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private final JButton settingsButton = new JButton();
     private final JButton collapseButton = new JButton();
 
-    private final JPanel topBar = new JPanel(new BorderLayout(12, 0));
+    private final JPanel topBar = new JPanel(new BorderLayout(12, 0)) {
+        @Override public Dimension getPreferredSize() {
+            Dimension size = super.getPreferredSize();
+            var insets = getInsets();
+            return new Dimension(size.width, 34 + insets.top + insets.bottom);
+        }
+    };
+    private final JPanel headerActions = new JPanel(new BorderLayout());
     private final JLabel activeViewTitleLabel = new JLabel();
     private final JButton notificationBellBtn = new JButton();
     private final Runnable notifListener = () -> javax.swing.SwingUtilities.invokeLater(this::refreshSidebarBadges);
     private final Runnable moduleListener = () -> javax.swing.SwingUtilities.invokeLater(this::rebuildSidebarNavigation);
     private final javax.swing.Timer autoRefreshTimer;
-    private final JPanel statusBar = new JPanel(new BorderLayout());
-    private final JLabel statusBarLabel = new JLabel();
 
     private String currentViewKey;
     private boolean sidebarCollapsed = false;
@@ -153,9 +168,11 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         brandPanel.add(Box.createVerticalStrut(10));
         sidebar.add(brandPanel, BorderLayout.NORTH);
 
-        navList.setLayout(new BoxLayout(navList, BoxLayout.Y_AXIS));
+        navScroll.setBorder(BorderFactory.createEmptyBorder());
+        var navScrollBar = navScroll.getVerticalScrollBar();
+        navScrollBar.setPreferredSize(new Dimension(9, navScrollBar.getPreferredSize().height));
         rebuildSidebarNavigation();
-        sidebar.add(navList, BorderLayout.CENTER);
+        sidebar.add(navScroll, BorderLayout.CENTER);
 
         // Sidebar Bottom Footer
         sidebarFooter.setLayout(new BoxLayout(sidebarFooter, BoxLayout.Y_AXIS));
@@ -208,24 +225,53 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         sidebar.add(sidebarFooter, BorderLayout.SOUTH);
         root.add(sidebar, BorderLayout.WEST);
 
-        // Right Workspace (Minimal Topbar + Content + Footer)
+        // Workspace header and content
         JPanel rightArea = new JPanel(new BorderLayout());
 
         activeViewTitleLabel.setFont(ThemeManager.monoFont(Font.BOLD, 15.5f));
-        topBar.add(activeViewTitleLabel, BorderLayout.WEST);
+        topBar.add(activeViewTitleLabel, BorderLayout.CENTER);
         notificationBellBtn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         notificationBellBtn.addActionListener(e -> navigateTo(VIEW_NOTIFICATIONS));
-        topBar.add(notificationBellBtn, BorderLayout.EAST);
+        headerActions.setOpaque(false);
+        topBar.add(headerActions, BorderLayout.EAST);
         rightArea.add(topBar, BorderLayout.NORTH);
 
         rightArea.add(contentHost, BorderLayout.CENTER);
 
-        statusBarLabel.setFont(ThemeManager.monoFont(Font.PLAIN, 11f));
-        statusBar.add(statusBarLabel, BorderLayout.WEST);
-        rightArea.add(statusBar, BorderLayout.SOUTH);
-
         root.add(rightArea, BorderLayout.CENTER);
         setContentPane(root);
+    }
+
+    /** Keeps both sidebar widths fitted to the viewport and gives the buttons their natural height. */
+    private static final class SidebarNavList extends JPanel implements Scrollable {
+        SidebarNavList() {
+            setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        }
+
+        @Override
+        public Dimension getPreferredScrollableViewportSize() {
+            return getPreferredSize();
+        }
+
+        @Override
+        public int getScrollableUnitIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return 16;
+        }
+
+        @Override
+        public int getScrollableBlockIncrement(Rectangle visibleRect, int orientation, int direction) {
+            return Math.max(16, visibleRect.height - 42);
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            return true;
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportHeight() {
+            return false;
+        }
     }
 
     private static void configureFooterIconButton(JButton btn) {
@@ -248,13 +294,13 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         // Core & Operations modules
         addModuleGroup(session, false,
                 AppModule.DASHBOARD, AppModule.TODO,
-                AppModule.INTAKE, AppModule.PUTAWAY, AppModule.STAGING,
+                AppModule.SORTING, AppModule.INTAKE, AppModule.PUTAWAY, AppModule.STAGING,
                 AppModule.SCANNER, AppModule.INVENTORY);
 
         // Management modules (Locations, Dictionaries, Customers, Orders, Invoices)
         addModuleGroup(session, true,
                 AppModule.LOCATIONS, AppModule.DICTIONARIES,
-                AppModule.CUSTOMERS, AppModule.ORDERS, AppModule.INVOICES);
+                AppModule.CUSTOMERS, AppModule.ORDERS, AppModule.INVOICES, AppModule.PAYROLL);
 
         // Communications modules (Notifications, Messages, Email — in that order for all roles)
         addModuleGroup(session, true,
@@ -408,6 +454,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         btn.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
         btn.putClientProperty("i18nKey", i18nKey);
         btn.addActionListener(e -> navigateTo(viewKey));
+        btn.addFocusListener(new FocusAdapter() {
+            @Override
+            public void focusGained(FocusEvent e) {
+                btn.scrollRectToVisible(new Rectangle(btn.getSize()));
+            }
+        });
         navGroup.add(btn);
         navButtons.put(viewKey, btn);
         container.add(btn);
@@ -444,7 +496,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         Runnable refreshAction = () -> {
             if (currentViewKey != null && views.containsKey(currentViewKey)) {
                 views.get(currentViewKey).refreshData();
-                setStatusMessage(ctx.getI18n().t("status.refreshed"));
             }
         };
         inputMap.put(KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0), "rewear.refresh");
@@ -460,6 +511,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     private void registerDefaultViews() {
         // Lazy factories: views are instantiated on first navigation so login only loads DashboardView
         registerViewFactory(VIEW_DASHBOARD, () -> new DashboardView(ctx));
+        registerViewFactory(VIEW_SORTING, () -> new SortingView(ctx));
         registerViewFactory(VIEW_INTAKE, () -> new PackageIntakeView(ctx));
         registerViewFactory(VIEW_SCANNER, () -> new QrScannerView(ctx));
         registerViewFactory(VIEW_INVENTORY, () -> new InventoryView(ctx));
@@ -470,6 +522,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerViewFactory(VIEW_DICTIONARIES, () -> new DictionariesView(ctx));
         registerViewFactory(VIEW_CUSTOMERS, () -> new CustomersView(ctx));
         registerViewFactory(VIEW_ORDERS, () -> new OrdersView(ctx));
+        registerViewFactory(VIEW_PAYROLL, () -> new PayrollView(ctx));
         registerViewFactory(VIEW_INVOICES, () -> new InvoicesView(ctx));
         registerViewFactory(VIEW_EMAIL, () -> new EmailView(ctx));
         registerViewFactory(VIEW_NOTIFICATIONS, () -> new NotificationsView(ctx, this::navigateTo));
@@ -487,6 +540,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     }
 
     public void navigateTo(String viewKey) {
+        boolean openTranslations = NotificationService.TRANSLATIONS_TARGET.equals(viewKey);
+        if (openTranslations) viewKey = VIEW_ADMIN;
         if (VIEW_TRANSPORT.equals(viewKey)) {
             viewKey = VIEW_PUTAWAY;
         }
@@ -507,12 +562,18 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         JToggleButton btn = navButtons.get(viewKey);
         if (btn != null) {
             btn.setSelected(true);
+            btn.scrollRectToVisible(new Rectangle(btn.getSize()));
         }
         updateNavButtonStyles();
         activeViewTitleLabel.setText(ctx.getI18n().t(view.getTitleI18nKey()).toUpperCase(Locale.ROOT));
-        notificationBellBtn.setVisible(VIEW_DASHBOARD.equals(viewKey));
+        headerActions.removeAll();
+        JComponent controls = VIEW_DASHBOARD.equals(viewKey) ? notificationBellBtn : view.getHeaderActions();
+        if (controls != null) headerActions.add(controls, BorderLayout.CENTER);
+        headerActions.revalidate();
+        headerActions.repaint();
         view.refreshData();
         cardLayout.show(contentHost, viewKey);
+        if (openTranslations && view instanceof AdminView admin) admin.showTranslations();
         refreshSidebarBadges();
     }
 
@@ -523,7 +584,8 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                                  int putawayCount,
                                  int stagingCount,
                                  int openOrders,
-                                 int overdueInvoices) {
+                                 int overdueInvoices,
+                                 int adminUpdates) {
     }
 
     private void refreshSidebarBadges() {
@@ -536,9 +598,12 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         final boolean hasStaging = navButtons.containsKey(VIEW_STAGING);
         final boolean hasOrders = navButtons.containsKey(VIEW_ORDERS);
         final boolean hasInvoices = navButtons.containsKey(VIEW_INVOICES);
+        final boolean hasAdmin = navButtons.containsKey(VIEW_ADMIN) && ctx.getSession().isAdmin();
         final boolean isForklift = ctx.getSession().isForklift();
 
         AsyncUiRunner.runLatest("mainframe.badges", null, () -> {
+            int adminUpdates = hasAdmin ? ctx.getNotificationService().checkTranslationUpdate(me,
+                    ctx.getI18n().externalSourceStatus(ctx.getPreferences().getExternalTranslationsPath()), ctx.getI18n()) : 0;
             int unreadNotifs = ctx.getNotificationService().countUnread(me.id());
             int unreadEmails = ctx.getEmailService().countUnreadInbox(me.id());
             int unreadMessages = ctx.getChatService().countTotalUnread(me.id());
@@ -549,21 +614,14 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
                         .filter(t -> !t.completed()).count();
                 todoCount = sysCount + openPersonal;
             }
-            int putawayCount = hasPutaway ? ctx.getTransportService().findPutawayQueue().size() : 0;
-            int stagingCount = 0;
-            if (hasStaging) {
-                Long driverFilter = isForklift ? me.id() : null;
-                stagingCount = (int) ctx.getTransportService().findOrderStagingTasksForDriver(driverFilter).stream()
-                        .filter(t -> !t.isAtDispatchZone()).count();
-            }
+            int putawayCount = hasPutaway ? ctx.getPackageDao().countPutawayQueue() : 0;
+            int stagingCount = hasStaging
+                    ? ctx.getTransportService().countPendingStaging(isForklift ? me.id() : null) : 0;
             int openOrders = hasOrders ? ctx.getOrderDao().countOpenOrders() : 0;
-            int overdueInvoices = hasInvoices
-                    ? (int) ctx.getInvoiceDao().findAll().stream()
-                            .filter(inv -> inv.status() == hu.due.rewear.model.InvoiceStatus.OVERDUE).count()
-                    : 0;
+            int overdueInvoices = hasInvoices ? ctx.getInvoiceDao().countOverdue() : 0;
             return new BadgeSnapshot(
                     unreadNotifs, unreadEmails, unreadMessages,
-                    todoCount, putawayCount, stagingCount, openOrders, overdueInvoices);
+                    todoCount, putawayCount, stagingCount, openOrders, overdueInvoices, adminUpdates);
         }, snap -> {
             if (!ctx.getSession().isAuthenticated()) {
                 return;
@@ -579,6 +637,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
             setNavBadge(VIEW_NOTIFICATIONS, snap.unreadNotifications());
             setNavBadge(VIEW_EMAIL, snap.unreadEmails());
             setNavBadge(VIEW_MESSAGES, snap.unreadMessages());
+            setNavBadge(VIEW_ADMIN, snap.adminUpdates());
             if (hasTodo) {
                 setNavBadge(VIEW_TODO, snap.todoCount());
             }
@@ -745,6 +804,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         brandPanel.setBackground(ThemeManager.bg());
         brandLogoLabel.setIcon(LogoAssets.logoIcon(sidebarCollapsed ? 42 : 52, dark));
         navList.setBackground(ThemeManager.bg());
+        navScroll.getViewport().setBackground(ThemeManager.bg());
         sidebarFooter.setBackground(ThemeManager.bg());
         sidebar.setBorder(BrutalistStyle.hairlineRightRule(14, sidebarCollapsed ? 10 : 12));
 
@@ -764,14 +824,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
 
         topBar.setBackground(ThemeManager.bg());
         activeViewTitleLabel.setForeground(ThemeManager.fg());
-        topBar.setBorder(BorderFactory.createCompoundBorder(
-                BorderFactory.createMatteBorder(0, 0, 2, 0, ThemeManager.border()),
-                BorderFactory.createEmptyBorder(12, 18, 12, 18)
-        ));
-
-        statusBar.setBackground(ThemeManager.bg());
-        statusBar.setBorder(BrutalistStyle.hairlineTopRule(5, 14));
-        statusBarLabel.setForeground(ThemeManager.muted());
+        topBar.setBorder(BrutalistStyle.hairlineBottomRule(12, 18));
 
         updateNavButtonStyles();
         refreshSidebarBadges();
@@ -781,13 +834,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         }
     }
 
-    public void setStatusMessage(String message) {
-        java.nio.file.Path dbPath = ctx.getDatabaseManager().getDatabasePath();
-        statusBarLabel.setText(message.toUpperCase(Locale.ROOT)
-                + "  //  DB: ./data/" + dbPath.getFileName());
-        statusBarLabel.setToolTipText(dbPath.toString());
-    }
-
     private void performBackgroundAutoRefresh() {
         if (!isVisible() || !isActive() || !ctx.getSession().isAuthenticated()) {
             return;
@@ -795,7 +841,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         refreshSidebarBadges();
         if (currentViewKey != null && views.containsKey(currentViewKey)) {
             switch (currentViewKey) {
-                case VIEW_NOTIFICATIONS, VIEW_TODO, VIEW_PUTAWAY, VIEW_STAGING, VIEW_EMAIL, VIEW_MESSAGES ->
+                case VIEW_NOTIFICATIONS, VIEW_SORTING, VIEW_TODO, VIEW_PUTAWAY, VIEW_STAGING, VIEW_EMAIL, VIEW_MESSAGES ->
                         views.get(currentViewKey).refreshData();
                 default -> { }
             }
@@ -827,7 +873,6 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         if (currentViewKey != null && views.containsKey(currentViewKey)) {
             activeViewTitleLabel.setText(i18n.t(views.get(currentViewKey).getTitleI18nKey()).toUpperCase(Locale.ROOT));
         }
-        setStatusMessage(i18n.t("app.ready"));
     }
 
     @Override

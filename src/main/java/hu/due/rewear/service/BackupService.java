@@ -39,22 +39,29 @@ public final class BackupService {
      * Creates a consistent, compacted standalone copy of the active SQLite database.
      */
     public void backupDatabase(Path destinationPath) throws IOException {
-        Path absTarget = destinationPath.toAbsolutePath();
-        if (absTarget.equals(db.getDatabasePath())) {
+        Path absTarget = destinationPath.toAbsolutePath().normalize();
+        Path activeDatabase = db.getDatabasePath().normalize();
+        if (absTarget.equals(activeDatabase) || (Files.exists(absTarget) && Files.isSameFile(absTarget, activeDatabase))) {
             throw new IllegalArgumentException("Backup destination cannot overwrite the active database file.");
         }
         if (absTarget.getParent() != null) {
             Files.createDirectories(absTarget.getParent());
         }
-        Files.deleteIfExists(absTarget);
-
-        String escaped = absTarget.toString().replace("'", "''");
-        try (Connection conn = db.getConnection();
-             Statement stmt = conn.createStatement()) {
-            stmt.execute("VACUUM INTO '" + escaped + "'");
+        Path stagingDirectory = Files.createTempDirectory(absTarget.getParent(), ".rewear-backup-");
+        Path snapshot = stagingDirectory.resolve("snapshot.db");
+        try {
+            String escaped = snapshot.toString().replace("'", "''");
+            try (Connection conn = db.getConnection();
+                 Statement stmt = conn.createStatement()) {
+                stmt.execute("VACUUM INTO '" + escaped + "'");
+            } catch (SQLException e) {
+                throw new IOException("Database backup failed: " + e.getMessage(), e);
+            }
+            Files.move(snapshot, absTarget, StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING);
             LOG.info("SQLite database backed up to {}", absTarget);
-        } catch (SQLException e) {
-            throw new IOException("Database backup failed: " + e.getMessage(), e);
+        } finally {
+            Files.deleteIfExists(snapshot);
+            Files.deleteIfExists(stagingDirectory);
         }
     }
 

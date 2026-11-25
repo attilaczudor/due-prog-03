@@ -144,35 +144,41 @@ public final class InventoryService {
         if (actorRole == RoleCode.OPERATOR && location.locationType() != LocationType.OPERATOR_STATION) {
             throw new IllegalArgumentException("Operators can only place new packages at an OPERATOR_STATION.");
         }
-        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
-        List<Long> createdIds = db.executeInTransaction(conn -> {
-            List<Long> ids = new ArrayList<>(previews.size());
-            Set<String> batchCodes = new HashSet<>();
-            for (InventoryPackage p : previews) {
-                String qr = p.qrCode();
-                if (batchCodes.contains(qr) || packageDao.existsByQrCode(conn, qr)) {
-                    qr = codeService.generateUniqueCode(now, p.targetGroupCode(), p.garmentTypeCode(),
-                            p.qualityGradeCode(), p.packageTypeCode(), p.weightKg(),
-                            c -> {
-                                try {
-                                    return batchCodes.contains(c) || packageDao.existsByQrCode(conn, c);
-                                } catch (SQLException e) {
-                                    throw new DaoException("Failed checking QR uniqueness", e);
-                                }
-                            });
-                }
-                batchCodes.add(qr);
-                String hex = qr.substring(qr.length() - 2);
-                long id = packageDao.insert(conn, qr,
-                        p.targetGroupId(), p.garmentTypeId(), p.qualityGradeId(), p.packageTypeId(),
-                        location.id(), p.weightKg(), hex, PackageStatus.IN_STOCK, p.notes(), userId, now);
-                movementDao.insert(conn, id, MovementType.INTAKE, null, location.id(), userId,
-                        p.notes() != null ? p.notes() : "Initial package intake", now);
-                ids.add(id);
-            }
-            return ids;
-        });
+        List<Long> createdIds = db.executeInTransaction(conn -> insertPreviewedPackages(conn, previews, location, userId));
+        return finishIntake(createdIds, location, userId);
+    }
 
+    List<Long> insertPreviewedPackages(java.sql.Connection conn, List<InventoryPackage> previews,
+                                      WarehouseLocation location, long userId) throws SQLException {
+        LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
+        List<Long> ids = new ArrayList<>(previews.size());
+        Set<String> batchCodes = new HashSet<>();
+        for (InventoryPackage p : previews) {
+            String qr = p.qrCode();
+            if (batchCodes.contains(qr) || packageDao.existsByQrCode(conn, qr)) {
+                qr = codeService.generateUniqueCode(now, p.targetGroupCode(), p.garmentTypeCode(),
+                        p.qualityGradeCode(), p.packageTypeCode(), p.weightKg(),
+                        c -> {
+                            try {
+                                return batchCodes.contains(c) || packageDao.existsByQrCode(conn, c);
+                            } catch (SQLException e) {
+                                throw new DaoException("Failed checking QR uniqueness", e);
+                            }
+                        });
+            }
+            batchCodes.add(qr);
+            String hex = qr.substring(qr.length() - 2);
+            long id = packageDao.insert(conn, qr,
+                    p.targetGroupId(), p.garmentTypeId(), p.qualityGradeId(), p.packageTypeId(),
+                    location.id(), p.weightKg(), hex, PackageStatus.IN_STOCK, p.notes(), userId, now);
+            movementDao.insert(conn, id, MovementType.INTAKE, null, location.id(), userId,
+                    p.notes() != null ? p.notes() : "Initial package intake", now);
+            ids.add(id);
+        }
+        return ids;
+    }
+
+    List<InventoryPackage> finishIntake(List<Long> createdIds, WarehouseLocation location, long userId) {
         List<InventoryPackage> saved = new ArrayList<>(createdIds.size());
         for (Long id : createdIds) {
             packageDao.findById(id).ifPresent(saved::add);
@@ -343,31 +349,34 @@ public final class InventoryService {
      * SQLite transaction, rejecting the batch if any package is already {@code SHIPPED} or {@code DISCARDED}.
      */
     public int relocatePackages(List<Long> packageIds, long newLocationId, String note, long userId) {
+        return db.executeInTransaction(conn -> relocatePackages(conn, packageIds, newLocationId, note, userId));
+    }
+
+    int relocatePackages(Connection conn, List<Long> packageIds, long newLocationId, String note, long userId)
+            throws SQLException {
         if (packageIds == null || packageIds.isEmpty()) {
             return 0;
         }
         LocalDateTime now = LocalDateTime.now();
         String auditNote = note != null && !note.isBlank() ? note.trim() : "Bulk relocated via warehouse app";
-        return db.executeInTransaction(conn -> {
-            int moved = 0;
-            for (Long packageId : packageIds) {
-                if (packageId == null) continue;
-                InventoryPackage pkg = packageDao.findById(conn, packageId)
-                        .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
-                if (pkg.status() == PackageStatus.SHIPPED || pkg.status() == PackageStatus.DISCARDED) {
-                    throw new IllegalStateException("Cannot relocate package " + pkg.qrCode()
-                            + " with status: " + pkg.status());
-                }
-                if (pkg.locationId() == newLocationId) {
-                    continue;
-                }
-                packageDao.updateLocation(conn, packageId, newLocationId, now);
-                movementDao.insert(conn, packageId, MovementType.RELOCATE,
-                        pkg.locationId(), newLocationId, userId, auditNote, now);
-                moved++;
+        int moved = 0;
+        for (Long packageId : packageIds) {
+            if (packageId == null) continue;
+            InventoryPackage pkg = packageDao.findById(conn, packageId)
+                    .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
+            if (pkg.status() == PackageStatus.SHIPPED || pkg.status() == PackageStatus.DISCARDED) {
+                throw new IllegalStateException("Cannot relocate package " + pkg.qrCode()
+                        + " with status: " + pkg.status());
             }
-            return moved;
-        });
+            if (pkg.locationId() == newLocationId) {
+                continue;
+            }
+            packageDao.updateLocation(conn, packageId, newLocationId, now);
+            movementDao.insert(conn, packageId, MovementType.RELOCATE,
+                    pkg.locationId(), newLocationId, userId, auditNote, now);
+            moved++;
+        }
+        return moved;
     }
 
     public void verifyStocktake(long packageId, String note, long userId) {
@@ -387,13 +396,16 @@ public final class InventoryService {
     }
 
     public InventoryPackage discardPackage(long packageId, String note, long userId) {
-        InventoryPackage pkg = packageDao.findById(packageId)
-                .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
-        if (pkg.status() == PackageStatus.SHIPPED) {
-            throw new IllegalStateException("Cannot discard an already shipped package.");
-        }
         LocalDateTime now = LocalDateTime.now();
         db.runInTransaction(conn -> {
+            InventoryPackage pkg = packageDao.findById(conn, packageId)
+                    .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
+            if (pkg.status() == PackageStatus.DISCARDED) {
+                return;
+            }
+            if (pkg.status() != PackageStatus.IN_STOCK) {
+                throw new IllegalStateException("Release the package from its order before discarding it.");
+            }
             packageDao.updateStatus(conn, packageId, PackageStatus.DISCARDED, now);
             movementDao.insert(
                     conn,
@@ -441,6 +453,16 @@ public final class InventoryService {
         String finalQr = db.executeInTransaction(conn -> {
             InventoryPackage existing = packageDao.findById(conn, packageId)
                     .orElseThrow(() -> new IllegalArgumentException("Package not found: " + packageId));
+            boolean allocated = existing.status() == PackageStatus.RESERVED || existing.status() == PackageStatus.SHIPPED;
+            if (status != existing.status()
+                    && (allocated || status == PackageStatus.RESERVED || status == PackageStatus.SHIPPED)) {
+                throw new IllegalStateException("Change the package's reservation or shipment through its order.");
+            }
+            if (allocated && (weightKg.compareTo(existing.weightKg()) != 0
+                    || targetGroup.id() != existing.targetGroupId() || garmentType.id() != existing.garmentTypeId()
+                    || qualityGrade.id() != existing.qualityGradeId() || packageType.id() != existing.packageTypeId())) {
+                throw new IllegalStateException("Release the package from its order before changing its label or weight.");
+            }
 
             LocalDateTime entryTime = existing.createdAt() != null ? existing.createdAt() : now;
             String preferredQr = codeService.buildCode(

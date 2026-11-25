@@ -223,6 +223,7 @@ public final class ProfileSettingsDialog extends JDialog
         lastNameField.getDocument().addDocumentListener(nameSync);
         firstNameField.getDocument().addDocumentListener(nameSync);
         emailField.setText(user.email() != null ? user.email() : "");
+        emailField.setEditable(false);
         phoneField.setText(user.phone() != null ? user.phone() : "");
 
         GridBagConstraints gbc = new GridBagConstraints();
@@ -476,6 +477,7 @@ public final class ProfileSettingsDialog extends JDialog
         lastNameLbl.setText(i18n.t("profile.last_name") + ":");
         firstNameLbl.setText(i18n.t("profile.first_name") + ":");
         emailLbl.setText(i18n.t("profile.email") + ":");
+        emailField.setToolTipText(i18n.t("profile.email.managed"));
         phoneLbl.setText(i18n.t("profile.phone") + ":");
 
         appearanceTitleLbl.setText(i18n.t("profile.appearance.section").toUpperCase(Locale.ROOT));
@@ -586,7 +588,7 @@ public final class ProfileSettingsDialog extends JDialog
                 full.isEmpty() ? current.fullName() : full,
                 ln.isEmpty() ? current.safeLastName() : ln,
                 fn.isEmpty() ? current.safeFirstName() : fn,
-                emailField.getText(), phoneField.getText(), pendingAvatarPng,
+                current.email(), phoneField.getText(), pendingAvatarPng,
                 current.roleId(), current.roleCode(), current.roleName(), current.active(), current.createdAt());
         avatarPreview.setUserAppearance(temp.initials(), pendingAvatarPng);
         removePhotoBtn.setEnabled(pendingAvatarPng != null && pendingAvatarPng.length > 0);
@@ -642,7 +644,6 @@ public final class ProfileSettingsDialog extends JDialog
                     handleField.getText().trim(),
                     lastName,
                     firstName,
-                    emailField.getText().trim(),
                     phoneField.getText().trim(),
                     pendingAvatarPng,
                     newRoleId

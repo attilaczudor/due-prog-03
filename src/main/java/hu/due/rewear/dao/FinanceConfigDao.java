@@ -290,12 +290,15 @@ public final class FinanceConfigDao {
                 SELECT 1 FROM invoices WHERE upper(currency) = upper(?)
                 UNION ALL
                 SELECT 1 FROM orders WHERE upper(currency) = upper(?)
+                UNION ALL
+                SELECT 1 FROM bank_accounts WHERE currency = upper(?)
                 LIMIT 1
                 """;
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, code);
             ps.setString(2, code);
+            ps.setString(3, code);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }

@@ -48,13 +48,8 @@ out/
 .settings/
 .vscode/
 
-# Local runtime database, preferences & generated exports/backups
-data/*.db
-data/*.db-journal
-data/*.db-wal
-data/*.db-shm
-data/app.properties
-data/receipts/
+# Local runtime data, preferences, document archives, exports and backups
+/data/
 .runtime/
 *.sqlite
 *.sqlite3
@@ -64,7 +59,7 @@ backups/
 # Local planning files (not tracked in public repo)
 PRD.md
 PHASES_AND_TASKS.md
-HANDOVER.md
+/HANDOVER.md
 ASSIGNMENT_AND_DOCS_BRIEF.md
 graphify-out/
 .agents/
