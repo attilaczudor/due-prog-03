@@ -863,3 +863,17 @@ role.PRODUCTION_LEAD,Production Manager,Termelési vezető
 role.SHIFT_LEAD,Shift Leader,Műszakvezető
 role.HR_PAYROLL,HR and Payroll,Bérszámfejtés és HR
 nav.rota,Rota,Beosztás
+rota.scale.month,Month,Hónap
+rota.scale.week,Week,Hét
+rota.scale.day,Day,Nap
+rota.today,Today,Ma
+rota.plan,Plan shift,Műszak beosztása
+rota.worker,Worker,Dolgozó
+rota.shift,Shift,Műszak
+rota.shift.MORNING,Morning,Délelőtt
+rota.shift.AFTERNOON,Afternoon,Délután
+rota.shift.NIGHT,Night,Éjszaka
+rota.shift.OFF,Off,Szabadnap
+rota.summary.month,"{0} shifts planned this month","{0} beosztott műszak ebben a hónapban"
+rota.summary.week,"{0} shifts planned this week","{0} beosztott műszak ezen a héten"
+rota.summary.day,"{0} working, {1} off","{0} dolgozik, {1} szabadnapos"

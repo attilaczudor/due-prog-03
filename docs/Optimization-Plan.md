@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -544,6 +544,49 @@ with raw supply.
   the area as free text. If drivers should log in and record their own collections, that is a separate change.
 - A delivery still comes from exactly one line.
 - The screens were checked by compiling and by service tests, not by clicking through them.
+
+---
+
+## Pass 11 — company roles and the shift rota (25 November 2026)
+
+### Roles
+
+The company now has a hierarchy rather than a flat list. New: **PRODUCTION_LEAD** (termelési vezető) over the
+sorting operation, **SHIFT_LEAD** (műszakvezető) under them for one shift, and **HR_PAYROLL** for pay, rota and
+worker records. The single **FORKLIFT** role split in two, because one role was doing two different jobs and the
+code could only tell them apart by looking at team and order assignments:
+
+- **SUPPLY_DRIVER** (alapanyag-targoncás) serves the sorting floor in both directions: stores arriving
+  collections, delivers raw material to the stations, and takes finished labelled packages to the shelves.
+- **DELIVERY_DRIVER** (kiszállítási targoncás) serves customer orders: collecting to the dock and loading.
+
+A one-off migration renames the old role (so its module permissions carry over) and moves each driver by what
+they actually did: supplying a sorting team keeps the supply job, everyone else becomes a delivery driver. It is
+guarded so it never runs twice, which a mutation check confirms. Module defaults follow the hierarchy: money
+stays with management, payroll with HR and the administrators, reference data with the production lead.
+
+### Rota
+
+A new **ROTA** module and top-level menu with month, week and day calendar views. A shift is one person's day,
+including a planned rest day, so `rota_shifts` has `UNIQUE (user_id, work_day)` and planning the same day again
+corrects it. The planning roles see and write the whole company; everyone else sees their own days read-only.
+The demo workspace is filled with a month of shifts that rotate weekly through morning, afternoon and night for
+the real sorters, helpers, station manager and drivers, with weekends off for most and a small night crew.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **145 / 145** across 40 classes (+3 `RoleHierarchyTest`, +5
+`RotaServiceTest`, +1 `RotaViewTest`). The rota view is painted to an image in the test and checked for actual
+ink, which caught a first version that laid out only its top level and rendered nearly blank. The month and week
+views were also rendered to PNG and looked at.
+
+### Not done
+
+- The rota has no shift templates per team, no copy-last-week, and no conflict rules beyond one shift per day.
+- The calendar is read and planned from the same screen; there is no printable rota sheet yet.
+- The primary "Plan shift" button does not paint its background in an offscreen render; its text and colours
+  were checked directly and are correct, and the real application paints primary buttons normally.
+- Transit drivers are still not users; collections are recorded by management with the area as free text.
 
 ---
 

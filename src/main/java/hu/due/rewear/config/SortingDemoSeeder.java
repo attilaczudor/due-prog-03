@@ -11,12 +11,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
 final class SortingDemoSeeder {
     private static final String SEED_KEY = "demo.sorting.seeded";
-    private static final String CURRENT_VERSION = "3";
+    private static final String CURRENT_VERSION = "4";
     private static final Person FULFILMENT_DRIVER = new Person("Kelemen", "Ádám");
     private static final List<Person> HELPERS = List.of(
             new Person("Szűcs", "Bálint"),
@@ -68,6 +69,7 @@ final class SortingDemoSeeder {
             // Sequential steps, so a workspace seeded at any earlier version ends up current.
             if ("1".equals(version)) upgradeLegacyNames();
             upgradeRawLots();
+            upgradeRota();
             return;
         }
         var stationManager = users.findByUsername("operator");
@@ -131,6 +133,7 @@ final class SortingDemoSeeder {
                 }
             }
             seedRawLots(conn, manager.get().id());
+            seedRota(conn, manager.get().id());
         });
     }
 
@@ -189,6 +192,55 @@ final class SortingDemoSeeder {
         }
     }
 
+    /**
+     * A month of shifts around today for the people who actually work them, so the calendar has something to
+     * show in a demo. Floor roles rotate through morning, afternoon and night by position in the roster; the
+     * weekend is a rest day for most, with a small night crew kept on.
+     */
+    private static void seedRota(java.sql.Connection conn, long plannerId) throws SQLException {
+        record Worker(long id, String role) { }
+        var workers = new ArrayList<Worker>();
+        try (var ps = conn.prepareStatement("""
+                SELECT u.id, r.code FROM users u JOIN roles r ON r.id=u.role_id
+                WHERE u.active=1 AND r.code IN ('SORTER','SORTING_HELPER','OPERATOR','SUPPLY_DRIVER',
+                                                'DELIVERY_DRIVER','SHIFT_LEAD','PRODUCTION_LEAD')
+                ORDER BY r.code, u.id
+                """); var rows = ps.executeQuery()) {
+            while (rows.next()) workers.add(new Worker(rows.getLong(1), rows.getString(2)));
+        }
+        if (workers.isEmpty()) return;
+
+        var today = BusinessClock.today();
+        var from = today.minusDays(10);
+        String stamp = hu.due.rewear.dao.DaoDateUtil.format(BusinessClock.now());
+        String[] shifts = {"MORNING", "AFTERNOON", "NIGHT"};
+        int[][] hours = {{6 * 60, 14 * 60}, {14 * 60, 22 * 60}, {22 * 60, 6 * 60}};
+        try (var ps = conn.prepareStatement("""
+                INSERT OR IGNORE INTO rota_shifts(user_id,work_day,shift_code,start_minute,end_minute,note,created_by,created_at)
+                VALUES (?,?,?,?,?,NULL,?,?)
+                """)) {
+            for (int dayOffset = 0; dayOffset < 31; dayOffset++) {
+                var day = from.plusDays(dayOffset);
+                boolean weekend = day.getDayOfWeek().getValue() >= 6;
+                for (int i = 0; i < workers.size(); i++) {
+                    Worker worker = workers.get(i);
+                    // Each person moves to the next shift every week, so the pattern looks like a real rotation.
+                    int slot = (i + dayOffset / 7) % shifts.length;
+                    boolean resting = weekend && (i + dayOffset) % 4 != 0;
+                    ps.setLong(1, worker.id());
+                    ps.setString(2, day.toString());
+                    ps.setString(3, resting ? "OFF" : shifts[slot]);
+                    ps.setInt(4, resting ? 0 : hours[slot][0]);
+                    ps.setInt(5, resting ? 0 : hours[slot][1]);
+                    ps.setLong(6, plannerId);
+                    ps.setString(7, stamp);
+                    ps.addBatch();
+                }
+            }
+            ps.executeBatch();
+        }
+    }
+
     private String seedVersion() {
         try (var conn = db.getConnection();
              var ps = conn.prepareStatement("SELECT setting_value FROM app_settings WHERE setting_key = ?")) {
@@ -199,6 +251,22 @@ final class SortingDemoSeeder {
         }
     }
 
+    /** Gives an existing demo workspace a month of shifts, without touching anything else. */
+    private void upgradeRota() {
+        var manager = users.findByUsername("manager");
+        if (manager.isEmpty()) return;
+        db.runInTransaction(conn -> {
+            try (var marker = conn.prepareStatement("""
+                    UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '3'
+                    """)) {
+                marker.setString(1, CURRENT_VERSION);
+                marker.setString(2, SEED_KEY);
+                if (marker.executeUpdate() != 1) return;
+            }
+            seedRota(conn, manager.get().id());
+        });
+    }
+
     /** Gives an existing demo workspace the collection lines, without touching anything else. */
     private void upgradeRawLots() {
         var manager = users.findByUsername("manager");
@@ -207,7 +275,7 @@ final class SortingDemoSeeder {
             try (var marker = conn.prepareStatement("""
                     UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '2'
                     """)) {
-                marker.setString(1, CURRENT_VERSION);
+                marker.setString(1, "3");
                 marker.setString(2, SEED_KEY);
                 if (marker.executeUpdate() != 1) return;
             }

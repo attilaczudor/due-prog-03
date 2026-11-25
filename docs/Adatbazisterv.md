@@ -2,7 +2,7 @@
 
 **Adatbázis-kezelő rendszer:** Beágyazott SQLite 3 (JDBC `sqlite-jdbc`, `PRAGMA foreign_keys = ON`)  
 **Séma fájl:** `src/main/resources/db/schema.sql`  
-**Séma:** **42 alkalmazástábla**, **24 név szerint deklarált index** és a kulcsmegszorítások SQLite-indexei
+**Séma:** **43 alkalmazástábla**, **25 név szerint deklarált index** és a kulcsmegszorítások SQLite-indexei
 
 ---
 
@@ -15,7 +15,7 @@ Az alkalmazástáblák tíz logikai csoportot alkotnak.
 3. **QR kódtörzsek — dinamikus szótártáblák (4 tábla):** `target_groups`, `garment_types`, `quality_grades`, `package_types` *(közvetlenül leképezik a QR termékkód szegmenseit és az alapértelmezett EUR/HUF kilónkénti árakat)*
 4. **Raktárkészlet és mozgásnapló (3 tábla):** `warehouse_locations`, `inventory_packages`, `stock_movements`
 5. **B2B partnerek, rendelések, átadás és többdevizás számlázás (8 tábla):** `customers`, `orders`, `order_requested_products`, `order_webshop_references`, `order_items`, `invoices`, `invoice_items`, `invoice_events`
-6. **Vállalati kommunikáció, értesítések és teendők (6 tábla):** `emails`, `chat_rooms`, `chat_room_members`, `chat_messages`, `notifications`, `user_todos`
+6. **Vállalati kommunikáció, értesítések, teendők és beosztás (7 tábla):** `rota_shifts`, `emails`, `chat_rooms`, `chat_room_members`, `chat_messages`, `notifications`, `user_todos`
 7. **Felhasználónként mentett számla- és e-mail-szűrések (2 tábla):** `smart_folders`, `smart_folder_rules`
 8. **Kézi és demó banki nyilvántartás (2 tábla):** `bank_accounts`, `bank_transactions`
 9. **Válogatás (7 tábla, nyersanyag-tételekkel):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
@@ -306,6 +306,24 @@ Az állapotváltás és a hozzá tartozó esemény ugyanabban a tranzakcióban m
 
 ---
 
+### 3.43 `rota_shifts` (Műszakbeosztás)
+| Oszlop | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Egyedi azonosító |
+| `user_id` | `INTEGER` | `NOT NULL FK -> users(id) ON DELETE CASCADE` | A beosztott dolgozó |
+| `work_day` | `TEXT` | `NOT NULL` | A munkanap (ISO dátum) |
+| `shift_code` | `TEXT` | `CHECK ('MORNING','AFTERNOON','NIGHT','OFF')` | Délelőtt, délután, éjszaka vagy szabadnap |
+| `start_minute`, `end_minute` | `INTEGER` | `NOT NULL CHECK (0..1439)` | A műszak kezdete és vége percben, így egyedi időpont is beosztható |
+| `note` | `TEXT` | `NULL` | Megjegyzés (pl. helyettesítés) |
+| `created_by` | `INTEGER` | `NULL FK -> users(id) ON DELETE SET NULL` | Ki osztotta be |
+| `created_at` | `TEXT` | `NOT NULL` | Mikor |
+| *(egyedi)* | `UNIQUE` | `UNIQUE (user_id, work_day)` | Egy dolgozónak naponta egy beosztása van |
+
+A szabadnap is beosztás (`OFF`), nem hiányzó sor, így a pihenőnap tervezett és látható. Az éjszakai műszak
+a `start_minute > end_minute` esetben átnyúlik a következő napra. Indexe: `idx_rota_shifts_day`.
+
+---
+
 ## 4. Normalizálás igazolása (1NF → 2NF → 3NF)
 
 - **Első normálforma (1NF):** Minden attribútum atomi értéket tartalmaz (a raktárhely `zone`, `aisle`, `shelf` mezőkre bontott, a rendelési tételek az `order_items`, a számlasorok az `invoice_items`, a chatszoba-tagságok a `chat_room_members`, a modul-szabályok pedig a `role_module_permissions` kapcsolótáblában élnek). Minden tábla rendelkezik egyértelmű elsődleges kulccsal.
@@ -320,7 +338,7 @@ Az állapotváltás és a hozzá tartozó esemény ugyanabban a tranzakcióban m
 
 ## 5. Indexek, tranzakciók és adatbiztonság
 
-- **24 deklarált index:** Gyorsítják a készlet, mozgásnapló, rendelések, számlák, üzenetek, értesítések, teendők, válogatási naplók és banki tranzakciók lekérdezéseit. A `idx_sorting_bag_inventory` egyediséget is biztosít a készlethez kapcsolt válogatott csomagokra, az `idx_invoice_events_invoice` pedig a számlák előzményeit gyorsítja.
+- **25 deklarált index:** Gyorsítják a készlet, mozgásnapló, rendelések, számlák, üzenetek, értesítések, teendők, válogatási naplók és banki tranzakciók lekérdezéseit. A `idx_sorting_bag_inventory` egyediséget is biztosít a készlethez kapcsolt válogatott csomagokra, az `idx_invoice_events_invoice` pedig a számlák előzményeit gyorsítja.
 - **Tranzakciókezelés:** Minden összetett üzleti művelet (csomagfelvétel + `INTAKE`, kötegelt áthelyezés, targoncás komissiózás, ellenőrzött vevői kiadás + `SHIP`, számla + tételek + jóváíró számla, számlaállapot-váltás + naplóbejegyzés) atomi tranzakcióban fut a `DatabaseManager.runInTransaction(...)` segítségével egyetlen megosztott JDBC kapcsolaton.
 - **Kiadás és bizonylatok:** Az összekészítés egy tranzakcióban frissíti a csomag helyét, a mozgásnaplót és a rendelés állapotát. A bizonylattár csak a teljes fájl másolása után cseréli le a számla fájlhivatkozását.
 - **Hivatkozási védelem és hordozható mentés:** `PRAGMA foreign_keys = ON` + `DictionaryDao` használat-ellenőrzés; rollback-journal mód + `BackupService` (`VACUUM INTO`) egyetlen hordozható `.db` mentési fájllal és visszaállítás előtti `.db.bak` biztonsági másolattal.

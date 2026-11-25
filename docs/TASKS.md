@@ -22,6 +22,8 @@
 
 - [x] Give the company a role hierarchy: production manager and shift leader above the floor, an HR/payroll role, and the single forklift role split into supply (sorting floor) and delivery (customer orders). Menus follow from the role.
 
+- [x] Add the shift rota as its own main menu with month, week and day calendar views, written by the planning roles and visible to everyone for their own days. The demo workspace is filled with a month of rotating shifts.
+
 ## Next session
 
 - [ ] Click through what was only compiled or painted, not seen: the first-time setup dialog, the invoice dialog (history table, disabled buttons, status drop-down), the Pick list button and printed layout, the mail attachment open flow, and the Admin backup and restore buttons.

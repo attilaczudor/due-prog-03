@@ -293,6 +293,21 @@ CREATE TABLE IF NOT EXISTS invoice_events (
 );
 CREATE INDEX IF NOT EXISTS idx_invoice_events_invoice ON invoice_events(invoice_id);
 
+-- 14c. Shift rota: who works which shift on which day
+CREATE TABLE IF NOT EXISTS rota_shifts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    work_day TEXT NOT NULL,
+    shift_code TEXT NOT NULL CHECK (shift_code IN ('MORNING', 'AFTERNOON', 'NIGHT', 'OFF')),
+    start_minute INTEGER NOT NULL CHECK (start_minute BETWEEN 0 AND 1439),
+    end_minute INTEGER NOT NULL CHECK (end_minute BETWEEN 0 AND 1439),
+    note TEXT,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TEXT NOT NULL,
+    UNIQUE (user_id, work_day)
+);
+CREATE INDEX IF NOT EXISTS idx_rota_shifts_day ON rota_shifts(work_day);
+
 -- 15. User Email Mailboxes (External SMTP/IMAP & Internal Company Mail)
 CREATE TABLE IF NOT EXISTS emails (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
