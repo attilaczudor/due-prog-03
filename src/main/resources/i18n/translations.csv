@@ -830,3 +830,9 @@ setup.restore,Restore from a backup…,Visszaállítás mentésből…
 setup.restore.empty,"That backup contains no user accounts, so nobody could sign in. Choose another file.","Ez a mentés nem tartalmaz felhasználói fiókot, így senki nem tudna belépni. Válasszon másik fájlt."
 setup.quit,Quit,Kilépés
 setup.error.mismatch,The two passwords do not match.,A két jelszó nem egyezik.
+picklist.title,Pick list,Szedési lista
+picklist.btn,Pick list,Szedési lista
+picklist.collected,Collected {0} of {1} packages ({2}%),{0} / {1} csomag összeszedve ({2}%)
+picklist.remaining_weight,Still to collect: {0} kg,Még összeszedendő: {0} kg
+picklist.empty,Nothing to collect.,Nincs összeszedendő csomag.
+picklist.nothing,"There is nothing to pick. An order needs reserved packages, and a scheduled order also needs an assigned driver and dock.","Nincs mit összeszedni. A rendeléshez foglalt csomagok kellenek, az ütemezett rendeléshez pedig kijelölt sofőr és kiadó zóna is."

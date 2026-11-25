@@ -35,6 +35,8 @@ import hu.due.rewear.service.InvoiceService;
 import hu.due.rewear.service.LabelPdfExporter;
 import hu.due.rewear.service.NotificationService;
 import hu.due.rewear.service.OnboardingService;
+import hu.due.rewear.service.PickListPdfExporter;
+import hu.due.rewear.service.PickListService;
 import hu.due.rewear.service.OrderService;
 import hu.due.rewear.service.PayrollService;
 import hu.due.rewear.service.PartnerStatementService;
@@ -119,6 +121,8 @@ public final class AppContext {
     private final RoleModuleService roleModuleService;
     private final BackupService backupService;
     private final OnboardingService onboardingService;
+    private final PickListService pickListService;
+    private final PickListPdfExporter pickListPdfExporter;
 
     public AppContext() {
         this(new DatabaseManager(), new AppPreferences(), I18nManager.getInstance());
@@ -227,6 +231,8 @@ public final class AppContext {
         this.sortingService = new SortingService(databaseManager, session, dictionaryDao, locationDao, inventoryService, packageDao, notificationService, i18n);
         this.payrollService = new PayrollService(databaseManager, session);
         this.payrollService.initializeDepartments();
+        this.pickListService = new PickListService(transportService, locationDao);
+        this.pickListPdfExporter = new PickListPdfExporter(i18n);
         this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao, invoiceDao);
         this.inventoryService.setNotificationService(notificationService);
         this.orderService.setNotificationService(notificationService);
@@ -430,6 +436,14 @@ public final class AppContext {
 
     public BackupService getBackupService() {
         return backupService;
+    }
+
+    public PickListPdfExporter getPickListPdfExporter() {
+        return pickListPdfExporter;
+    }
+
+    public PickListService getPickListService() {
+        return pickListService;
     }
 
     public OnboardingService getOnboardingService() {

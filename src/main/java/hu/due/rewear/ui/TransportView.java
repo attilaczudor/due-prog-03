@@ -69,6 +69,7 @@ public final class TransportView extends JPanel implements NavigableView {
     private final JComboBox<LocChoice> dispatchCombo = new JComboBox<>();
     private final JButton moveToDispatchBtn = new JButton();
     private final JButton loadOrderBtn = new JButton();
+    private final JButton pickListBtn = new JButton();
     private final DefaultTableModel stagingModel = BrutalistStyle.nonEditableTableModel();
     private final JTable stagingTable = new JTable(stagingModel);
     private final JLabel stagingSummaryLabel = new JLabel();
@@ -124,6 +125,7 @@ public final class TransportView extends JPanel implements NavigableView {
             stagingBar.add(dispatchCombo);
             stagingBar.add(moveToDispatchBtn);
             stagingBar.add(loadOrderBtn);
+            stagingBar.add(pickListBtn);
             JPanel stagingHeader = new JPanel(new BorderLayout());
             stagingHeader.add(stagingBar, BorderLayout.NORTH);
             stagingHeader.add(scanFeedbackLabel, BorderLayout.SOUTH);
@@ -143,12 +145,39 @@ public final class TransportView extends JPanel implements NavigableView {
         moveToDispatchBtn.addActionListener(e -> handleMoveToDispatch());
         loadOrderBtn.setEnabled(false);
         loadOrderBtn.addActionListener(e -> verifyVehicleLoading());
+        pickListBtn.addActionListener(e -> showPickList());
         stagingTable.getSelectionModel().addListSelectionListener(e -> {
             int row = TableSorting.selectedModelRow(stagingTable);
             loadOrderBtn.setEnabled(row >= 0 && row < stagingRows.size() && stagingRows.get(row).customerArrived());
         });
         scanCollectField.addActionListener(e -> handleScanCollect());
         scanCollectBtn.addActionListener(e -> handleScanCollect());
+    }
+
+    /**
+     * Opens the pick list for the selected rows' orders, or for everything this user may see when nothing
+     * is selected. A forklift driver only ever sees the orders assigned to them.
+     */
+    private void showPickList() {
+        I18nManager i18n = ctx.getI18n();
+        var selected = new java.util.LinkedHashSet<Long>();
+        for (int viewRow : stagingTable.getSelectedRows()) {
+            int row = stagingTable.convertRowIndexToModel(viewRow);
+            if (row >= 0 && row < stagingRows.size()) {
+                selected.add(stagingRows.get(row).orderId());
+            }
+        }
+        Long driverFilter = ctx.getSession().isForklift() ? ctx.getSession().requireCurrentUser().id() : null;
+        var list = selected.isEmpty()
+                ? ctx.getPickListService().forDriver(driverFilter)
+                : ctx.getPickListService().forOrders(selected);
+        if (list.isEmpty()) {
+            JOptionPane.showMessageDialog(this, i18n.t("picklist.nothing"),
+                    i18n.t("common.warning"), JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        DocumentPreviewDialog.showDocuments(javax.swing.SwingUtilities.getWindowAncestor(this), ctx,
+                List.of(ctx.getPickListPdfExporter().createPageSource(list)), "", i18n.t("picklist.title"));
     }
 
     private void verifyVehicleLoading() {
@@ -352,6 +381,7 @@ public final class TransportView extends JPanel implements NavigableView {
         stagingTargetLabel.setText(i18n.t("transport.target_dock") + ":");
         moveToDispatchBtn.setText(i18n.t("transport.btn.move_dock"));
         loadOrderBtn.setText(i18n.t("orders.load_order"));
+        pickListBtn.setText(i18n.t("picklist.btn"));
         stagingModel.setColumnIdentifiers(new Object[]{
                 i18n.t("orders.order_number"),
                 i18n.t("orders.customer"),
@@ -367,7 +397,7 @@ public final class TransportView extends JPanel implements NavigableView {
     public void applyTheme() {
         BrutalistStyle.stylePrimaryButton(moveToStorageBtn);
         BrutalistStyle.stylePrimaryButton(scanCollectBtn);
-        BrutalistStyle.styleSecondaryButtons(moveToDispatchBtn, loadOrderBtn);
+        BrutalistStyle.styleSecondaryButtons(moveToDispatchBtn, loadOrderBtn, pickListBtn);
         BrutalistStyle.styleTable(putawayTable);
         BrutalistStyle.styleTable(stagingTable);
     }

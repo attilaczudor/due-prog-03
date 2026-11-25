@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -238,8 +238,8 @@ file handling, backup and restore, stock reservation, credit notes and time hand
 ### Documentation numbers to carry into the Hungarian reports
 
 Deferred with the rest of the submission documents, but the figures are now:
-**831** translation keys (reports say 810), **168** main Java sources (Programterv says 161),
-**33** test classes (says 24), **113** tests (says 62), **168** main sources, **831** translation keys (reports say 810; pass 5 added 20).
+**837** translation keys (reports say 810), **170** main Java sources (Programterv says 161),
+**34** test classes (says 24), **120** tests (says 62), **170** main sources, **837** translation keys (reports say 810; passes 5 and 6 added 26).
 
 ---
 
@@ -344,11 +344,54 @@ directory, created a database with 0 users, 0 invoices and all 7 roles.
 
 ---
 
+## Pass 6 — continuous integration and pick lists (25 November 2026)
+
+### CI
+
+- [x] `.github/workflows/ci.yml` runs `./mvnw -B -ntp clean verify` on every push to `main` and on every
+  pull request, on Ubuntu and macOS with JDK 17 (Temurin), headless. Test reports are kept when a run
+  fails, and the jar from the Linux run is kept for seven days.
+- Verified locally: the same command with `-Djava.awt.headless=true` passes (113 run, 1 skipped, the dialog
+  test that needs a display) and the YAML parses. **Not verified:** the workflow itself has not run on
+  GitHub yet, and the Linux and macOS runners may expose differences (fonts, file systems) that this Mac
+  does not. Actions are pinned to major versions, not commit hashes.
+
+### Pick lists
+
+- [x] **`PickListService`.** Built on the open order staging tasks, nothing new is stored. A package counts
+  as collected when it is at the dispatch zone, which is exactly what scanning it for an order does, so
+  progress cannot drift from the real state. Lines still to collect come first in walking order (zone,
+  then aisle, then shelf, then package code); staged ones follow. Numbers inside labels compare by value, so
+  aisle 2 precedes aisle 10. Lists exist for one order, a selection of orders (one walk across several), or
+  every order assigned to a driver; progress is available overall and per order.
+- [x] **`PickListPdfExporter`.** A4 document in the delivery-note style: collected/total and remaining weight,
+  per-order progress, a tick box per package, staged packages crossed out and last. Previewable and
+  printable through the existing document preview.
+- [x] **Order Staging screen.** A "Pick list" button: the selected rows' orders, or everything the user may
+  see when nothing is selected (a forklift driver only ever sees their own orders). Six new translation keys.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **120 / 120** across 34 classes (+7 `PickListServiceTest`). Mutation
+checks: removing "staged last" broke the progress test. The first attempt at the numeric-sort check did
+**not** fail with plain text order, because the test's zero-padded aisles (`02`, `10`) sort correctly as
+text; the test now uses `2` and `10`, and the mutation fails as it should.
+
+### Not done
+
+- The walking route is plain ascending order. It does not alternate direction between aisles (an S-shaped
+  walk) and does not know the physical layout; it assumes labels run in the order a person walks them.
+- The Order Staging button and the printed layout were checked by compiling and painting to an image, not
+  by looking at them on screen.
+- Stocktake sessions and damage/quarantine/reweighing operations are still open.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
 
-- [ ] Picking by order and shelf, with aisle-sorted pick lists and scanned/total progress.
+- [x] Picking by order and shelf, with route-sorted pick lists and collected/total progress — done in pass 6, see below.
 - [ ] Stocktake sessions plus explicit damage, quarantine and reweighing operations.
 - [x] Backup and restore as one validated bundle — done in pass 4, see below.
 - [x] Separate demo seeding from real first-run onboarding — done in pass 5, see below.
