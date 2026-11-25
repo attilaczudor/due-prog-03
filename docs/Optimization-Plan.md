@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes** (details in the Pass 4 section).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -238,8 +238,8 @@ file handling, backup and restore, stock reservation, credit notes and time hand
 ### Documentation numbers to carry into the Hungarian reports
 
 Deferred with the rest of the submission documents, but the figures are now:
-**811** translation keys (reports say 810), **164** main Java sources (Programterv says 161),
-**31** test classes (says 24), **103** tests (says 62), 165 main sources. Translation keys stay at 811.
+**831** translation keys (reports say 810), **168** main Java sources (Programterv says 161),
+**33** test classes (says 24), **113** tests (says 62), **168** main sources, **831** translation keys (reports say 810; pass 5 added 20).
 
 ---
 
@@ -286,6 +286,64 @@ traversal tests, and removing the rollback call broke the post-swap failure test
 
 ---
 
+## Pass 5 — demo workspace vs real company (25 November 2026)
+
+### What was wrong
+
+Demo data was not a first-run choice; it was part of every start, and some of it was a security problem
+for any real installation:
+
+- A schema migration recreated `superadmin` / `superadmin123` on every start whenever that account was
+  missing, so a company's administrator could remove it and it would come back with a public password.
+  Another recreated `forklift` / `forklift123` the same way.
+- The same migration re-added the demo stations and dock on every start, bringing back locations a company
+  had retired.
+- Demo invoices, mail and chat rooms were inserted at every start wherever those tables were empty. A real
+  company with no invoices yet would have woken up with four sample invoices, three mails and three rooms.
+- Demo bank accounts were seeded on every start. The five base roles existed only because the demo seeder
+  created them, so a database without it had no roles at all.
+- The login screen always showed one-click buttons carrying the default passwords.
+
+### Built
+
+- [x] **Roles belong to the schema.** All seven are created with `INSERT OR IGNORE`; no migration creates
+  an account any more. The v2.2 upgrade step now runs only in the run that actually adds its columns.
+- [x] **`OnboardingService`.** A fresh database stays empty until one explicit choice:
+  `startDemoWorkspace()` or `createCompanyWorkspace(...)`. The company path creates one SUPER_ADMIN
+  account in a single transaction, stores the company name, and optionally adds the standard catalogues
+  and a starter shelf layout. Both calls refuse to run on an installation that already has users.
+- [x] **Password and input rules for the company owner.** At least 8 characters and at most 72 bytes
+  (BCrypt ignores the rest), not a published demo password, not a common one, not containing the
+  username; username 3-32 characters of letters, digits, dot, dash, underscore; company name required.
+- [x] **`StarterData`.** The dictionaries and shelf layout moved out of the demo seeder so the demo and a
+  company use one definition of them.
+- [x] **Startup rules.** The application opens with `InitialData.AWAIT_SETUP`; databases that already have
+  users are never topped up with sample records. Tests keep `DEMO_IF_EMPTY` through the 3-argument
+  constructor. Existing demo workspaces still get the sorting-roster upgrade.
+- [x] **Existing databases are classified once.** A database with no recorded mode counts as a demo
+  workspace if any demo account still has its published password, otherwise as a company.
+- [x] **UI.** A first-time setup dialog (company, demo, or restore from a backup) and login quick-fill
+  buttons that appear only in a demo workspace.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **113 / 113** across 33 classes (+9 `OnboardingServiceTest`,
++1 `SetupWizardDialogTest`). Mutation check: putting the old top-up call back made the regression test fail
+with exactly the leak above (4 invoices, 3 mails, 3 chat rooms in a company workspace); disabling the
+forbidden-password check broke the validation test. A scratch copy of the jar, started in an empty
+directory, created a database with 0 users, 0 invoices and all 7 roles.
+
+### Not verified or deliberately left
+
+- The setup dialog was never seen on screen: a screenshot of the scratch run came back black. It is
+  covered by a construction test in both languages only, so check layout and wording by eye once.
+- A demo workspace cannot be converted into a company workspace; the way out is a backup restore.
+- A new company still gets the default internal mail domain (`rewear-wms.hu`) until it is changed in
+  Admin, and the partner-type upgrade step still adds sample partners to a very old database it upgrades.
+- Existing real installations that kept the demo accounts keep them; deleting them is up to the owner.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
@@ -293,7 +351,7 @@ These remain open. They are product work, not cleanup. Passes 2 and 3 only prepa
 - [ ] Picking by order and shelf, with aisle-sorted pick lists and scanned/total progress.
 - [ ] Stocktake sessions plus explicit damage, quarantine and reweighing operations.
 - [x] Backup and restore as one validated bundle — done in pass 4, see below.
-- [ ] Separate demo seeding from real first-run onboarding.
+- [x] Separate demo seeding from real first-run onboarding — done in pass 5, see below.
 - [ ] Explicit draft / issue / correction steps in finance.
 - [ ] Measure scan-to-feedback and refresh latency under representative data volumes.
 

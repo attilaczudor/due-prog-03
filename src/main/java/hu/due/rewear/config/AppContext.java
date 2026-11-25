@@ -34,6 +34,7 @@ import hu.due.rewear.service.InvoiceArchiveService;
 import hu.due.rewear.service.InvoiceService;
 import hu.due.rewear.service.LabelPdfExporter;
 import hu.due.rewear.service.NotificationService;
+import hu.due.rewear.service.OnboardingService;
 import hu.due.rewear.service.OrderService;
 import hu.due.rewear.service.PayrollService;
 import hu.due.rewear.service.PartnerStatementService;
@@ -117,17 +118,32 @@ public final class AppContext {
     private final PayrollService payrollService;
     private final RoleModuleService roleModuleService;
     private final BackupService backupService;
+    private final OnboardingService onboardingService;
 
     public AppContext() {
         this(new DatabaseManager(), new AppPreferences(), I18nManager.getInstance());
     }
 
+    /** What a database with no users yet becomes when the application opens it. */
+    public enum InitialData {
+        /** Wait for the owner to choose between the demo workspace and their own company (the application). */
+        AWAIT_SETUP,
+        /** Load the demo workspace straight away, as tests and scripts expect. */
+        DEMO_IF_EMPTY
+    }
+
+    /** Opens the database and loads the demo workspace into an empty one; the application uses {@link InitialData#AWAIT_SETUP}. */
     public AppContext(DatabaseManager databaseManager, AppPreferences preferences, I18nManager i18n) {
-        this(databaseManager, preferences, i18n, step -> { });
+        this(databaseManager, preferences, i18n, step -> { }, InitialData.DEMO_IF_EMPTY);
     }
 
     public AppContext(DatabaseManager databaseManager, AppPreferences preferences, I18nManager i18n,
                       Consumer<StartupStep> progress) {
+        this(databaseManager, preferences, i18n, progress, InitialData.DEMO_IF_EMPTY);
+    }
+
+    public AppContext(DatabaseManager databaseManager, AppPreferences preferences, I18nManager i18n,
+                      Consumer<StartupStep> progress, InitialData initialData) {
         this.databaseManager = databaseManager;
         this.preferences = preferences;
         this.i18n = i18n;
@@ -150,7 +166,18 @@ public final class AppContext {
         progress.accept(StartupStep.DATABASE);
         new SchemaInitializer(databaseManager).initialize();
         progress.accept(StartupStep.INITIAL_DATA);
-        new DemoDataSeeder(databaseManager).seedIfEmpty();
+        this.onboardingService = new OnboardingService(databaseManager);
+        if (onboardingService.needsSetup()) {
+            // A brand-new database stays empty until the owner chooses; only tests ask for the demo up front.
+            if (initialData == InitialData.DEMO_IF_EMPTY) {
+                onboardingService.startDemoWorkspace();
+            }
+        } else {
+            // Existing data is never topped up with sample records: a company with no invoices yet must
+            // not wake up one day with demo invoices, mail and chat rooms.
+            onboardingService.recordModeOfExistingDatabase();
+            new DemoDataSeeder(databaseManager).upgradeDemoWorkspace();
+        }
 
         progress.accept(StartupStep.SERVICES);
         this.roleDao = new RoleDao(databaseManager);
@@ -167,7 +194,6 @@ public final class AppContext {
         this.smartFolderDao = new SmartFolderDao(databaseManager);
         this.financeConfigDao = new FinanceConfigDao(databaseManager);
         this.bankLedgerDao = new BankLedgerDao(databaseManager);
-        this.bankLedgerDao.seedDemoAccounts();
         this.emailDao = new EmailDao(databaseManager);
         this.chatDao = new ChatDao(databaseManager);
         this.notificationDao = new NotificationDao(databaseManager);
@@ -404,5 +430,9 @@ public final class AppContext {
 
     public BackupService getBackupService() {
         return backupService;
+    }
+
+    public OnboardingService getOnboardingService() {
+        return onboardingService;
     }
 }

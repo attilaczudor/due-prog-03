@@ -2,12 +2,12 @@
 
 **Checkpoint · 25 November 2026**
 
-ReWear WMS is a Java 17 Swing desktop application for a second-hand textile warehouse. FlatLaf provides the bilingual Hungarian and English interface, SQLite persists the warehouse and finance records, and ZXing handles package QR codes. Start with the [task board](TASKS.md) for the next session and the [README](../README.md) for build instructions and demo accounts.
+ReWear WMS is a Java 17 Swing desktop application for a second-hand textile warehouse. FlatLaf provides the bilingual Hungarian and English interface, SQLite persists the warehouse and finance records, and ZXing handles package QR codes. Start with the [task board](TASKS.md) for the next session and the [README](../README.md) for build instructions and the first-launch choice (the demo accounts exist only in a demo workspace).
 
 ## Build and verify
 
-1. Use JDK 17. From the project root run `./mvnw clean verify` — the bundled Maven wrapper fetches Maven 3.9.9 on first use, so no Maven installation is needed. The checkpoint has 103 JUnit tests across 31 classes and produces `target/due-prog-03.jar`.
-2. For a fresh demo, copy the JAR to an empty directory outside the checkout and launch it there with `java -jar due-prog-03.jar`. [AppPaths](../src/main/java/hu/due/rewear/config/AppPaths.java) anchors a JAR in this checkout's `target` directory to the checkout itself.
+1. Use JDK 17. From the project root run `./mvnw clean verify` — the bundled Maven wrapper fetches Maven 3.9.9 on first use, so no Maven installation is needed. The checkpoint has 113 JUnit tests across 33 classes and produces `target/due-prog-03.jar`.
+2. For a fresh installation, copy the JAR to an empty directory outside the checkout and launch it there with `java -jar due-prog-03.jar`. It shows the first-time setup (own company, demo workspace, or restore); pick the demo workspace for the accounts in the README. [AppPaths](../src/main/java/hu/due/rewear/config/AppPaths.java) anchors a JAR in this checkout's `target` directory to the checkout itself.
 3. Use a copy of an earlier database when testing migrations. For a complete local backup, retain the database, invoice archive, receipt vault and mail attachment vault together. The in-app **Full Backup (.zip)** holds a database snapshot plus all three document directories with a SHA-256 manifest. Restoring a `.zip` verifies every checksum and the database integrity before touching anything, moves the current documents aside to `data/pre-restore-<time>-files/`, swaps the new state in (rolling back on failure) and signs the user out. A bare `.db` from an older version still restores the database only. The zips are not encrypted, so store them like the live data folder, and delete old `pre-restore-*` copies by hand.
 
 ## Demo walkthrough

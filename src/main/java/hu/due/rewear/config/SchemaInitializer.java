@@ -2,7 +2,6 @@ package hu.due.rewear.config;
 
 import hu.due.rewear.dao.DaoException;
 import hu.due.rewear.util.BusinessClock;
-import org.mindrot.jbcrypt.BCrypt;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -48,7 +47,7 @@ public final class SchemaInitializer {
                 }
             }
             ensureUserProfileColumns(conn);
-            ensureSuperAdminRoleAndAccount(conn);
+            ensureBaseRoles(conn);
             ensureMultiCurrencySchema(conn);
             ensureTaxAndPartnerSchema(conn);
             ensureV22OperationsAndCommsSchema(conn);
@@ -216,78 +215,48 @@ public final class SchemaInitializer {
             stmt.execute("INSERT OR IGNORE INTO app_settings (setting_key, setting_value) VALUES ('mail.simulation_mode', '1')");
         }
 
-        // 3. Ensure FORKLIFT role & demo account exist on already-seeded DBs
+        // 3. Count users: the legacy upgrade and the e-mail backfill only apply to a database that already has people in it.
         long userCount = 0;
         try (Statement stmt = conn.createStatement();
              ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
             if (rs.next()) userCount = rs.getLong(1);
         }
         if (userCount > 0) {
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("INSERT OR IGNORE INTO roles (code, name) VALUES ('FORKLIFT', 'Forklift Driver')");
-            }
-            long forkliftRoleId = -1;
-            try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM roles WHERE code = 'FORKLIFT'");
-                 ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) forkliftRoleId = rs.getLong(1);
-            }
-            if (forkliftRoleId > 0) {
-                boolean hasForklift = false;
-                try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM users WHERE lower(username) = 'forklift'");
-                     ResultSet rs = ps.executeQuery()) {
-                    hasForklift = rs.next();
-                }
-                if (!hasForklift) {
-                    String hash = BCrypt.hashpw("forklift123", BCrypt.gensalt(10));
-                    String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(BusinessClock.now());
-                    try (PreparedStatement ps = conn.prepareStatement(
-                            "INSERT INTO users (username, password_hash, full_name, last_name, first_name, email, role_id, active, created_at) "
-                                    + "VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?)")) {
-                        ps.setString(1, "forklift");
-                        ps.setString(2, hash);
-                        ps.setString(3, "Tóth Márk");
-                        ps.setString(4, "Tóth");
-                        ps.setString(5, "Márk");
-                        ps.setString(6, "mark.toth@rewear-wms.hu");
-                        ps.setLong(7, forkliftRoleId);
-                        ps.setString(8, created);
-                        ps.executeUpdate();
+            // 4. Only when this very run adds the v2.2 columns is the database an older install being
+            //    upgraded. Doing it on every start recreated stations a company had retired.
+            if (addedStationAssignment || addedForkliftAssignment) {
+                try (Statement stmt = conn.createStatement()) {
+                    stmt.execute("""
+                            INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                            VALUES ('ST-OP-01', 'OP', '01', '01', 'OPERATOR_STATION', 400.0, 1)
+                            """);
+                    stmt.execute("""
+                            INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                            VALUES ('ST-OP-02', 'OP', '02', '01', 'OPERATOR_STATION', 400.0, 1)
+                            """);
+                    stmt.execute("""
+                            INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                            VALUES ('ST-OP-03', 'OP', '03', '01', 'OPERATOR_STATION', 400.0, 1)
+                            """);
+                    stmt.execute("""
+                            INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
+                            VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', 2000.0, 1)
+                            """);
+                    if (addedStationAssignment) {
+                        stmt.execute("""
+                            UPDATE users
+                            SET assigned_station_id = (SELECT id FROM warehouse_locations WHERE code = 'ST-OP-01' LIMIT 1)
+                            WHERE lower(username) = 'operator' AND assigned_station_id IS NULL
+                            """);
                     }
-                }
-            }
-
-            // 4. Seed multiple OPERATOR_STATIONs & DISPATCH_ZONE if upgrading an existing DB
-            try (Statement stmt = conn.createStatement()) {
-                stmt.execute("""
-                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                        VALUES ('ST-OP-01', 'OP', '01', '01', 'OPERATOR_STATION', 400.0, 1)
-                        """);
-                stmt.execute("""
-                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                        VALUES ('ST-OP-02', 'OP', '02', '01', 'OPERATOR_STATION', 400.0, 1)
-                        """);
-                stmt.execute("""
-                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                        VALUES ('ST-OP-03', 'OP', '03', '01', 'OPERATOR_STATION', 400.0, 1)
-                        """);
-                stmt.execute("""
-                        INSERT OR IGNORE INTO warehouse_locations (code, zone, aisle, shelf, location_type, max_capacity_kg, active)
-                        VALUES ('DOCK-01', 'DOCK', '01', '01', 'DISPATCH_ZONE', 2000.0, 1)
-                        """);
-                if (addedStationAssignment) {
-                    stmt.execute("""
-                        UPDATE users
-                        SET assigned_station_id = (SELECT id FROM warehouse_locations WHERE code = 'ST-OP-01' LIMIT 1)
-                        WHERE lower(username) = 'operator' AND assigned_station_id IS NULL
-                        """);
-                }
-                if (addedForkliftAssignment) {
-                    stmt.execute("""
-                        UPDATE orders
-                        SET assigned_forklift_id = (SELECT id FROM users WHERE lower(username) = 'forklift' LIMIT 1),
-                            dispatch_location_id = (SELECT id FROM warehouse_locations WHERE code = 'DOCK-01' LIMIT 1)
-                        WHERE status IN ('DRAFT', 'PACKING') AND assigned_forklift_id IS NULL
-                        """);
+                    if (addedForkliftAssignment) {
+                        stmt.execute("""
+                            UPDATE orders
+                            SET assigned_forklift_id = (SELECT id FROM users WHERE lower(username) = 'forklift' LIMIT 1),
+                                dispatch_location_id = (SELECT id FROM warehouse_locations WHERE code = 'DOCK-01' LIMIT 1)
+                            WHERE status IN ('DRAFT', 'PACKING') AND assigned_forklift_id IS NULL
+                            """);
+                    }
                 }
             }
 
@@ -385,60 +354,31 @@ public final class SchemaInitializer {
         return false;
     }
 
-    private void ensureSuperAdminRoleAndAccount(Connection conn) throws SQLException {
-        // Only migrate already-seeded databases; brand-new empty databases are seeded by DemoDataSeeder
-        long userCount = 0;
-        try (Statement stmt = conn.createStatement();
-             ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM users")) {
-            if (rs.next()) {
-                userCount = rs.getLong(1);
-            }
-        }
-        if (userCount == 0) {
-            return;
-        }
-
-        // 1. Ensure SUPER_ADMIN role exists
+    /**
+     * Every installation needs the same fixed set of roles, whether it holds the demo workspace or a
+     * real company, so they belong to the schema and not to any seed data.
+     * <p>
+     * This used to also recreate a {@code superadmin} account with the well-known demo password whenever
+     * it was missing. That silently re-opened a default-credential login on a real company's database
+     * after its administrator had removed or renamed it, so no account is ever created from here.
+     */
+    private void ensureBaseRoles(Connection conn) throws SQLException {
         try (Statement stmt = conn.createStatement()) {
-            stmt.execute("INSERT OR IGNORE INTO roles (code, name) VALUES ('SUPER_ADMIN', 'Super Administrator')");
-        }
-        long superAdminRoleId = -1;
-        try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM roles WHERE code = 'SUPER_ADMIN'");
-             ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                superAdminRoleId = rs.getLong(1);
-            }
-        }
-        if (superAdminRoleId < 0) {
-            return;
-        }
-
-        // 2. Ensure 'superadmin' account (Czudor Attila) exists
-        boolean hasSuperAdmin = false;
-        try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM users WHERE lower(username) = 'superadmin'");
-             ResultSet rs = ps.executeQuery()) {
-            hasSuperAdmin = rs.next();
-        }
-        if (!hasSuperAdmin) {
-            String hash = BCrypt.hashpw("superadmin123", BCrypt.gensalt(10));
-            String created = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").format(BusinessClock.now());
-            try (PreparedStatement ps = conn.prepareStatement(
-                    "INSERT INTO users (username, password_hash, full_name, last_name, first_name, role_id, active, created_at) VALUES (?, ?, ?, ?, ?, ?, 1, ?)")) {
-                ps.setString(1, "superadmin");
-                ps.setString(2, hash);
-                ps.setString(3, "Czudor Attila");
-                ps.setString(4, "Czudor");
-                ps.setString(5, "Attila");
-                ps.setLong(6, superAdminRoleId);
-                ps.setString(7, created);
-                ps.executeUpdate();
-            }
-        }
-
-        // 3. Reassign legacy 'admin' display name away from Attila Czudor so Czudor Attila is exclusively Super Admin
-        try (PreparedStatement ps = conn.prepareStatement(
-                "UPDATE users SET full_name = 'Szabó Gábor', last_name = 'Szabó', first_name = 'Gábor' WHERE lower(username) = 'admin' AND (full_name LIKE '%Attila Czudor%' OR full_name LIKE '%Czudor Attila%')")) {
-            ps.executeUpdate();
+            stmt.execute("""
+                    INSERT OR IGNORE INTO roles (code, name) VALUES
+                    ('SUPER_ADMIN', 'Super Administrator'),
+                    ('ADMIN', 'Administrator'),
+                    ('MANAGER', 'Warehouse Manager'),
+                    ('OPERATOR', 'Station Manager'),
+                    ('FORKLIFT', 'Forklift Driver'),
+                    ('SORTER', 'Sorting Operator'),
+                    ('SORTING_HELPER', 'Sorting Helper')
+                    """);
+            // Older databases stored the operator role under its former display name.
+            stmt.execute("UPDATE roles SET name = 'Station Manager' WHERE code = 'OPERATOR' AND name = 'Sorting Operator'");
+            // A legacy demo database showed its admin under the account owner's name; keep the demo roster consistent.
+            stmt.execute("UPDATE users SET full_name = 'Szabó Gábor', last_name = 'Szabó', first_name = 'Gábor' "
+                    + "WHERE lower(username) = 'admin' AND (full_name LIKE '%Attila Czudor%' OR full_name LIKE '%Czudor Attila%')");
         }
     }
 

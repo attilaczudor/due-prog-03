@@ -45,11 +45,19 @@ Desktop Java 17 GUI warehouse, QR labeling, scanning, forklift logistics, intern
   - The menu list scrolls when the window is short. The avatar and sidebar controls stay pinned below it in both sidebar modes.
 - **Brutalist Monochrome Light & Dark Theme & Zero-Refresh Ergonomics:** FlatLaf uses square corners, hairline borders, vector icons, and monospace typography. Admin & Maintenance, Code Dictionaries, and Payments use collapsible secondary menus styled like the Email folder rail. Table header arrows sort columns in either direction. Views load on demand and refresh automatically, with heavy work off the Swing event thread. Global shortcuts include `Cmd/Ctrl+1..9/0`, `F5`/`Cmd/Ctrl+R`, and `Esc`.
 - **CSV-Driven Bilingual UI (`EN` / `HU` + Extensible):** All **811** UI keys live in `src/main/resources/i18n/translations.csv`. Add any new language column (`de`, `sk`, etc.) and reload live from **Admin → Translations** without recompiling.
-- **Zero-Config 3NF Embedded Database & Diagnostics:** The SQLite schema declares **41 tables** and **23 indexes**, with foreign keys enabled. The app shows startup progress, prepares storage, runs migrations, seeds demo data, and provides BCrypt authentication, audit CSV export, full backup and restore (database plus invoice, receipt and mail files, checksum-verified with rollback), and live diagnostics.
+- **Zero-Config 3NF Embedded Database & Diagnostics:** The SQLite schema declares **41 tables** and **23 indexes**, with foreign keys enabled. The app shows startup progress, prepares storage, runs migrations, asks on first launch whether to start your own company or the demo workspace, and provides BCrypt authentication, audit CSV export, full backup and restore (database plus invoice, receipt and mail files, checksum-verified with rollback), and live diagnostics.
 
 ---
 
-## Demo Accounts
+## First launch and demo accounts
+
+A new installation opens a **first-time setup** screen and creates nothing until you choose:
+
+- **Set up my company** starts empty with your own administrator account (password of 8+ characters, not a demo or common password). Optionally add the standard clothing catalogues and a starter shelf layout; both can be edited later.
+- **Try the demo workspace** loads the sample warehouse and the demo accounts below. Their passwords are public, so never put real data in a demo workspace.
+- **Restore from a backup** brings in an earlier full backup (`.zip`) or database (`.db`) instead.
+
+The accounts below exist only in a demo workspace, and the login screen offers them only there.
 
 | Role | Username | Password | Default Access |
 |---|---|---|---|

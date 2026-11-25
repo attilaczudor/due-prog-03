@@ -52,6 +52,19 @@ public final class RoleDao {
         }
     }
 
+    /** Returns the id of the role with this code, creating it first if the schema has not provided it. */
+    public long ensure(Connection conn, RoleCode code, String name) throws SQLException {
+        try (PreparedStatement ps = conn.prepareStatement("SELECT id FROM roles WHERE code = ?")) {
+            ps.setString(1, code.name());
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getLong(1);
+                }
+            }
+        }
+        return insert(conn, code, name);
+    }
+
     public long insert(Connection conn, RoleCode code, String name) throws SQLException {
         String sql = "INSERT INTO roles (code, name) VALUES (?, ?)";
         try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {

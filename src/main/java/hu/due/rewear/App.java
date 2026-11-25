@@ -10,6 +10,7 @@ import hu.due.rewear.service.MailExportJanitor;
 import hu.due.rewear.ui.LoginFrame;
 import hu.due.rewear.ui.LogoAssets;
 import hu.due.rewear.ui.MainFrame;
+import hu.due.rewear.ui.SetupWizardDialog;
 import hu.due.rewear.ui.StartupWindow;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -52,7 +53,8 @@ public final class App {
         new SwingWorker<AppContext, AppContext.StartupStep>() {
             @Override protected AppContext doInBackground() throws Exception {
                 Files.createDirectories(AppPaths.exportsDir());
-                AppContext context = new AppContext(new DatabaseManager(), preferences, i18n, this::publish);
+                AppContext context = new AppContext(new DatabaseManager(), preferences, i18n, this::publish,
+                        AppContext.InitialData.AWAIT_SETUP);
                 pruneAbandonedMailExports(context);
                 return context;
             }
@@ -64,7 +66,13 @@ public final class App {
             @Override protected void done() {
                 startup.dispose();
                 try {
-                    showLogin(get());
+                    AppContext context = get();
+                    // A brand-new installation has nobody who could sign in: the owner chooses first.
+                    if (context.getOnboardingService().needsSetup()
+                            && !new SetupWizardDialog(context).showDialog()) {
+                        return;
+                    }
+                    showLogin(context);
                 } catch (InterruptedException ex) {
                     Thread.currentThread().interrupt();
                     showStartupError(i18n, ex);

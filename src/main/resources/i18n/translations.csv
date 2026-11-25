@@ -810,3 +810,23 @@ payroll.draft_gross,Draft gross (HUF),Bruttó tervezet (Ft)
 payroll.packed_bags,Packed bags,Csomagolt zsákok
 payroll.packed_kg,Packed output (kg),Csomagolt késztermék (kg)
 payroll.active,Active,Aktív
+setup.title,First-time setup,Első indítás beállítása
+setup.intro,"Welcome to ReWear WMS. Choose how this installation starts. The choice is made once; to change it later you would restore a backup.","Üdvözöljük a ReWear WMS-ben. Válassza ki, hogyan induljon ez a telepítés. A választás egyszeri; később csak mentés visszaállításával módosítható."
+setup.mode.company,Set up my company,Saját cég beállítása
+setup.mode.company.desc,"Starts empty, with your own administrator account. Nothing is added except what you tick below.","Üresen indul, a saját rendszergazdai fiókjával. Csak az kerül be, amit alább bejelöl."
+setup.mode.demo,Try the demo workspace,Demó munkaterület kipróbálása
+setup.mode.demo.desc,"Loads a sample warehouse with fictional partners, stock, invoices, mail and chat. It comes with published demo logins, so never use it for real data.","Kitalált partnerekkel, készlettel, számlákkal, levelezéssel és csevegéssel töltött mintaraktár. Nyilvánosan ismert demó belépőkkel jár, ezért valódi adatokhoz soha ne használja."
+setup.company_name,Company name,Cégnév
+setup.last_name,Last name,Vezetéknév
+setup.first_name,First name,Keresztnév
+setup.username,Administrator username,Rendszergazda felhasználóneve
+setup.email,E-mail (optional),E-mail (nem kötelező)
+setup.password,Password (8+ characters),Jelszó (legalább 8 karakter)
+setup.password_confirm,Repeat password,Jelszó újra
+setup.catalogs,"Add the standard clothing catalogues (target groups, garment types, quality grades, package types)","Szokásos ruházati törzsadatok hozzáadása (célcsoportok, ruhatípusok, minőségi osztályok, csomagtípusok)"
+setup.locations,"Add a starter shelf layout (stations, shelves, dispatch dock)","Kezdő polcrend hozzáadása (állomások, polcok, kiadó zóna)"
+setup.continue,Continue,Tovább
+setup.restore,Restore from a backup…,Visszaállítás mentésből…
+setup.restore.empty,"That backup contains no user accounts, so nobody could sign in. Choose another file.","Ez a mentés nem tartalmaz felhasználói fiókot, így senki nem tudna belépni. Válasszon másik fájlt."
+setup.quit,Quit,Kilépés
+setup.error.mismatch,The two passwords do not match.,A két jelszó nem egyezik.

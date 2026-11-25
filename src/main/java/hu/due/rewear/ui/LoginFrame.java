@@ -192,6 +192,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         }
         footer.add(quickFillPanel);
 
+        // The quick-fill buttons carry the published demo passwords, so only a demo workspace shows them.
+        footer.setVisible(ctx.getOnboardingService().isDemoWorkspace());
         outer.add(footer, BorderLayout.SOUTH);
 
         setContentPane(outer);
