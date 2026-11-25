@@ -10,5 +10,9 @@ public enum MovementType {
     RESERVE,
     RELEASE,
     SHIP,
+    /** Held aside after damage was found. */
+    QUARANTINE,
+    /** Returned to stock from quarantine. */
+    QUARANTINE_RELEASE,
     DISCARD
 }

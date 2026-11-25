@@ -2,6 +2,7 @@ package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
+import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.LocationType;
 import hu.due.rewear.model.Stocktake.Count;
 import hu.due.rewear.model.Stocktake.Missing;
@@ -61,6 +62,11 @@ public final class StocktakeView extends JPanel implements NavigableView {
     private final JTable countsTable = BrutalistStyle.tableWithTooltips(countsModel);
     private final DefaultTableModel missingModel = BrutalistStyle.nonEditableTableModel();
     private final JTable missingTable = BrutalistStyle.tableWithTooltips(missingModel);
+    private final DefaultTableModel quarantineModel = BrutalistStyle.nonEditableTableModel();
+    private final JTable quarantineTable = BrutalistStyle.tableWithTooltips(quarantineModel);
+    private final JButton returnBtn = new JButton();
+    private final JButton writeOffBtn = new JButton();
+    private List<InventoryPackage> quarantineRows = List.of();
 
     private Session current;
 
@@ -89,10 +95,18 @@ public final class StocktakeView extends JPanel implements NavigableView {
         header.add(feedbackLabel, BorderLayout.SOUTH);
         add(header, BorderLayout.NORTH);
 
-        JPanel tables = new JPanel(new java.awt.GridLayout(2, 1, 0, 8));
+        JPanel quarantinePanel = titled("stocktake.quarantine", quarantineTable);
+        JPanel quarantineActions = new JPanel(new WrapLayout(FlowLayout.LEFT, 6, 2));
+        quarantineActions.setOpaque(false);
+        quarantineActions.add(returnBtn);
+        quarantineActions.add(writeOffBtn);
+        quarantinePanel.add(quarantineActions, BorderLayout.SOUTH);
+
+        JPanel tables = new JPanel(new java.awt.GridLayout(3, 1, 0, 8));
         tables.setOpaque(false);
         tables.add(titled("stocktake.counted", countsTable));
         tables.add(titled("stocktake.missing", missingTable));
+        tables.add(quarantinePanel);
         add(tables, BorderLayout.CENTER);
 
         summaryLabel.setFont(ThemeManager.monoFont(Font.BOLD, 12f));
@@ -103,6 +117,8 @@ public final class StocktakeView extends JPanel implements NavigableView {
         scanField.addActionListener(e -> guarded(this::countScanned));
         closeBtn.addActionListener(e -> guarded(this::closeSession));
         cancelBtn.addActionListener(e -> guarded(this::cancelSession));
+        returnBtn.addActionListener(e -> guarded(() -> decideQuarantine(false)));
+        writeOffBtn.addActionListener(e -> guarded(() -> decideQuarantine(true)));
 
         applyTranslations();
         applyTheme();
@@ -192,7 +208,7 @@ public final class StocktakeView extends JPanel implements NavigableView {
         }
         var applied = service.close(current.id());
         JOptionPane.showMessageDialog(this,
-                t("stocktake.applied", applied.relocated(), applied.reweighed(), applied.writtenOff(), applied.missing()),
+                t("stocktake.applied", applied.relocated(), applied.reweighed(), applied.quarantined(), applied.missing()),
                 t("common.success"), JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -204,6 +220,27 @@ public final class StocktakeView extends JPanel implements NavigableView {
                 JOptionPane.YES_NO_OPTION) == JOptionPane.YES_OPTION) {
             service.cancel(current.id());
         }
+    }
+
+    /** Releases the selected quarantined package back to stock, or writes it off for good. */
+    private void decideQuarantine(boolean writeOff) {
+        int row = TableSorting.selectedModelRow(quarantineTable);
+        if (row < 0 || row >= quarantineRows.size()) {
+            throw new IllegalStateException(t("stocktake.select_quarantined"));
+        }
+        InventoryPackage item = quarantineRows.get(row);
+        String reason = JOptionPane.showInputDialog(this,
+                t(writeOff ? "stocktake.write_off_confirm" : "stocktake.return_confirm", item.qrCode()),
+                t(writeOff ? "stocktake.write_off" : "stocktake.return"), JOptionPane.QUESTION_MESSAGE);
+        if (reason == null) {
+            return;
+        }
+        if (writeOff) {
+            service.writeOffQuarantined(item.id(), reason);
+        } else {
+            service.returnToStock(item.id(), reason);
+        }
+        feedbackLabel.setText(item.qrCode() + " — " + t(writeOff ? "stocktake.write_off" : "stocktake.return"));
     }
 
     @Override public void refreshData() {
@@ -219,10 +256,21 @@ public final class StocktakeView extends JPanel implements NavigableView {
             component.setEnabled(mayCount && open);
         }
 
+        quarantineRows = service.quarantined();
+        quarantineModel.setRowCount(0);
+        for (InventoryPackage item : quarantineRows) {
+            quarantineModel.addRow(new Object[]{item.qrCode(), item.locationCode(),
+                    FormatUtil.stripZeros(item.weightKg()) + " kg", item.notes() == null ? "" : item.notes()});
+        }
+        boolean hasQuarantine = !quarantineRows.isEmpty();
+        returnBtn.setEnabled(mayCount && hasQuarantine);
+        writeOffBtn.setEnabled(mayCount && hasQuarantine);
+
         countsModel.setRowCount(0);
         missingModel.setRowCount(0);
         if (!open) {
-            summaryLabel.setText(t("stocktake.history", service.recentSessions(5).size()));
+            summaryLabel.setText(t("stocktake.history", service.recentSessions(5).size())
+                    + (hasQuarantine ? "  |  " + t("stocktake.in_quarantine", quarantineRows.size()) : ""));
             return;
         }
         List<Count> counts = service.counts(current.id());
@@ -241,7 +289,8 @@ public final class StocktakeView extends JPanel implements NavigableView {
             missingModel.addRow(new Object[]{gone.qrCode(), gone.locationCode(),
                     FormatUtil.stripZeros(BigDecimal.valueOf(gone.grams(), 3)) + " kg"});
         }
-        summaryLabel.setText(t("stocktake.summary", counts.size(), missing.size()));
+        summaryLabel.setText(t("stocktake.summary", counts.size(), missing.size())
+                + (hasQuarantine ? "  |  " + t("stocktake.in_quarantine", quarantineRows.size()) : ""));
     }
 
     @Override public void applyTranslations() {
@@ -258,6 +307,10 @@ public final class StocktakeView extends JPanel implements NavigableView {
                 t("invoice.history.by"), t("invoice.history.when")});
         missingModel.setColumnIdentifiers(new Object[]{t("intake.generated_code"), t("intake.location"),
                 t("intake.weight_kg")});
+        quarantineModel.setColumnIdentifiers(new Object[]{t("intake.generated_code"), t("intake.location"),
+                t("intake.weight_kg"), t("intake.notes")});
+        returnBtn.setText(t("stocktake.return"));
+        writeOffBtn.setText(t("stocktake.write_off"));
         refreshData();
     }
 
@@ -268,9 +321,10 @@ public final class StocktakeView extends JPanel implements NavigableView {
         feedbackLabel.setForeground(ThemeManager.muted());
         scanLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(countBtn);
-        BrutalistStyle.styleSecondaryButtons(startBtn, closeBtn, cancelBtn);
+        BrutalistStyle.styleSecondaryButtons(startBtn, closeBtn, cancelBtn, returnBtn, writeOffBtn);
         BrutalistStyle.styleTable(countsTable);
         BrutalistStyle.styleTable(missingTable);
+        BrutalistStyle.styleTable(quarantineTable);
     }
 
     @Override public String getViewKey() { return MainFrame.VIEW_STOCKTAKE; }

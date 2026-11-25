@@ -67,6 +67,7 @@ public final class SchemaInitializer {
         });
         new SortingRosterMigration(dbManager).upgrade(sql);
         new SortingRawMaterialMigration(dbManager).upgrade(sql);
+        new QuarantineMigration(dbManager).upgrade(sql);
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
     }
 

@@ -906,3 +906,13 @@ stocktake.history,"No stocktake is open. Earlier sessions: {0}","Nincs nyitott l
 stocktake.close_confirm,"Close this stocktake? Misplaced packages move to where they were found, weights are corrected and damaged packages are written off.","Lezárja a leltárt? A rossz polcon talált csomagok a tényleges helyükre kerülnek, a súlyok javítva lesznek, a sérült csomagok pedig leírásra kerülnek."
 stocktake.cancel_confirm,Abandon this stocktake? Nothing will be changed.,Elveti a leltárt? Semmi nem változik.
 stocktake.applied,"{0} moved, {1} reweighed, {2} written off, {3} missing","{0} áthelyezve, {1} újramérve, {2} leírva, {3} hiányzik"
+stocktake.quarantine,In quarantine,Karanténban
+stocktake.return,Return to stock,Visszavétel készletre
+stocktake.write_off,Write off,Leírás
+stocktake.return_confirm,"Return {0} to stock? Give a reason.","Visszaveszi a(z) {0} csomagot készletre? Adja meg az indokot."
+stocktake.write_off_confirm,"Write {0} off for good? Give a reason.","Véglegesen leírja a(z) {0} csomagot? Adja meg az indokot."
+stocktake.select_quarantined,Select a quarantined package first.,Előbb válasszon ki egy karanténban lévő csomagot.
+stocktake.in_quarantine,"{0} in quarantine","{0} csomag karanténban"
+status.package.QUARANTINED,Quarantined,Karanténban
+movement.QUARANTINE,Quarantined,Karanténba helyezve
+movement.QUARANTINE_RELEASE,Returned to stock,Visszavéve készletre

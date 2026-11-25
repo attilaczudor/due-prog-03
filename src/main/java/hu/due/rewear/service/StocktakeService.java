@@ -66,7 +66,7 @@ public final class StocktakeService {
             """;
 
     /** What closing a session changed. */
-    public record Applied(int relocated, int reweighed, int writtenOff, int missing) { }
+    public record Applied(int relocated, int reweighed, int quarantined, int missing) { }
 
     private final DatabaseManager db;
     private final SessionContext session;
@@ -278,7 +278,7 @@ public final class StocktakeService {
             }
             int relocated = 0;
             int reweighed = 0;
-            int writtenOff = 0;
+            int quarantined = 0;
             for (Count line : countsIn(conn, sessionId)) {
                 InventoryPackage item = packages.findById(conn, line.packageId()).orElse(null);
                 if (item == null) {
@@ -300,11 +300,12 @@ public final class StocktakeService {
                         reweighed++;
                     }
                     case DAMAGED -> {
-                        packages.updateStatus(conn, item.id(), PackageStatus.DISCARDED, now);
-                        movements.insert(conn, item.id(), MovementType.DISCARD, item.locationId(), null,
-                                actor.id(), "Stocktake #" + sessionId + ": damaged"
+                        // Held aside, not written off: somebody still has to decide what happens to it.
+                        packages.updateStatus(conn, item.id(), PackageStatus.QUARANTINED, now);
+                        movements.insert(conn, item.id(), MovementType.QUARANTINE, item.locationId(),
+                                item.locationId(), actor.id(), "Stocktake #" + sessionId + ": damaged"
                                         + (line.note() == null ? "" : " — " + line.note()), now);
-                        writtenOff++;
+                        quarantined++;
                     }
                     case FOUND, UNEXPECTED -> movements.insert(conn, item.id(), MovementType.SCAN_VERIFY,
                             item.locationId(), item.locationId(), actor.id(),
@@ -321,10 +322,10 @@ public final class StocktakeService {
                     throw new IllegalStateException("This stocktake is already closed.");
                 }
             }
-            return new Applied(relocated, reweighed, writtenOff, missing);
+            return new Applied(relocated, reweighed, quarantined, missing);
         });
-        LOG.info("Stocktake {} closed: {} relocated, {} reweighed, {} written off, {} missing",
-                sessionId, applied.relocated(), applied.reweighed(), applied.writtenOff(), applied.missing());
+        LOG.info("Stocktake {} closed: {} relocated, {} reweighed, {} quarantined, {} missing",
+                sessionId, applied.relocated(), applied.reweighed(), applied.quarantined(), applied.missing());
         return applied;
     }
 
@@ -340,6 +341,40 @@ public final class StocktakeService {
                 }
             }
         });
+    }
+
+    /** Packages held aside after damage was found, waiting for somebody to decide. */
+    public List<InventoryPackage> quarantined() {
+        requireViewer();
+        return packages.findByFilter(new hu.due.rewear.model.PackageFilter(
+                null, PackageStatus.QUARANTINED, null, null, null, null, null));
+    }
+
+    /** Writes a quarantined package off for good. */
+    public void writeOffQuarantined(long packageId, String reason) {
+        decide(packageId, PackageStatus.DISCARDED, MovementType.DISCARD, "Written off from quarantine", reason);
+    }
+
+    /** Returns a quarantined package to stock, on the shelf it is already standing on. */
+    public void returnToStock(long packageId, String reason) {
+        decide(packageId, PackageStatus.IN_STOCK, MovementType.QUARANTINE_RELEASE, "Returned to stock", reason);
+    }
+
+    private void decide(long packageId, PackageStatus target, MovementType movement, String what, String reason) {
+        User actor = requireCounter();
+        LocalDateTime now = BusinessClock.now();
+        db.runInTransaction(conn -> {
+            InventoryPackage item = packages.findById(conn, packageId)
+                    .orElseThrow(() -> new IllegalArgumentException("Package not found."));
+            if (item.status() != PackageStatus.QUARANTINED) {
+                throw new IllegalStateException("Only a quarantined package can be released or written off.");
+            }
+            packages.updateStatus(conn, packageId, target, now);
+            movements.insert(conn, packageId, movement, item.locationId(),
+                    target == PackageStatus.DISCARDED ? null : item.locationId(), actor.id(),
+                    what + (reason == null || reason.isBlank() ? "" : " — " + reason.strip()), now);
+        });
+        LOG.info("Package {} {} by {}", packageId, what.toLowerCase(Locale.ROOT), actor.username());
     }
 
     // ---- internals --------------------------------------------------------------------------

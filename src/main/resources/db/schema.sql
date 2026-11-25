@@ -122,7 +122,7 @@ CREATE TABLE IF NOT EXISTS inventory_packages (
     weight_kg REAL NOT NULL CHECK (weight_kg > 0),
     hex_suffix TEXT NOT NULL CHECK (length(hex_suffix) = 2),
     status TEXT NOT NULL DEFAULT 'IN_STOCK'
-        CHECK (status IN ('IN_STOCK', 'RESERVED', 'SHIPPED', 'DISCARDED')),
+        CHECK (status IN ('IN_STOCK', 'RESERVED', 'QUARANTINED', 'SHIPPED', 'DISCARDED')),
     notes TEXT,
     created_by INTEGER NOT NULL,
     created_at TEXT NOT NULL,
@@ -193,7 +193,8 @@ CREATE TABLE IF NOT EXISTS stock_movements (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     package_id INTEGER NOT NULL,
     movement_type TEXT NOT NULL
-        CHECK (movement_type IN ('INTAKE', 'RELOCATE', 'SCAN_VERIFY', 'RESERVE', 'RELEASE', 'SHIP', 'DISCARD')),
+        CHECK (movement_type IN ('INTAKE', 'RELOCATE', 'SCAN_VERIFY', 'RESERVE', 'RELEASE', 'SHIP',
+                                 'QUARANTINE', 'QUARANTINE_RELEASE', 'DISCARD')),
     from_location_id INTEGER,
     to_location_id INTEGER,
     user_id INTEGER NOT NULL,

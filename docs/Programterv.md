@@ -6,13 +6,13 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**179 fő Java forrásfájl**, **43 JUnit 5 tesztosztály**, **157 teszt**):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**180 fő Java forrásfájl**, **44 JUnit 5 tesztosztály**, **161 teszt**):
 
 ```mermaid
 flowchart TD
     UI["UI Réteg (hu.due.rewear.ui)<br/>LoginFrame, MainFrame (modul-alapú oldalsáv, élő jelvények, auto-refresh),<br/>18 oldalmenümodul (TransportView PUTAWAY/STAGING, TodoView,<br/>NotificationsView, MessagesView, EmailView + RecipientMultiSelectField,<br/>SortingView, PayrollView, AdminModulesPanel, AdminEmailSettingsPanel, OrderHandoverDialog, SetupWizardDialog (első indítás),<br/>PrintPreviewDialog, DocumentPreviewDialog, AsyncUiRunner, SectionNavigation)"]
     SVC["Üzleti Logika & PDF Réteg (hu.due.rewear.service)<br/>AuthService, SessionContext, RoleModuleService, ProductCodeService,<br/>QrCodeService, InventoryService, TransportService, SortingService, OrderService, PayrollService,<br/>ScannerService, InvoiceService, ReceiptVaultService, PartnerStatementService,<br/>EmailService, ChatService, NotificationService, TodoService,<br/>PDF/CSV exportálók (köztük PickListPdfExporter),<br/>BackupService + BackupBundle (teljes mentés), MailAttachmentVault, MailExportJanitor,<br/>InvoiceLifecycle, OnboardingService, PickListService"]
-    I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (907 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
+    I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (917 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
     DAO["Adatelérési Réteg (hu.due.rewear.dao)<br/>JDBC DAO-k, például RoleDao, UserDao, RoleModulePermissionDao, SettingsDao,<br/>FinanceConfigDao, DictionaryDao, WarehouseLocationDao, InventoryPackageDao,<br/>StockMovementDao, CustomerDao, OrderDao, OrderItemDao, InvoiceDao,<br/>EmailDao, ChatDao, NotificationDao, TodoDao<br/>(összesen 20 DAO osztály)"]
     MODEL["Domain Modellek (hu.due.rewear.model)<br/>Java 17 Record POJO-k és Enumok (AppModule, RoleCode, LocationType,<br/>InventoryPackage, Order, Invoice, EmailMessage, ChatRoom, AppNotification, ...)"]
     DB[("Beágyazott SQLite 3 (45 tábla, 26 deklarált index)<br/>data/rewear-wms.db + data/invoices/ + data/receipts/ + data/mail-attachments/")]
@@ -386,7 +386,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **43 tesztosztály, összesen 157 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **44 tesztosztály, összesen 161 automatizált JUnit 5 teszt** ellenőrzi. A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -433,3 +433,4 @@ A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevi
 | `ScreenWalkthroughTest` | 2 | Minden szerepkör minden elérhető képernyőjének megnyitása a valódi főablakon át, kirajzolás-ellenőrzéssel, valamint az első indítási ablak két nyelven (kijelző nélküli környezetben kimarad) |
 | `DialogWalkthroughTest` | 3 | Modális ablakok megnyitása és ellenőrzése: számla előzményei, csak az engedélyezett állapotváltások felkínálása, jogosultság nélküli felhasználónál kikapcsolt gombok, targoncás szedési listája (kijelző nélküli környezetben kimarad) |
 | `StocktakeServiceTest` | 7 | Polc számolása, rossz polcon talált csomag áthelyezése, súlytűrés, sérült áru leírása lezáráskor, hiányzó tételek jelentése leírás nélkül, egyszerre egy leltár és szerepkörök, zónaleltár |
+| `QuarantineMigrationTest` | 2 | A karantén két `CHECK` megszorítást bővít: a készlet- és mozgástábla újraépítése minden sor, azonosító és index megőrzésével, valamint a már naprakész adatbázis érintetlenül hagyása |

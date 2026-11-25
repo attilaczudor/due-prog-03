@@ -91,7 +91,7 @@ class StocktakeServiceTest {
         var applied = stocktake.close(session.id());
         assertEquals(0, applied.relocated());
         assertEquals(0, applied.reweighed());
-        assertEquals(0, applied.writtenOff());
+        assertEquals(0, applied.quarantined());
         assertEquals(Status.CLOSED, stocktake.findSession(session.id()).orElseThrow().status());
         assertTrue(movementNotes(item.id()).stream().anyMatch(n -> n.startsWith("SCAN_VERIFY")), "The count is traceable");
     }
@@ -143,7 +143,7 @@ class StocktakeServiceTest {
     }
 
     @Test
-    void damagedStockIsWrittenOffOnlyWhenTheSessionCloses() {
+    void damagedStockGoesIntoQuarantineWhenTheSessionCloses() {
         setUp();
         InventoryPackage item = onShelf(shelfA);
         Session session = stocktake.open(null, shelfA.id(), null);
@@ -156,10 +156,61 @@ class StocktakeServiceTest {
 
         var applied = stocktake.close(session.id());
 
-        assertEquals(1, applied.writtenOff());
-        assertEquals(PackageStatus.DISCARDED, reload(item.id()).status());
+        assertEquals(1, applied.quarantined());
+        assertEquals(PackageStatus.QUARANTINED, reload(item.id()).status(), "Held aside, not written off");
         assertTrue(movementNotes(item.id()).stream()
-                .anyMatch(n -> n.startsWith(MovementType.DISCARD.name()) && n.contains("Water damage")));
+                .anyMatch(n -> n.startsWith(MovementType.QUARANTINE.name()) && n.contains("Water damage")));
+        assertTrue(stocktake.quarantined().stream().anyMatch(p -> p.id() == item.id()));
+    }
+
+    @Test
+    void quarantinedStockIsEitherReturnedToStockOrWrittenOffByHand() {
+        setUp();
+        InventoryPackage keep = onShelf(shelfA);
+        Session session = stocktake.open(null, shelfA.id(), null);
+        stocktake.count(session.id(), keep.qrCode(), null, true, "Looks wet");
+        InventoryPackage scrap = ctx.getPackageDao().findByFilter(PackageFilter.empty()).stream()
+                .filter(p -> p.status() == PackageStatus.IN_STOCK && p.locationId() == shelfA.id()
+                        && p.id() != keep.id())
+                .findFirst().orElseThrow();
+        stocktake.count(session.id(), scrap.qrCode(), null, true, "Torn open");
+        stocktake.close(session.id());
+        assertEquals(2, stocktake.quarantined().size());
+
+        stocktake.returnToStock(keep.id(), "Dried out, fine");
+        stocktake.writeOffQuarantined(scrap.id(), "Beyond saving");
+
+        assertEquals(PackageStatus.IN_STOCK, reload(keep.id()).status());
+        assertEquals(shelfA.id(), reload(keep.id()).locationId(), "It goes back on the shelf it is standing on");
+        assertEquals(PackageStatus.DISCARDED, reload(scrap.id()).status());
+        assertTrue(stocktake.quarantined().isEmpty());
+        assertTrue(movementNotes(keep.id()).stream()
+                .anyMatch(n -> n.startsWith(MovementType.QUARANTINE_RELEASE.name()) && n.contains("Dried out")));
+        assertTrue(movementNotes(scrap.id()).stream()
+                .anyMatch(n -> n.startsWith(MovementType.DISCARD.name()) && n.contains("Beyond saving")));
+
+        // Only quarantined stock can be decided on, and only the right roles may decide.
+        assertThrows(IllegalStateException.class, () -> stocktake.returnToStock(keep.id(), "again"));
+        ctx.getSession().login(ctx.getUserDao().findByUsername("sorter01").orElseThrow());
+        assertThrows(IllegalStateException.class, () -> stocktake.writeOffQuarantined(scrap.id(), "nope"));
+    }
+
+    @Test
+    void quarantinedStockCannotBeSoldOrCountedTowardsStock() {
+        setUp();
+        InventoryPackage item = onShelf(shelfA);
+        long customer = ctx.getCustomerDao().findAll(true).get(0).id();
+        var order = ctx.getOrderService().createOrder(customer, "EUR", null, manager.id());
+        Session session = stocktake.open(null, shelfA.id(), null);
+        stocktake.count(session.id(), item.qrCode(), null, true, "Mouldy");
+        stocktake.close(session.id());
+
+        assertThrows(IllegalStateException.class,
+                () -> ctx.getOrderService().addPackageToOrder(order.id(), item.id(), new BigDecimal("5.00"), manager.id()),
+                "Quarantined stock must not be sold");
+        assertTrue(ctx.getPackageDao().findByFilter(new hu.due.rewear.model.PackageFilter(
+                        null, PackageStatus.IN_STOCK, null, null, null, null, null)).stream()
+                .noneMatch(p -> p.id() == item.id()));
     }
 
     @Test

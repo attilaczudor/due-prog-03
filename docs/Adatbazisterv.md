@@ -190,13 +190,13 @@ erDiagram
 | `target_group_id`, `garment_type_id`, `quality_grade_id`, `package_type_id`, `location_id` | `INTEGER` | `NOT NULL FK` | Hivatkozások a kódtörzsekre és aktuális raktárhelyre |
 | `weight_kg` | `REAL` | `NOT NULL CHECK (> 0)` | Nettó súly (kg) |
 | `hex_suffix` | `TEXT` | `NOT NULL CHECK (length = 2)` | Véletlen 2 jegyű hexadecimális azonosító |
-| `status` | `TEXT` | `CHECK ('IN_STOCK','RESERVED','SHIPPED','DISCARDED')` | Életciklus-állapot |
+| `status` | `TEXT` | `CHECK ('IN_STOCK','RESERVED','QUARANTINED','SHIPPED','DISCARDED')` | Életciklus-állapot. A `QUARANTINED` a leltáron sérültnek talált, félretett csomag: nincs eladva és nincs leírva, amíg valaki nem dönt róla. |
 | `notes` | `TEXT` | `NULL` | Opcionális megjegyzés |
 | `created_by` | `INTEGER` | `NOT NULL FK -> users(id)` | Rögzítő felhasználó |
 | `created_at`, `updated_at` | `TEXT` | `NOT NULL` | Időbélyegek |
 
 ### 3.13 `stock_movements` (Készletmozgás audit napló)
-- `id`, `package_id` (`FK`), `movement_type` (`INTAKE`, `RELOCATE`, `SCAN_VERIFY`, `RESERVE`, `RELEASE`, `SHIP`, `DISCARD`), `from_location_id` (`FK`), `to_location_id` (`FK`), `user_id` (`FK`), `note`, `created_at`.
+- `id`, `package_id` (`FK`), `movement_type` (`INTAKE`, `RELOCATE`, `SCAN_VERIFY`, `RESERVE`, `RELEASE`, `SHIP`, `QUARANTINE`, `QUARANTINE_RELEASE`, `DISCARD`), `from_location_id` (`FK`), `to_location_id` (`FK`), `user_id` (`FK`), `note`, `created_at`.
 
 ### 3.14 `customers` (B2B üzleti partnerek — Vevők és Beszállítók)
 - `id`, `name`, `partner_type` (`CUSTOMER`, `SUPPLIER`, `BOTH`), `contact_name`, `email`, `phone`, `address`, `tax_number`, `country_code`, `preferred_currency`, `active`, `created_at`.

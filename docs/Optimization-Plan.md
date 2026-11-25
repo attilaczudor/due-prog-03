@@ -110,7 +110,7 @@ The codebase is in good condition. The findings below are specific and narrow, n
 | Java compiler warnings | 0 | 0 |
 | Shade warnings | 9 | 9 (unchanged, irreducible) |
 
-Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43** (details in their sections).
+Pass 4 raised the totals to **103 tests across 31 classes**, pass 5 to **113 across 33**, pass 6 to **120 across 34**, pass 7 to **127 across 35**, pass 8 to **131 across 36**, pass 10 to **136 across 37**, pass 11 to **145 across 40**, pass 12 to **150 across 42**, pass 13 to **157 across 43**, pass 14 to **161 across 44** (details in their sections).
 
 ## Phase 2 — Improvements
 
@@ -681,13 +681,34 @@ applying the damage write-off at count time instead of at close each failed a te
 - **A borrowed label.** The scan box said "Scan QR to Collect", reused from order staging; it has its own
   wording now.
 
-### Not done
+### Quarantine (pass 14)
 
-- **Quarantine.** Damaged stock is written off, which is the existing path. A real quarantine — stock held
-  aside but not yet written off — needs a package status of its own, and the status list is a SQLite `CHECK`
-  constraint, so adding one means rebuilding the inventory table. That is worth doing carefully rather than
-  quickly.
+Damage found at a stocktake no longer writes stock off. The package goes to a new `QUARANTINED` status: held
+aside, not sellable, not counted in stock valuation, and not written off either. The Stocktake screen lists
+what is in quarantine with two decisions — return it to stock, or write it off for good — each recorded as a
+stock movement with the reason given.
+
+Both the package status and the movement type are SQLite `CHECK` constraints, which cannot be widened in
+place, so `QuarantineMigration` rebuilds the inventory and movement tables once from the current schema.
+Rebuilding drops a table's indexes with it, so they are recreated from the same schema afterwards, and ids are
+preserved so every foreign key still points where it did. Nothing else had to change to keep quarantined stock
+out of orders: every path that makes stock sellable already asks for `IN_STOCK` by name.
+
+A migration test reverts a demo database to the pre-quarantine schema and upgrades it, checking row counts,
+ids, indexes and foreign keys. Two mutation checks: skipping the index recreation, and rebuilding on every
+start, each fail it. The second one only failed after the test was strengthened — it had compared the schema
+text, which a rebuild reproduces exactly; comparing the table's root page actually detects a rebuild.
+
+**A mistake in the test, not the code:** the first version of the revert helper renamed the parent table.
+Modern SQLite rewrites child tables' foreign keys to follow a rename, so `order_items` ended up pointing at a
+table the helper then dropped. The migration itself never renames; the helper now drops and recreates under
+the same name. Finding it was only possible because the error message was widened to name the child row, the
+parent and the key.
+
+### Still not done
+
 - A session cannot be reopened once closed, and there is no printed count sheet.
+- Quarantined stock still counts towards a shelf's used weight, since it is physically on the shelf.
 
 ---
 

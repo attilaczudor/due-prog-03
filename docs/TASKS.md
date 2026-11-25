@@ -36,7 +36,7 @@
 ## After the demo
 
 - [ ] Design payroll approval history, closed periods, corrections, and controlled export after the business rules are agreed.
-- [x] Add stocktake sessions with damage and reweighing. Quarantine is still open: it needs a package status of its own, which means rebuilding the inventory table.
+- [x] Add stocktake sessions with damage, reweighing and quarantine. Damaged stock is held aside under its own status until somebody returns it to stock or writes it off.
 - [ ] Consider an S-shaped pick route once the physical layout is known. Consider an S-shaped pick route once the physical layout is known.
 - [ ] Move money from SQLite REAL to integer minor units (a migration touching many files).
 - [ ] Decide which roles may create invoices (from an order, manually, from a receipt) and gate that too; assign invoice numbers at issue instead of at draft creation.
