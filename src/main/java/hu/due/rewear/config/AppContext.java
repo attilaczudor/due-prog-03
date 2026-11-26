@@ -8,8 +8,10 @@ import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.NavReportDao;
+import hu.due.rewear.dao.DowntimeDao;
 import hu.due.rewear.dao.GradeYieldDao;
 import hu.due.rewear.dao.PurchaseLotDao;
+import hu.due.rewear.service.DowntimeService;
 import hu.due.rewear.service.GradeYieldService;
 import hu.due.rewear.service.PurchaseLotService;
 import hu.due.rewear.nav.NavCredentialStore;
@@ -93,6 +95,8 @@ public final class AppContext {
     private final PurchaseLotDao purchaseLotDao;
     private final GradeYieldDao gradeYieldDao;
     private final GradeYieldService gradeYieldService;
+    private final DowntimeDao downtimeDao;
+    private final DowntimeService downtimeService;
     private final PurchaseLotService purchaseLotService;
     private final NavReportingService navReportingService;
     private final NavCredentialStore navCredentialStore;
@@ -276,6 +280,8 @@ public final class AppContext {
         this.gradeYieldDao = new GradeYieldDao(databaseManager);
         this.gradeYieldService = new GradeYieldService(databaseManager, session, gradeYieldDao,
                 dictionaryDao, purchaseLotDao, settingsDao);
+        this.downtimeDao = new DowntimeDao(databaseManager);
+        this.downtimeService = new DowntimeService(databaseManager, session, downtimeDao);
 
         invoiceService.syncOverdueStatuses();
         initLocalizationFromPreferences();
@@ -334,6 +340,14 @@ public final class AppContext {
 
     public GradeYieldService getGradeYieldService() {
         return gradeYieldService;
+    }
+
+    public DowntimeService getDowntimeService() {
+        return downtimeService;
+    }
+
+    public DowntimeDao getDowntimeDao() {
+        return downtimeDao;
     }
 
     public PurchaseLotDao getPurchaseLotDao() {

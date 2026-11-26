@@ -368,6 +368,43 @@ Index: `idx_yield_baseline_active`.
 
 ---
 
+### 3.52–3.53 Leállásnapló (`downtime_reasons`, `downtime_events`)
+
+| Oszlop (`downtime_reasons`) | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Egyedi azonosító |
+| `code` | `TEXT` | `NOT NULL UNIQUE COLLATE NOCASE` | Rövid kód (pl. `SUP-WAIT`) |
+| `loss_group` | `TEXT` | `NOT NULL CHECK (8 érték)` | Veszteségcsoport: `SUPPLY`, `EQUIPMENT`, `QUALITY`, `CHANGEOVER`, `FACILITY`, `STAFFING`, `ADMIN`, `EXTERNAL` |
+| `name_en`, `name_hu` | `TEXT` | `NOT NULL` | A megfogalmazás mindkét nyelven, a műhely saját szavaival |
+| `attributable` | `INTEGER` | `NOT NULL DEFAULT 0 CHECK (0,1)` | A csapat saját ideje-e (túlnyúlt szünet igen, áramszünet nem) |
+| `active`, `retired_at` | | `CHECK` párban | Kivezetett ok nem törlődik: a alatta rögzített leállások azzal a megfogalmazással történtek |
+
+| Oszlop (`downtime_events`) | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `work_day` | `TEXT` | `NOT NULL` | Melyik munkanaphoz tartozik |
+| `team_id`, `sorter_id`, `station_id` | `INTEGER` | `FK`, elhagyható | `NULL` csapat = az egész üzem, `NULL` válogató = a csapat mindenkije |
+| `started_at`, `ended_at` | `TEXT` | `ended_at` elhagyható | Mikor állt le és mikor indult újra (helyi idő, mint a munkanap) |
+| `minutes` | `INTEGER` | `CHECK (> 0)` | Hossza percben, mindig a két időbélyegből számolva, sosem begépelve |
+| `people_affected` | `INTEGER` | `NOT NULL DEFAULT 1 CHECK (> 0)` | Hányan álltak; a csapatból származtatva és eltárolva, mert a csapat összetétele változik |
+| `reason_id` | `INTEGER` | `FK -> downtime_reasons` | Az ok; lezáráskor kötelező |
+| `opened_by`, `opened_at`, `closed_by`, `closed_at` | | | Ki nyitotta és ki zárta |
+
+A tábla saját `CHECK` megszorítása mondja ki a szabályt, amin az egész nyilvántartás áll: **ok nélkül semmi
+nem zárható le.** Vagy még tart a leállás (`ended_at`, `minutes`, `closed_at`, `closed_by` mind `NULL`), vagy
+lezárult — és akkor mind a négy ki van töltve, az ok is. Az indoklás nélkül lezárt leállás az a sor, amelyik
+később „ismeretlen" néven jön elő, amikor valaki összeadja az órákat.
+
+Kétféle összeg készül belőle, szándékosan elkülönítve. A **perc** az, ameddig a szalag állt — ez egy ember
+saját nem produktív ideje. A **főperc** (perc × érintett fő) az, amibe került: a négy embert megállító fél óra
+négyszer annyi, mint az egy embert megállító. Rendelkezésre állás csak az utóbbiból számolható, a beosztott
+**válogatóórákhoz** mérve (a segéd csomagol, a targoncás ellát — az ő órájuk nem a szalag kapacitása). Egy
+konkrét emberre szűkített kérdésnél a főperc az ő saját perce, mert a mellette álló három ember a csapat
+veszteségéről szóló tény, nem az ő bónuszáról.
+
+Indexek: `idx_downtime_day`, `idx_downtime_reason`.
+
+---
+
 ### 3.31b Nyersanyag-tételek és igénylés (`sorting_raw_lots`, `sorting_requests`)
 
 - **`sorting_raw_lots`:** egy napi begyűjtés a `reference` (egyedi) mellett `material` (mit tartalmaz), `source_area`

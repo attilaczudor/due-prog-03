@@ -20,7 +20,7 @@ import java.util.Map;
 
 final class SortingDemoSeeder {
     private static final String SEED_KEY = "demo.sorting.seeded";
-    private static final String CURRENT_VERSION = "5";
+    private static final String CURRENT_VERSION = "6";
     /** How many work days of sorting the demo workspace opens with, the last of them today. */
     private static final int HISTORY_DAYS = 6;
     /** The order a sorter fills the bags in: the premium grade first, the rags last. */
@@ -106,6 +106,7 @@ final class SortingDemoSeeder {
             upgradeRawLots();
             upgradeRota();
             upgradeSortingHistory();
+            upgradeStoppages();
             return;
         }
         var stationManager = users.findByUsername("operator");
@@ -171,6 +172,7 @@ final class SortingDemoSeeder {
             seedRawLots(conn, manager.get().id());
             seedRota(conn, manager.get().id());
             seedSortingHistory(conn);
+            seedStoppages(conn, new hu.due.rewear.dao.DowntimeDao(db), manager.get().id());
         });
     }
 
@@ -408,7 +410,7 @@ final class SortingDemoSeeder {
                     LocalDateTime requested = today
                             ? now.minusHours(shift == 0 ? 5 : 2)
                             : day.atTime(shift == 0 ? 6 : 14, shift == 0 ? 40 : 20);
-                    LocalDateTime delivered = requested.plusMinutes(35);
+                    LocalDateTime delivered = requested.plusMinutes(12);
                     LocalDateTime finished = today
                             ? now.minusMinutes(30)
                             : day.atTime(shift == 0 ? 13 : 21, 50);
@@ -462,6 +464,83 @@ final class SortingDemoSeeder {
             }
         }
     }
+
+    /**
+     * The week's stoppages: a couple a day, one of them still running.
+     *
+     * <p>The seeded week has people working through material all day without ever stopping, which no line
+     * does. These are the ordinary interruptions — a scale that failed, a forklift that was somewhere else, a
+     * meeting, a power cut that stopped the whole floor — so that the stoppage screen opens with something to
+     * read and the availability figure is a figure rather than a hundred per cent.
+     *
+     * <p>One of them is left running. Closing it, and having to say why, is the first thing a reader of this
+     * demo does with the record.
+     *
+     * <p>Nothing is seeded if any stoppage is already logged, or if the week itself is not there: a stoppage
+     * attributed to a shift nobody worked would be an invention rather than an example.
+     */
+    private static void seedStoppages(Connection conn, hu.due.rewear.dao.DowntimeDao downtime, long supervisor)
+            throws SQLException {
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT 1 FROM downtime_events LIMIT 1")) {
+            if (rs.next()) return;
+        }
+        List<HistoryTeam> teams = historyTeams(conn);
+        if (teams.isEmpty()) return;
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT 1 FROM sorting_requests WHERE processed_grams IS NOT NULL LIMIT 1")) {
+            if (!rs.next()) return;
+        }
+        Map<String, Long> reasons = new java.util.LinkedHashMap<>();
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT code, id FROM downtime_reasons WHERE active = 1")) {
+            while (rs.next()) reasons.put(rs.getString(1), rs.getLong(2));
+        }
+        if (reasons.isEmpty()) return;
+
+        List<LocalDate> days = historyDays();
+        LocalDateTime now = BusinessClock.now();
+        for (Stoppage stoppage : STOPPAGES) {
+            if (stoppage.dayIndex() >= days.size()) continue;
+            Long reason = reasons.get(stoppage.reasonCode());
+            if (reason == null) continue;
+            LocalDate day = days.get(stoppage.dayIndex());
+            HistoryTeam team = stoppage.teamIndex() < 0 ? null : teams.get(stoppage.teamIndex() % teams.size());
+            LocalDateTime started = day.atTime(stoppage.hour(), stoppage.minute());
+            LocalDateTime ended = started.plusMinutes(stoppage.minutes());
+            Long teamId = team == null ? null : team.id();
+            Long stationId = team == null ? null : team.stationId();
+            int people = downtime.peopleAffected(conn, teamId, null, day);
+            downtime.insertEvent(conn, day, teamId, null, stationId, started, ended, stoppage.minutes(),
+                    people, reason, stoppage.note(), supervisor, ended, supervisor, ended);
+        }
+        // Still stopped: the scale at one station went down half an hour ago and nobody has said why yet.
+        HistoryTeam waiting = teams.get(0);
+        int people = downtime.peopleAffected(conn, waiting.id(), null, now.toLocalDate());
+        downtime.insertEvent(conn, now.toLocalDate(), waiting.id(), null, waiting.stationId(),
+                now.minusMinutes(28), null, null, people, null, null, supervisor, now.minusMinutes(28),
+                null, null);
+    }
+
+    /**
+     * One seeded stoppage. A negative team index is the whole floor, which is how a power cut is recorded.
+     */
+    private record Stoppage(int dayIndex, int teamIndex, String reasonCode, int hour, int minute, int minutes,
+                            String note) { }
+
+    private static final List<Stoppage> STOPPAGES = List.of(
+            new Stoppage(0, 1, "SUP-WAIT", 9, 20, 35, "Kifogyott a bála, a targonca a másik oldalon volt"),
+            new Stoppage(0, 3, "EQP-SCALE", 11, 5, 50, "Mérleg újraindítás, szerviz hívva"),
+            new Stoppage(1, -1, "ADM-MEET", 6, 45, 25, "Heti műszakértekezlet"),
+            new Stoppage(1, 2, "QUA-DIRTY", 13, 10, 40, "Nedves tétel, külön rakva"),
+            new Stoppage(2, 0, "STA-TRAIN", 7, 30, 60, "Új válogató betanítása"),
+            new Stoppage(2, 4, "SUP-LATE", 15, 40, 20, null),
+            new Stoppage(3, -1, "FAC-POWER", 10, 15, 45, "Áramkimaradás az egész csarnokban"),
+            new Stoppage(3, 1, "CHG-LINE", 14, 50, 15, "Átállás gyerekruháról pólóra"),
+            new Stoppage(4, 2, "EQP-LABEL", 8, 35, 30, "Címkenyomtató papírelakadás"),
+            new Stoppage(4, 3, "STA-BREAK", 12, 20, 12, "A szünet túlnyúlt"),
+            new Stoppage(5, 0, "SUP-WAIT", 7, 55, 22, null),
+            new Stoppage(5, 4, "EXT-DOCK", 9, 45, 35, "A kapu foglalt volt a kiszállítás miatt"));
 
     /**
      * The work days the history covers, oldest first. Today is in it whatever day of the week it is, so the
@@ -708,13 +787,29 @@ final class SortingDemoSeeder {
         }
     }
 
+    /** Gives an existing demo workspace the week's stoppages, without touching anything else. */
+    private void upgradeStoppages() {
+        var manager = users.findByUsername("manager");
+        if (manager.isEmpty()) return;
+        db.runInTransaction(conn -> {
+            try (var marker = conn.prepareStatement("""
+                    UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '5'
+                    """)) {
+                marker.setString(1, CURRENT_VERSION);
+                marker.setString(2, SEED_KEY);
+                if (marker.executeUpdate() != 1) return;
+            }
+            seedStoppages(conn, new hu.due.rewear.dao.DowntimeDao(db), manager.get().id());
+        });
+    }
+
     /** Gives an existing demo workspace the worked week, without touching anything else. */
     private void upgradeSortingHistory() {
         db.runInTransaction(conn -> {
             try (var marker = conn.prepareStatement("""
                     UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '4'
                     """)) {
-                marker.setString(1, CURRENT_VERSION);
+                marker.setString(1, "5");
                 marker.setString(2, SEED_KEY);
                 if (marker.executeUpdate() != 1) return;
             }

@@ -28,6 +28,9 @@ import java.util.function.Function;
 final class SortingView extends JPanel implements NavigableView {
     private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
             .withZone(BusinessClock.ZONE);
+    /** A stoppage is a wall-clock event on a work day, so its times are written and read as local ones. */
+    private static final DateTimeFormatter STAMP = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+    private static final DateTimeFormatter SHORT_STAMP = DateTimeFormatter.ofPattern("MM-dd HH:mm");
 
     private final AppContext ctx;
     private final SortingService service;
@@ -41,6 +44,11 @@ final class SortingView extends JPanel implements NavigableView {
     private final JTextField yieldTo = new JTextField(10);
     private final JLabel yieldSummary = new JLabel(" ");
     private hu.due.rewear.dao.GradeYieldDao.Scope yieldScope = hu.due.rewear.dao.GradeYieldDao.Scope.all();
+    private final DataTable<hu.due.rewear.model.DowntimeEvent> stoppages = new DataTable<>();
+    private final JTextField downFrom = new JTextField(10);
+    private final JTextField downTo = new JTextField(10);
+    private final JLabel downSummary = new JLabel(" ");
+    private hu.due.rewear.dao.DowntimeDao.Scope downScope = hu.due.rewear.dao.DowntimeDao.Scope.all();
     private final DataTable<Team> teams = new DataTable<>();
     private final DataTable<Daily> daily = new DataTable<>();
     private final List<ActionButton> actions = new ArrayList<>();
@@ -56,6 +64,11 @@ final class SortingView extends JPanel implements NavigableView {
         workDate.setText(day.toString());
         yieldFrom.setText(day.minusDays(30).toString());
         yieldTo.setText(day.toString());
+        downFrom.setText(day.minusDays(7).toString());
+        downTo.setText(day.toString());
+        // The period the screen opens on is the period the boxes say it is. Opening on everything ever
+        // recorded, with last week's dates showing above it, would be a figure nobody could place.
+        downScope = new hu.due.rewear.dao.DowntimeDao.Scope(day.minusDays(7), day, null, null);
         setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
         add(sections);
         RoleCode role = ctx.getSession().requireCurrentUser().roleCode();
@@ -123,6 +136,32 @@ final class SortingView extends JPanel implements NavigableView {
             yieldPanel.add(yieldSummary, BorderLayout.SOUTH);
             sections.addSection("yield.title", SidebarIcons.forView(MainFrame.VIEW_DASHBOARD, 16), yieldPanel);
         }
+        // Where the hours went that were not spent sorting. It sits beside yield because the two answer the
+        // same question from opposite ends: what came out of the time, and what happened to the rest of it.
+        if (manages || role == RoleCode.SORTER) {
+            boolean keepsReasons = RoleCode.MANAGEMENT.contains(role) || role == RoleCode.PRODUCTION_LEAD;
+            var downActions = controls();
+            downFrom.getAccessibleContext().setAccessibleName(t("downtime.from"));
+            downTo.getAccessibleContext().setAccessibleName(t("downtime.to"));
+            downActions.add(downFrom);
+            downActions.add(downTo);
+            addAction(downActions, "downtime.show", true, this::showDowntime);
+            if (manages) {
+                addAction(downActions, "downtime.record", false, this::recordStoppage);
+                addAction(downActions, "downtime.close", false, this::closeStoppage);
+            }
+            addAction(downActions, "downtime.breakdown", false, this::downtimeBreakdown);
+            if (keepsReasons) {
+                addAction(downActions, "downtime.reason.new", false, this::newReason);
+                addAction(downActions, "downtime.reason.edit", false, this::editReason);
+            }
+            var downPanel = new JPanel(new BorderLayout(0, 6));
+            downPanel.setOpaque(false);
+            downPanel.add(downActions, BorderLayout.NORTH);
+            downPanel.add(new JScrollPane(stoppages.table), BorderLayout.CENTER);
+            downPanel.add(downSummary, BorderLayout.SOUTH);
+            sections.addSection("downtime.title", SidebarIcons.forView(MainFrame.VIEW_TODO, 16), downPanel);
+        }
         if (manages) {
             var teamActions = controls();
             addAction(teamActions, "sorting.team.new", true, () -> editTeam(null));
@@ -141,6 +180,207 @@ final class SortingView extends JPanel implements NavigableView {
         }
         applyTranslations();
         applyTheme();
+    }
+
+    // ---------------------------------------------------------------- stoppages
+
+    private hu.due.rewear.service.DowntimeService downtime() {
+        return ctx.getDowntimeService();
+    }
+
+    private void showDowntime() {
+        downScope = new hu.due.rewear.dao.DowntimeDao.Scope(
+                LocalDate.parse(downFrom.getText().strip()), LocalDate.parse(downTo.getText().strip()),
+                null, null);
+    }
+
+    /**
+     * Records a stoppage. Leaving the "started again" box empty starts the clock instead of closing it,
+     * which is what somebody standing at a stopped line actually wants.
+     */
+    private void recordStoppage() {
+        var teamBox = choices(withAll(service.workspace(day).teams().stream()
+                .map(row -> new Choice<>(row.id(), row.name())).toList(), "downtime.whole_line"));
+        var sorterBox = choices(withAll(sorterChoices(), "downtime.everybody"));
+        var stationBox = choices(withAll(ctx.getLocationDao()
+                .findByType(LocationType.OPERATOR_STATION, true).stream()
+                .map(row -> new Choice<>(row.id(), row.code())).toList(), "downtime.any_station"));
+        var reasonBox = choices(withAll(reasonChoices(), "downtime.reason_unknown"));
+        var started = new JTextField(BusinessClock.now().format(STAMP), 16);
+        var ended = new JTextField(16);
+        var note = new JTextField(24);
+        if (!form("downtime.record", "downtime.team", teamBox, "downtime.sorter", sorterBox,
+                "sorting.station", stationBox, "downtime.started", started, "downtime.ended", ended,
+                "downtime.reason", reasonBox, "common.notes", note)) {
+            return;
+        }
+        Long team = optional(teamBox);
+        Long sorter = optional(sorterBox);
+        Long station = optional(stationBox);
+        Long reason = optional(reasonBox);
+        var from = stamp(started.getText());
+        var to = ended.getText().isBlank() ? null : stamp(ended.getText());
+        if (to == null) {
+            downtime().open(team, sorter, station, from, reason, note.getText());
+            return;
+        }
+        if (reason == null) {
+            throw new IllegalArgumentException(t("downtime.reason_required"));
+        }
+        downtime().log(team, sorter, station, from, to, reason, note.getText());
+    }
+
+    /** Closes the selected stoppage. A reason is not optional here: that is the point of the record. */
+    private void closeStoppage() {
+        var event = stoppages.selected();
+        if (event == null || !event.running()) {
+            JOptionPane.showMessageDialog(this, t("downtime.select_running"), t("common.warning"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        var reasonBox = choices(reasonChoices());
+        if (event.reasonId() != null) {
+            select(reasonBox, event.reasonId());
+        }
+        var note = new JTextField(event.note() == null ? "" : event.note(), 24);
+        var since = new JLabel(event.scopeLabel() + " · " + event.startedAt().format(STAMP));
+        if (form("downtime.close", "", since, "downtime.reason", reasonBox, "common.notes", note)) {
+            downtime().close(event.id(), selected(reasonBox), note.getText());
+        }
+    }
+
+    /** The same minutes grouped two ways: by loss group, which is what gets managed, and by reason. */
+    private void downtimeBreakdown() {
+        var report = downtime().report(downScope);
+        if (report.isEmpty()) {
+            JOptionPane.showMessageDialog(this, t("downtime.nothing_logged"), t("downtime.title"),
+                    JOptionPane.PLAIN_MESSAGE);
+            return;
+        }
+        var text = new StringBuilder();
+        for (var group : report.groups()) {
+            text.append(t("downtime.group." + group.group().name().toLowerCase(java.util.Locale.ROOT)))
+                    .append(": ").append(group.minutes()).append(" ").append(t("downtime.min"))
+                    .append(" · ").append(money(group.sharePercent())).append("%\n");
+        }
+        text.append("\n");
+        for (var line : report.lines()) {
+            text.append(line.code()).append(" · ").append(line.name(ctx.getI18n().getActiveLanguage()))
+                    .append(": ").append(line.minutes()).append(" ").append(t("downtime.min"))
+                    .append(line.attributable() ? " · " + t("downtime.attributable.yes") : "")
+                    .append("\n");
+        }
+        JOptionPane.showMessageDialog(this, text.toString().strip(), t("downtime.breakdown"),
+                JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private void newReason() {
+        var groupBox = groupChoices();
+        var code = new JTextField(10);
+        var english = new JTextField(24);
+        var hungarian = new JTextField(24);
+        var crewsOwn = new JCheckBox(t("downtime.attributable_hint"));
+        if (form("downtime.reason.new", "downtime.reason.code", code, "downtime.group", groupBox,
+                "downtime.reason.en", english, "downtime.reason.hu", hungarian, "", crewsOwn)) {
+            downtime().createReason(code.getText(),
+                    hu.due.rewear.model.LossGroup.valueOf((String) groupBox.getSelectedItem()),
+                    english.getText(), hungarian.getText(), crewsOwn.isSelected());
+        }
+    }
+
+    /**
+     * Rewording is what the fortnightly review of the list is for, so this edits the text in place; the
+     * retire box takes a reason out of use without touching the stoppages already logged under it.
+     */
+    private void editReason() {
+        var reasons = downtime().reasons(false);
+        if (reasons.isEmpty()) {
+            return;
+        }
+        var reasonBox = choices(reasons.stream()
+                .map(row -> new Choice<>(row.id(), row.code() + " · " + row.nameEn()
+                        + (row.active() ? "" : " (" + t("downtime.retired") + ")"))).toList());
+        var groupBox = groupChoices();
+        var english = new JTextField(24);
+        var hungarian = new JTextField(24);
+        var crewsOwn = new JCheckBox(t("downtime.attributable_hint"));
+        var retire = new JCheckBox(t("downtime.reason.retire"));
+        Runnable fill = () -> {
+            int index = reasonBox.getSelectedIndex();
+            if (index < 0) {
+                return;
+            }
+            long id = reasonBox.getItemAt(index).value();
+            reasons.stream().filter(row -> row.id() == id).findFirst().ifPresent(row -> {
+                groupBox.setSelectedItem(row.lossGroup().name());
+                english.setText(row.nameEn());
+                hungarian.setText(row.nameHu());
+                crewsOwn.setSelected(row.attributable());
+                retire.setSelected(!row.active());
+            });
+        };
+        fill.run();
+        reasonBox.addActionListener(event -> fill.run());
+        if (!form("downtime.reason.edit", "downtime.reason", reasonBox, "downtime.group", groupBox,
+                "downtime.reason.en", english, "downtime.reason.hu", hungarian, "", crewsOwn, "", retire)) {
+            return;
+        }
+        long id = selected(reasonBox);
+        var current = reasons.stream().filter(row -> row.id() == id).findFirst().orElseThrow();
+        downtime().updateReason(id, hu.due.rewear.model.LossGroup.valueOf((String) groupBox.getSelectedItem()),
+                english.getText(), hungarian.getText(), crewsOwn.isSelected());
+        if (retire.isSelected() && current.active()) {
+            downtime().retireReason(id);
+        } else if (!retire.isSelected() && !current.active()) {
+            downtime().reinstateReason(id);
+        }
+    }
+
+    private JComboBox<String> groupChoices() {
+        var box = new JComboBox<String>();
+        for (var group : hu.due.rewear.model.LossGroup.values()) {
+            box.addItem(group.name());
+        }
+        return box;
+    }
+
+    private List<Choice<Long>> reasonChoices() {
+        return downtime().reasons(true).stream()
+                .map(row -> new Choice<>(row.id(),
+                        row.code() + " · " + row.name(ctx.getI18n().getActiveLanguage())))
+                .toList();
+    }
+
+    private List<Choice<Long>> sorterChoices() {
+        return ctx.getUserDao().findAll().stream()
+                .filter(user -> user.active() && user.roleCode() == RoleCode.SORTER)
+                .map(user -> new Choice<>(user.id(), user.displayName()))
+                .toList();
+    }
+
+    /** Puts "everybody" at the top of a list, held as zero, because a stoppage often belongs to no one row. */
+    private List<Choice<Long>> withAll(List<Choice<Long>> items, String labelKey) {
+        var all = new ArrayList<Choice<Long>>();
+        all.add(new Choice<>(0L, t(labelKey)));
+        all.addAll(items);
+        return all;
+    }
+
+    private static Long optional(JComboBox<Choice<Long>> options) {
+        long value = selected(options);
+        return value == 0 ? null : value;
+    }
+
+    private static java.time.LocalDateTime stamp(String text) {
+        try {
+            return java.time.LocalDateTime.parse(text.strip().replace(' ', 'T'));
+        } catch (java.time.format.DateTimeParseException ex) {
+            throw new IllegalArgumentException("Use the form 2026-11-26 14:05 for a time.");
+        }
+    }
+
+    private static String shortStamp(java.time.LocalDateTime value) {
+        return value == null ? "—" : value.format(SHORT_STAMP);
     }
 
     private static JPanel controls() {
@@ -515,6 +755,34 @@ final class SortingView extends JPanel implements NavigableView {
                       + (cascade.baselineName() == null ? " · " + t("yield.no_baseline")
                          : " · " + t("yield.baseline") + ": " + cascade.baselineName()));
         }
+        RoleCode role = ctx.getSession().requireCurrentUser().roleCode();
+        if (role.runsProduction() || role == RoleCode.SORTER) {
+            String language = ctx.getI18n().getActiveLanguage();
+            stoppages.set(downtime().events(downScope), row -> new Object[]{
+                    row.workDay().toString(), row.scopeLabel(),
+                    row.reasonCode() == null ? t("downtime.running")
+                            : row.reasonCode() + " · " + row.reasonName(language),
+                    row.lossGroup() == null ? "—"
+                            : t("downtime.group." + row.lossGroup().name().toLowerCase(java.util.Locale.ROOT)),
+                    shortStamp(row.startedAt()), shortStamp(row.endedAt()),
+                    row.minutes() == null ? "—" : String.valueOf(row.minutes()),
+                    row.peopleAffected(),
+                    row.minutes() == null ? "—" : String.valueOf((long) row.minutes() * row.peopleAffected()),
+                    Boolean.TRUE.equals(row.attributable()) ? t("downtime.attributable.yes")
+                            : t("downtime.attributable.no"),
+                    dash(row.note()), dash(row.openedByName())});
+            var stopped = downtime().report(downScope);
+            var availability = stopped.availabilityPercent();
+            downSummary.setText(stopped.isEmpty() ? t("downtime.nothing_logged")
+                    : t("downtime.stopped") + ": " + stopped.stoppedMinutes() + " " + t("downtime.min")
+                      + " · " + t("downtime.person_minutes") + ": " + stopped.personMinutes()
+                      + " · " + t("downtime.attributable") + ": " + stopped.attributablePersonMinutes()
+                      + " · " + t("downtime.not_theirs") + ": " + stopped.unattributablePersonMinutes()
+                      + " · " + t("downtime.availability") + ": "
+                      + (availability == null ? t("downtime.no_roster") : money(availability) + "%")
+                      + " · " + t("downtime.waiting") + ": " + stopped.waitingForStockMinutes() + " "
+                      + t("downtime.min"));
+        }
         teams.set(state.teams(), row -> new Object[]{row.name(), row.sorterIds().size(), row.helperIds().size(), kg(row.targetGrams()),
                 row.bonusBasisPoints() == null ? "—" : percent(row.bonusBasisPoints())});
         daily.set(state.daily(), row -> new Object[]{row.sorter(), row.helper(), kg(row.processedGrams()),
@@ -539,6 +807,9 @@ final class SortingView extends JPanel implements NavigableView {
                 "purchase.assessed_by");
         columns(yield, "sorting.grade", "yield.output_kg", "yield.share", "yield.baseline_share",
                 "yield.variance", "yield.value_eur", "yield.value_huf");
+        columns(stoppages, "sorting.work_day", "downtime.scope", "downtime.reason", "downtime.group",
+                "downtime.started", "downtime.ended", "downtime.minutes", "downtime.people",
+                "downtime.person_minutes", "downtime.attributable", "common.notes", "downtime.opened_by");
         columns(teams, "sorting.team", "sorting.team.sorters", "sorting.team.helpers", "sorting.target_kg", "sorting.bonus_rate");
         columns(daily, "role.SORTER", "role.SORTING_HELPER", "sorting.processed_kg", "sorting.target_kg",
                 "common.status", "sorting.bonus_rate");

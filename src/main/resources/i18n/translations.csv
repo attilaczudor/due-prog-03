@@ -985,3 +985,54 @@ yield.margin,Margin,Fedezet
 yield.baseline_name,Baseline name,A viszonyítási alap neve
 yield.baseline_notes,Notes,Megjegyzés
 yield.baseline_activate,Measure variance against this one,Ehhez mérjük az eltérést
+downtime.title,Stoppages,Leállások
+downtime.from,Stoppages from (YYYY-MM-DD),Leállások ettől (ÉÉÉÉ-HH-NN)
+downtime.to,Stoppages to (YYYY-MM-DD),Leállások eddig (ÉÉÉÉ-HH-NN)
+downtime.show,Show Period,Időszak mutatása
+downtime.record,Record Stoppage,Leállás rögzítése
+downtime.close,It Started Again,Újraindult
+downtime.breakdown,Breakdown,Megoszlás
+downtime.scope,Whose time,Kinek az ideje
+downtime.group,Kind of loss,Veszteség típusa
+downtime.reason,Reason,Ok
+downtime.reason.new,New Reason,Új ok
+downtime.reason.edit,Reword or Retire,Átfogalmazás vagy kivezetés
+downtime.reason.code,Code,Kód
+downtime.reason.en,English wording,Angol megfogalmazás
+downtime.reason.hu,Hungarian wording,Magyar megfogalmazás
+downtime.reason.retire,Take out of use (keeps what was logged under it),Kivezetés (a már rögzített leállások megmaradnak)
+downtime.reason_unknown,Not known yet,Még nem tudni
+downtime.reason_required,A stoppage that has ended needs a reason.,A lezárt leálláshoz okot kell megadni.
+downtime.retired,retired,kivezetve
+downtime.team,Team,Csapat
+downtime.sorter,Sorter,Válogató
+downtime.whole_line,The whole line,Az egész üzem
+downtime.everybody,Everybody in scope,Mindenki az érintettek közül
+downtime.any_station,No particular station,Nem egy adott állomás
+downtime.started,Stopped at (YYYY-MM-DD HH:MM),Leállt ekkor (ÉÉÉÉ-HH-NN ÓÓ:PP)
+downtime.ended,Started again at (leave empty if still stopped),Újraindult ekkor (hagyd üresen ha még áll)
+downtime.minutes,Minutes,Perc
+downtime.people,People,Fő
+downtime.person_minutes,Person-minutes,Főperc
+downtime.attributable,Crew's own time,A csapat saját ideje
+downtime.attributable.yes,Theirs,Övék
+downtime.attributable.no,Not theirs,Nem övék
+downtime.attributable_hint,The crew could have done something about this,A csapat tehetett volna ellene
+downtime.not_theirs,Not theirs,Nem övék
+downtime.opened_by,Recorded by,Rögzítette
+downtime.running,Still stopped,Még áll
+downtime.select_running,Select a stoppage that is still running.,Válassz egy még tartó leállást.
+downtime.nothing_logged,Nothing stopped in this period.,Ebben az időszakban nem volt leállás.
+downtime.stopped,Stopped,Állt
+downtime.availability,Availability,Rendelkezésre állás
+downtime.no_roster,no rostered hours,nincs beosztott óra
+downtime.waiting,Waiting for material (worked out),Anyagra várás (számított)
+downtime.min,min,perc
+downtime.group.supply,Material supply,Anyagellátás
+downtime.group.equipment,Equipment,Eszköz
+downtime.group.quality,Quality and rework,Minőség és újramunka
+downtime.group.changeover,Changeover,Átállás
+downtime.group.facility,Building,Épület
+downtime.group.staffing,People,Létszám
+downtime.group.admin,Meetings and admin,Értekezlet és adminisztráció
+downtime.group.external,Outside the floor,Külső ok

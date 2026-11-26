@@ -720,3 +720,64 @@ CREATE TABLE IF NOT EXISTS grade_yield_baseline_shares (
 );
 
 CREATE INDEX IF NOT EXISTS idx_yield_baseline_active ON grade_yield_baselines(active, period_to);
+
+-- Downtime and non-productive time. Two things make this record worth keeping. The first is that a bonus
+-- paid on kilograms is only defensible if the time somebody spent waiting for material is separable from the
+-- time they spent sorting: the same log that answers "where did the hours go" also answers "why is my bonus
+-- lower than hers". The second is that a manual sorting line has no machine signal to read, so the only
+-- availability figure this operation can ever have is the one a supervisor writes down.
+--
+-- Lean practice is specific about the shape of the list, and the shape is the feature: a short, fixed set of
+-- loss groups with a handful of reasons each, written in the operators' own words and reviewed every couple
+-- of weeks. Plants that put two hundred reasons on a touchscreen get operators who pick the first plausible
+-- option during an active stoppage, which is worse than no list at all.
+CREATE TABLE IF NOT EXISTS downtime_reasons (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    loss_group TEXT NOT NULL CHECK (loss_group IN ('SUPPLY', 'EQUIPMENT', 'QUALITY', 'CHANGEOVER',
+        'FACILITY', 'STAFFING', 'ADMIN', 'EXTERNAL')),
+    name_en TEXT NOT NULL,
+    name_hu TEXT NOT NULL,
+    -- Whether the stopped time is the crew's own. A break that ran over is theirs; a power cut is not, and
+    -- counting it against them is how a bonus scheme loses the room.
+    attributable INTEGER NOT NULL DEFAULT 0 CHECK (attributable IN (0, 1)),
+    active INTEGER NOT NULL DEFAULT 1 CHECK (active IN (0, 1)),
+    created_by INTEGER REFERENCES users(id),
+    created_at TEXT NOT NULL,
+    -- A retired reason keeps its rows: the stoppages logged under it last year happened under that wording.
+    retired_at TEXT,
+    CHECK ((active = 1 AND retired_at IS NULL) OR (active = 0 AND retired_at IS NOT NULL))
+);
+
+-- One stoppage. A null team is the whole line rather than nobody, and a null sorter is everybody on the
+-- team: a power cut stops the site, and saying so should not mean naming twenty people.
+CREATE TABLE IF NOT EXISTS downtime_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_day TEXT NOT NULL,
+    team_id INTEGER REFERENCES sorting_teams(id),
+    sorter_id INTEGER REFERENCES users(id),
+    station_id INTEGER REFERENCES warehouse_locations(id),
+    started_at TEXT NOT NULL,
+    ended_at TEXT,
+    -- Stored, not derived at read time, for the same reason weights are stored in grams: the aggregates are
+    -- then exact integer arithmetic. The service computes it from the two timestamps and never anywhere else.
+    minutes INTEGER CHECK (minutes > 0),
+    -- How many people were standing still. Derived from the team when the stoppage is opened rather than
+    -- typed, and stored, because team membership changes and a figure recomputed from next month's roster
+    -- would quietly rewrite last month's availability.
+    people_affected INTEGER NOT NULL DEFAULT 1 CHECK (people_affected > 0),
+    reason_id INTEGER REFERENCES downtime_reasons(id),
+    note TEXT,
+    opened_by INTEGER NOT NULL REFERENCES users(id),
+    opened_at TEXT NOT NULL,
+    closed_by INTEGER REFERENCES users(id),
+    closed_at TEXT,
+    -- Nothing closes without a reason. A stoppage closed with no explanation is the row that turns up as
+    -- "unknown" when somebody finally asks where the hours went, and by then nobody remembers.
+    CHECK ((ended_at IS NULL AND minutes IS NULL AND closed_at IS NULL AND closed_by IS NULL)
+        OR (ended_at IS NOT NULL AND minutes IS NOT NULL AND reason_id IS NOT NULL
+            AND closed_at IS NOT NULL AND closed_by IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_downtime_day ON downtime_events(work_day);
+CREATE INDEX IF NOT EXISTS idx_downtime_reason ON downtime_events(reason_id);

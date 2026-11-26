@@ -1198,6 +1198,105 @@ in the sorting screen itself and nowhere else.
 
 ---
 
+## Pass 23 — where the hours went (26 November 2026)
+
+### Two uses, one record
+
+The research pairs this with grade yield for a reason. A bonus paid on kilograms is only defensible if the
+time somebody spent waiting for material is separable from the time they spent sorting, so the log that
+answers *where did the shift go* is the same log that answers *why is my bonus lower than hers* — and the
+second question is the one that gets asked out loud. The other use is that a manual sorting line has no
+machine to interrogate: the only availability figure this operation can ever have is the one a supervisor
+writes down.
+
+Lean practice is unusually specific about the shape of such a list, and the shape is the feature: around eight
+loss groups with fewer than ten reasons each, written in the operators' own words and reviewed every couple of
+weeks. A plant running two hundred reasons on a touchscreen gets people picking the first plausible option
+while the line is still stopped, which is worse than no list at all.
+
+### Built
+
+- [x] **Eight loss groups, fixed in code; nineteen reasons, not fixed at all.** Three to a group at most. The
+  groups are what reporting is built on, so they are in an enum; the wording inside them belongs to whoever
+  runs the floor, so it is in the database with a New Reason and a Reword or Retire button next to it. A
+  retired reason keeps every stoppage logged under it, because those happened under that wording and
+  restating last quarter's history in this quarter's vocabulary would make the report a work of fiction.
+- [x] **Nothing closes without a reason**, in the service and in the table's own `CHECK`. A stoppage closed
+  blank is the row that comes back as "unknown" when somebody finally adds the hours up, and by then nobody
+  remembers. A reason may be given while the line is still stopped, when it is already obvious; it may not be
+  left out when the line starts again.
+- [x] **Every reason is marked as the crew's own time or not.** A break that ran over is theirs. Waiting for a
+  forklift, a power cut and a stocktake are not, and holding those against a bonus is how a scheme stops being
+  believed. Three of the nineteen starters are attributable.
+- [x] **Person-minutes as well as wall-clock minutes.** A half-hour that stopped four people cost four times
+  what a half-hour that stopped one did. How many people were standing still is worked out from the team when
+  the stoppage is recorded and then stored, because team membership changes and a figure recomputed from next
+  month's roster would quietly rewrite last month's availability.
+- [x] **Availability against rostered sorter-hours**, from the rota the application already keeps. Sorters
+  only: a helper packs what comes off the bench and a driver feeds it, and counting their hours in would make
+  every stoppage look smaller than it was. With nothing rostered the figure is absent rather than zero.
+- [x] **The wait the application can work out for itself.** Between a sorter calling for material and a driver
+  delivering it, from timestamps that were already being written. It is reported *beside* the logged
+  stoppages and never added to them: the shift leader may well have logged that same wait by hand, and adding
+  both counts it twice.
+- [x] **One wording for "covers".** A stoppage of the whole line covers every team on it and a team's covers
+  its sorters — the same clause both narrows a report and refuses a second stoppage opened over a running
+  one, so the two cannot drift into disagreeing about who was standing still.
+- [x] **Recording is the shift leader's, the list is the production lead's, and a sorter reads their own.**
+  The same split as the yield baseline, for the same reason: logging against the list is daily work, changing
+  what the list says sets what everybody is measured against.
+- [x] **A dozen stoppages seeded into the demo week**, one of them still running. Closing it, and having to
+  say why, is the first thing a reader of the demo does with the record.
+
+### Deliberately not built
+
+**The other two thirds of OEE.** Availability times Performance times Quality is what the research describes,
+and only Availability is computable from what exists: Performance needs a target rate per hour that no
+published source has for a manual textile line, and Quality needs a rework count that nothing in the
+application records yet. Shipping a number labelled OEE that is really Availability would be worse than
+shipping neither.
+
+**A target.** For the same reason grade yield ships none. There is no published availability benchmark for a
+manual sorting line, and a figure from somebody else's plant is not a target.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **257 / 257** across 54 classes (+23).
+
+Twelve mutation checks: a table that accepts a stoppage closed blank; person-minutes that ignore how many
+people stopped; every minute held against the crew; availability reported as zero when nothing was rostered;
+a second stoppage opened over a running one; the derived wait added into the logged total; a team report that
+leaves out what stopped the whole line; a sorter covered only by a stoppage with their own name on it;
+availability measured against everybody's hours rather than the sorters'; a retired reason still being logged
+against; the derived wait truncated rather than rounded; and one person's own time counting the whole bench.
+
+Three of them found real defects rather than confirming the tests. The second mutation of the covering clause
+only hit the copy inside the no-double-open check, and that copy was wrong: a stoppage running on one team
+blocked recording one on another, because it tested only whether the sorter field was empty. That is why
+there is one clause now instead of two. The derived wait came back as twenty-four minutes for a twenty-five
+minute wait, because the difference of two dates in SQLite is a floating-point number of days and the cast
+truncated it; a day of such waits would have lost an hour nobody could account for.
+
+The third was found by looking at the sorter's own screen rather than by a mutation, and it mattered most.
+Her non-productive time read 1,728 person-minutes, which is her bench's loss and not hers: the three people
+standing next to her are a fact about the team's figure, not about her bonus. Person-minutes are now weighted
+by the people a stoppage stopped only when the question is about more than one of them. That is the exact
+arithmetic the research says makes somebody distrust a bonus calculation, and it was wrong on the one screen
+where the person affected would have read it.
+
+### Not done
+
+The shift handover record with its 48-hour escalation, which is now the last item on the research roadmap
+before the handheld client. The downtime log feeds one of its six fields — downtime minutes and primary cause
+— so that field is now a query rather than something to type.
+
+The demo's own availability reads higher than a real line's would, at around 96%. The rota rosters twenty
+sorters a day while the seeded week has ten of them actually working, so the denominator counts hours nobody
+in the sample ever filled. Fixing that means seeding work for the whole roster, which is a change to the
+week rather than to the stoppage record, and it belongs with whatever next revisits the demo.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

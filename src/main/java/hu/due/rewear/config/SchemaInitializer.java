@@ -79,6 +79,9 @@ public final class SchemaInitializer {
         new SortingRawMaterialMigration(dbManager).upgrade(sql);
         new QuarantineMigration(dbManager).upgrade(sql);
         new ExactDecimalMigration(dbManager).upgrade(sql);
+        // The stoppage reason list is reference data an existing installation needs as much as a new one, so
+        // it is filled here rather than with the first-run sample data — but only when it is empty.
+        new DowntimeReasonStarterList(dbManager).ensure();
         LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
     }
 
