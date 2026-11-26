@@ -1047,6 +1047,70 @@ the record is now structured, but the hand that fills it in has not moved.
 
 ---
 
+## Pass 21 — grade yield, and no target to go with it (26 November 2026)
+
+### The measurement the business runs on
+
+The application set targets and paid bonuses against kilograms through the line. That is the less important
+number: premium grade is roughly a tenth of the weight and over half of the revenue, and wearables are more
+than 90% of income, so a point of grade mix moves the business further than a point of throughput. Everything
+needed to say so was already in the database — graded bags with weights, the request they came from, the
+sorter, the team, and since pass 20 the purchase lot behind the material. What was missing was the arithmetic
+and something to compare it with.
+
+### Built
+
+- [x] **The cascade, as a share of processed input.** Grade by grade, with the residue — what went in and
+  came out as no graded bag at all — as a line of its own. A mix that counts only saleable output flatters
+  itself, and on the demo numbers the residue is half the input.
+- [x] **Scoped four ways**: purchase lot, raw lot, team, sorter, and any period, in any combination. Per lot
+  it answers whether a purchase price was a good one; per sorter and team it is the fair version of the
+  bonus question.
+- [x] **Valued at the prices the rest of the application already uses** — the product's own price where one
+  is set, the grade's otherwise, exactly as stock valuation resolves it, so the two screens cannot quietly
+  disagree. Both currencies are carried.
+- [x] **Margin per purchase lot**, costing only the part that has actually been sorted. Charging a whole lot
+  against a part of its output would read as a loss that is not there.
+- [x] **No target ships with the application.** This is the deliberate one. The published cascade is Nordic
+  2014 data and the reusable/recyclable/waste split runs from 53/33/14 in one country to 80/13/6 in another,
+  so a figure from the literature would measure somebody else's material and somebody else's people.
+  Instead a baseline is captured from a stated period of this site's own history, by a named person, and
+  frozen — variance against a number that moves whenever it is recomputed is not variance. Exactly one
+  baseline is active at a time.
+- [x] **Reading and setting are different permissions.** A shift leader reads the mix; what everybody is
+  measured against is the production lead's call.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **224 / 224** across 51 classes (+14).
+
+Shares are floored rather than rounded, so they never add up to more than the whole and the residue absorbs
+the rounding instead of going negative. Two tests pin that: three equal thirds, and a share whose fourth
+digit would round up.
+
+Mutation checks: taking shares of output instead of input; counting unfinished requests; rounding shares
+instead of flooring them; costing a whole lot rather than its sorted part; leaving more than one baseline
+active; and letting anybody set the baseline.
+
+Two of those six survived the first run, and the fault was in the tests rather than the code. The unfinished-
+request test had nothing finished in the database, so the report came back empty either way; it now mixes a
+finished run with an open one and checks that the open bags do not inflate the finished run's mix. And the
+rounding test used a share of exactly one third, which floors and rounds to the same 3333; it now uses two
+thirds, where the two answers differ. Both mutations fail the suite now.
+
+### Not done
+
+The downtime and non-productive-time log the research pairs with this. The two together are what make a bonus
+figure defensible — separating time a sorter spent waiting for stock from time they were sorting — and the
+delivery timestamps needed for it are already in the database.
+
+The demo workspace seeds raw lots and teams but no sorting requests at all, so the yield screen opens empty,
+as do graded bags and the daily board. Seeding a worked history would bring four screens to life at once, but
+it would also change the demo weights that several existing tests assert on, so it belongs in its own pass
+rather than smuggled into this one.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

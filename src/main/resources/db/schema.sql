@@ -688,3 +688,35 @@ CREATE TABLE IF NOT EXISTS purchase_lot_events (
 CREATE INDEX IF NOT EXISTS idx_purchase_lots_supplier ON purchase_lots(supplier_id);
 CREATE INDEX IF NOT EXISTS idx_purchase_lots_received ON purchase_lots(received_on);
 CREATE INDEX IF NOT EXISTS idx_purchase_lot_events_lot ON purchase_lot_events(lot_id, id);
+
+-- 50. Grade yield baselines
+-- The mix a sorting line produces is the measurement the business runs on: premium grade is about a tenth
+-- of the weight and over half of the revenue, so a point of mix is worth far more than a point of
+-- throughput. What a *good* mix looks like, though, is a property of this site's own material and people.
+-- The published cascades are Nordic 2014 figures and the reusable/recyclable/waste split swings from
+-- 53/33/14 to 80/13/6 between countries, so this application ships no target at all. A baseline is captured
+-- from a period of the site's own history, deliberately, by a named person, and frozen: variance measured
+-- against a figure that drifts every time it is recomputed means nothing.
+CREATE TABLE IF NOT EXISTS grade_yield_baselines (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    period_from TEXT NOT NULL,
+    period_to TEXT NOT NULL,
+    processed_grams INTEGER NOT NULL CHECK (processed_grams > 0),
+    active INTEGER NOT NULL DEFAULT 0 CHECK (active IN (0, 1)),
+    captured_by INTEGER NOT NULL REFERENCES users(id),
+    captured_at TEXT NOT NULL,
+    notes TEXT
+);
+
+-- One share per grade, in basis points of processed input, so the shares are exact integers that add up.
+-- The residue -- what went in but came out as no graded bag at all -- is a share like any other and is held
+-- against a null grade, because a cascade that only counts what was saleable flatters itself.
+CREATE TABLE IF NOT EXISTS grade_yield_baseline_shares (
+    baseline_id INTEGER NOT NULL REFERENCES grade_yield_baselines(id) ON DELETE CASCADE,
+    quality_grade_id INTEGER REFERENCES quality_grades(id),
+    share_basis_points INTEGER NOT NULL CHECK (share_basis_points BETWEEN 0 AND 10000),
+    UNIQUE (baseline_id, quality_grade_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_yield_baseline_active ON grade_yield_baselines(active, period_to);

@@ -8,7 +8,9 @@ import hu.due.rewear.dao.EmailDao;
 import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.NavReportDao;
+import hu.due.rewear.dao.GradeYieldDao;
 import hu.due.rewear.dao.PurchaseLotDao;
+import hu.due.rewear.service.GradeYieldService;
 import hu.due.rewear.service.PurchaseLotService;
 import hu.due.rewear.nav.NavCredentialStore;
 import hu.due.rewear.service.NavReportingService;
@@ -89,6 +91,8 @@ public final class AppContext {
     private final InventoryPackageDao packageDao;
     private final NavReportDao navReportDao;
     private final PurchaseLotDao purchaseLotDao;
+    private final GradeYieldDao gradeYieldDao;
+    private final GradeYieldService gradeYieldService;
     private final PurchaseLotService purchaseLotService;
     private final NavReportingService navReportingService;
     private final NavCredentialStore navCredentialStore;
@@ -269,6 +273,9 @@ public final class AppContext {
         this.purchaseLotDao = new PurchaseLotDao(databaseManager);
         this.purchaseLotService = new PurchaseLotService(databaseManager, session, purchaseLotDao);
         this.sortingService.setPurchaseLots(purchaseLotDao);
+        this.gradeYieldDao = new GradeYieldDao(databaseManager);
+        this.gradeYieldService = new GradeYieldService(databaseManager, session, gradeYieldDao,
+                dictionaryDao, purchaseLotDao, settingsDao);
 
         invoiceService.syncOverdueStatuses();
         initLocalizationFromPreferences();
@@ -323,6 +330,10 @@ public final class AppContext {
 
     public WarehouseLocationDao getLocationDao() {
         return locationDao;
+    }
+
+    public GradeYieldService getGradeYieldService() {
+        return gradeYieldService;
     }
 
     public PurchaseLotDao getPurchaseLotDao() {

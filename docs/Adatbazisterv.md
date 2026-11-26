@@ -343,6 +343,29 @@ tábla minden minősítést megőriz, mert a nyomtalanul felülírható szakvél
 
 Indexek: `idx_purchase_lots_supplier`, `idx_purchase_lots_received`, `idx_purchase_lot_events_lot`.
 
+### 3.50–3.51 Kihozatali viszonyítási alap (`grade_yield_baselines`, `grade_yield_baseline_shares`)
+| Oszlop | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `id` | `INTEGER` | `PRIMARY KEY AUTOINCREMENT` | Egyedi azonosító |
+| `name` | `TEXT` | `NOT NULL` | A viszonyítási alap neve |
+| `period_from`, `period_to` | `TEXT` | `NOT NULL` | Mely időszak tényadataiból készült |
+| `processed_grams` | `INTEGER` | `NOT NULL CHECK (> 0)` | Mennyi feldolgozott bemenetre épül |
+| `active` | `INTEGER` | `NOT NULL DEFAULT 0 CHECK (0,1)` | Ehhez mérjük az eltérést; egyszerre csak egy lehet aktív |
+| `captured_by`, `captured_at` | | `NOT NULL` | Ki rögzítette és mikor |
+
+A `grade_yield_baseline_shares` minőségi osztályonként egy arányt tárol bázispontban
+(`share_basis_points`), a **feldolgozott bemenet** arányában. A `quality_grade_id` `NULL` értéke a
+**maradék**: ami bement, de nem lett belőle minősített zsák. Az arányok lefelé kerekítve készülnek, így soha
+nem adnak ki többet az egésznél, és a kerekítés maradéka a maradék sorba kerül.
+
+**Az alkalmazás nem szállít kihozatali célszámot.** A szakirodalom kaszkádja 2014-es északi adat, az
+újrahasználható/újrafeldolgozható/hulladék arány pedig országonként 53/33/14 és 80/13/6 között szóródik — egy
+onnan vett szám más anyagát és más embereit mérné. A viszonyítási alapot ezért a saját üzem saját
+történetéből, nevesített személy rögzíti, és utána nem mozog: az eltérésnek csak rögzített alaphoz képest van
+értelme.
+
+Index: `idx_yield_baseline_active`.
+
 ---
 
 ### 3.31b Nyersanyag-tételek és igénylés (`sorting_raw_lots`, `sorting_requests`)

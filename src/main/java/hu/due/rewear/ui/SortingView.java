@@ -36,6 +36,11 @@ final class SortingView extends JPanel implements NavigableView {
     private final DataTable<Bag> bags = new DataTable<>();
     private final DataTable<Lot> lots = new DataTable<>();
     private final DataTable<hu.due.rewear.model.PurchaseLot> purchases = new DataTable<>();
+    private final DataTable<hu.due.rewear.service.GradeYieldService.Line> yield = new DataTable<>();
+    private final JTextField yieldFrom = new JTextField(10);
+    private final JTextField yieldTo = new JTextField(10);
+    private final JLabel yieldSummary = new JLabel(" ");
+    private hu.due.rewear.dao.GradeYieldDao.Scope yieldScope = hu.due.rewear.dao.GradeYieldDao.Scope.all();
     private final DataTable<Team> teams = new DataTable<>();
     private final DataTable<Daily> daily = new DataTable<>();
     private final List<ActionButton> actions = new ArrayList<>();
@@ -49,6 +54,8 @@ final class SortingView extends JPanel implements NavigableView {
         this.sections = new SectionNavigation(ctx.getI18n());
         this.day = service.today();
         workDate.setText(day.toString());
+        yieldFrom.setText(day.minusDays(30).toString());
+        yieldTo.setText(day.toString());
         setBorder(BorderFactory.createEmptyBorder(14, 18, 14, 18));
         add(sections);
         RoleCode role = ctx.getSession().requireCurrentUser().roleCode();
@@ -97,6 +104,24 @@ final class SortingView extends JPanel implements NavigableView {
         } else {
             addSection("sorting.requests", MainFrame.VIEW_TODO, requests, requestActions);
             addSection("sorting.bags", MainFrame.VIEW_INTAKE, bags, bagActions);
+        }
+        // Yield is the production lead's measure, so it sits with the daily figures rather than with the
+        // material: what matters is the mix that came out, not the weight that went in.
+        if (manages) {
+            var yieldActions = controls();
+            yieldFrom.getAccessibleContext().setAccessibleName(t("yield.from"));
+            yieldTo.getAccessibleContext().setAccessibleName(t("yield.to"));
+            yieldActions.add(yieldFrom);
+            yieldActions.add(yieldTo);
+            addAction(yieldActions, "yield.show", true, this::showYield);
+            addAction(yieldActions, "yield.by_lot", false, this::yieldByPurchaseLot);
+            addAction(yieldActions, "yield.capture_baseline", false, this::captureBaseline);
+            var yieldPanel = new JPanel(new BorderLayout(0, 6));
+            yieldPanel.setOpaque(false);
+            yieldPanel.add(yieldActions, BorderLayout.NORTH);
+            yieldPanel.add(new JScrollPane(yield.table), BorderLayout.CENTER);
+            yieldPanel.add(yieldSummary, BorderLayout.SOUTH);
+            sections.addSection("yield.title", SidebarIcons.forView(MainFrame.VIEW_DASHBOARD, 16), yieldPanel);
         }
         if (manages) {
             var teamActions = controls();
@@ -272,6 +297,52 @@ final class SortingView extends JPanel implements NavigableView {
         }
     }
 
+    private void showYield() {
+        yieldScope = hu.due.rewear.dao.GradeYieldDao.Scope.all()
+                .withPeriod(LocalDate.parse(yieldFrom.getText().strip()),
+                        LocalDate.parse(yieldTo.getText().strip()));
+    }
+
+    /** Narrows the cascade to one bought lot, which is where a purchase price is judged. */
+    private void yieldByPurchaseLot() {
+        var lot = purchases.selected();
+        if (lot == null) {
+            JOptionPane.showMessageDialog(this, t("yield.select_lot"), t("common.warning"),
+                    JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+        yieldScope = new hu.due.rewear.dao.GradeYieldDao.Scope(lot.id(), null, null, null, null, null);
+        var margin = ctx.getGradeYieldService().marginForPurchaseLot(lot.id());
+        JOptionPane.showMessageDialog(this,
+                t("yield.margin_of") + " " + margin.lotReference() + "\n\n"
+                        + t("yield.processed") + ": " + money(margin.processedKg()) + " kg\n"
+                        + t("yield.cost") + ": " + money(margin.cost()) + " " + margin.currency() + "\n"
+                        + t("yield.revenue") + ": " + money(margin.revenue()) + " " + margin.currency() + "\n"
+                        + t("yield.margin") + ": " + money(margin.margin()) + " " + margin.currency()
+                        + (margin.marginPercent() == null ? "" : "  (" + money(margin.marginPercent()) + "%)"),
+                t("yield.title"), JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private void captureBaseline() {
+        var name = new JTextField(20);
+        var from = new JTextField(yieldFrom.getText(), 10);
+        var to = new JTextField(yieldTo.getText(), 10);
+        var notes = new JTextField(24);
+        var activate = new JCheckBox();
+        activate.setSelected(true);
+        activate.setOpaque(false);
+        if (form("yield.capture_baseline", "yield.baseline_name", name, "yield.from", from, "yield.to", to,
+                "yield.baseline_notes", notes, "yield.baseline_activate", activate)) {
+            ctx.getGradeYieldService().captureBaseline(name.getText(),
+                    LocalDate.parse(from.getText().strip()), LocalDate.parse(to.getText().strip()),
+                    notes.getText(), activate.isSelected());
+        }
+    }
+
+    private static String money(java.math.BigDecimal value) {
+        return hu.due.rewear.util.FormatUtil.stripZeros(value);
+    }
+
     private void newPurchaseLot() {
         var reference = new JTextField(18);
         var country = new JTextField(6);
@@ -426,6 +497,24 @@ final class SortingView extends JPanel implements NavigableView {
                 hu.due.rewear.util.FormatUtil.stripZeros(row.purchasePricePerKg()) + " " + row.currency(),
                 hu.due.rewear.util.FormatUtil.stripZeros(row.totalCost()) + " " + row.currency(),
                 dash(row.assessedByName())});
+        if (ctx.getSession().getCurrentUser().map(u -> u.roleCode().runsProduction()).orElse(false)) {
+            var cascade = ctx.getGradeYieldService().report(yieldScope);
+            yield.set(cascade.lines(), row -> new Object[]{
+                    row.isResidue() ? t("yield.residue") : row.code() + " · " + row.name(),
+                    money(row.kg()), money(row.sharePercent()) + "%",
+                    row.baselineBasisPoints() == null ? "—"
+                            : money(java.math.BigDecimal.valueOf(row.baselineBasisPoints(), 2)) + "%",
+                    row.variancePoints() == null ? "—" : signed(row.variancePoints()),
+                    row.isResidue() ? "—" : money(row.valueEur()),
+                    row.isResidue() ? "—" : money(row.valueHuf())});
+            yieldSummary.setText(cascade.isEmpty() ? t("yield.nothing_sorted")
+                    : t("yield.processed") + ": " + money(cascade.processedKg()) + " kg · "
+                      + t("yield.recovery") + ": " + money(cascade.recoveryPercent()) + "% · "
+                      + t("yield.value_eur") + ": " + money(cascade.valueEur()) + " · "
+                      + t("yield.per_kg") + ": " + money(cascade.revenuePerProcessedKgEur()) + " EUR/kg"
+                      + (cascade.baselineName() == null ? " · " + t("yield.no_baseline")
+                         : " · " + t("yield.baseline") + ": " + cascade.baselineName()));
+        }
         teams.set(state.teams(), row -> new Object[]{row.name(), row.sorterIds().size(), row.helperIds().size(), kg(row.targetGrams()),
                 row.bonusBasisPoints() == null ? "—" : percent(row.bonusBasisPoints())});
         daily.set(state.daily(), row -> new Object[]{row.sorter(), row.helper(), kg(row.processedGrams()),
@@ -448,6 +537,8 @@ final class SortingView extends JPanel implements NavigableView {
         columns(purchases, "purchase.lot", "purchase.supplier", "purchase.country", "purchase.channel",
                 "purchase.legal_status", "purchase.net_kg", "purchase.price_per_kg", "purchase.cost",
                 "purchase.assessed_by");
+        columns(yield, "sorting.grade", "yield.output_kg", "yield.share", "yield.baseline_share",
+                "yield.variance", "yield.value_eur", "yield.value_huf");
         columns(teams, "sorting.team", "sorting.team.sorters", "sorting.team.helpers", "sorting.target_kg", "sorting.bonus_rate");
         columns(daily, "role.SORTER", "role.SORTING_HELPER", "sorting.processed_kg", "sorting.target_kg",
                 "common.status", "sorting.bonus_rate");
@@ -471,7 +562,8 @@ final class SortingView extends JPanel implements NavigableView {
 
     @Override public void applyTheme() {
         sections.applyTheme();
-        for (var data : List.of(requests, bags, lots, purchases, teams, daily)) BrutalistStyle.styleTable(data.table);
+        for (var data : List.of(requests, bags, lots, purchases, yield, teams, daily)) BrutalistStyle.styleTable(data.table);
+        yieldSummary.setForeground(hu.due.rewear.config.ThemeManager.muted());
         actions.forEach(action -> {
             if (action.primary()) BrutalistStyle.stylePrimaryButton(action.button());
             else BrutalistStyle.styleSecondaryButton(action.button());
@@ -491,6 +583,12 @@ final class SortingView extends JPanel implements NavigableView {
     /** Raw loads are talked about in tonnes; the exact kilograms are in the cell's tooltip. */
     private static String amount(long grams) {
         return SortingService.tonnes(grams).toPlainString() + " t";
+    }
+
+    /** A variance reads better with its sign: +1.4 and -1.4 are different news. */
+    private static String signed(java.math.BigDecimal points) {
+        String text = hu.due.rewear.util.FormatUtil.stripZeros(points);
+        return points.signum() > 0 ? "+" + text : text;
     }
 
     private static String dash(String value) {

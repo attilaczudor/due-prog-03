@@ -958,3 +958,30 @@ purchase.status.unassessed,Not yet assessed,Még nincs minősítve
 purchase.status.waste,Waste,Hulladék
 purchase.status.fit_for_reuse,Fit for re-use,Újrahasználatra alkalmas
 purchase.none_open,"There is no assessed purchase lot with material left. Record one, and assess it, first.","Nincs olyan minősített beszerzési tétel, amelyből még maradt anyag. Előbb rögzítsen egyet és minősítse."
+yield.title,Grade yield,Minőségi kihozatal
+yield.show,Show Period,Időszak mutatása
+yield.by_lot,Yield and Margin of Selected Lot,A kijelölt tétel kihozatala és fedezete
+yield.capture_baseline,Capture Baseline,Viszonyítási alap rögzítése
+yield.from,From,Ettől
+yield.to,To,Eddig
+yield.output_kg,Sorted out (kg),Kiválogatva (kg)
+yield.share,Share of input,Bemenet arányában
+yield.baseline_share,Baseline,Viszonyítási alap
+yield.variance,Variance (points),Eltérés (százalékpont)
+yield.value_eur,Value (EUR),Érték (EUR)
+yield.value_huf,Value (HUF),Érték (HUF)
+yield.residue,"Residue — went in, no graded bag came out","Maradék — bement, de nem lett belőle minősített zsák"
+yield.processed,Processed,Feldolgozva
+yield.recovery,Graded out of input,Minősített kihozatal
+yield.per_kg,Value per processed kg,Feldolgozott kilónkénti érték
+yield.baseline,Baseline,Viszonyítási alap
+yield.no_baseline,no baseline captured yet,még nincs rögzített viszonyítási alap
+yield.nothing_sorted,Nothing was sorted in this period.,Ebben az időszakban nem volt válogatás.
+yield.select_lot,Select a purchase lot first.,Előbb válasszon egy beszerzési tételt.
+yield.margin_of,Yield and margin of,Kihozatal és fedezet:
+yield.cost,Cost,Bekerülési költség
+yield.revenue,Value of output,A kihozatal értéke
+yield.margin,Margin,Fedezet
+yield.baseline_name,Baseline name,A viszonyítási alap neve
+yield.baseline_notes,Notes,Megjegyzés
+yield.baseline_activate,Measure variance against this one,Ehhez mérjük az eltérést

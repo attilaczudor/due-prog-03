@@ -51,7 +51,7 @@ Build in this order:
 - [x] **A purchase lot and intake assessment record.** Done 26 November, pass 20. The schema keystone: supplier, country of origin, collection
       channel, purchase price per kilogram, gross and net weight, customs classification, and the named human
       judgement of whether material is waste or fit for re-use at collection. Retires the free-text collection area.
-- [ ] **Grade-yield reporting and a target that uses it.** Yield by grade per intake lot, team, shift and sorter,
+- [x] **Grade-yield reporting, and a target that uses it.** Done 26 November, pass 21. Yield by grade per intake lot, team, shift and sorter,
       with purchase and sale prices as editable inputs. Learn the site's own baseline rather than shipping a target
       from the literature.
 - [ ] **Shift handover record with 48-hour escalation.** The cheapest high-value item: six structured fields at
