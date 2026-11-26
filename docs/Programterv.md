@@ -6,7 +6,7 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**209 fő Java forrásfájl**, **51 JUnit 5 tesztosztály**, **224 teszt**, ebből 1 csak kérésre fut):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**209 fő Java forrásfájl**, **53 JUnit 5 tesztosztály**, **234 teszt**, ebből 1 csak kérésre fut):
 
 ```mermaid
 flowchart TD
@@ -362,6 +362,14 @@ sequenceDiagram
 
 Ha a tulajdonos a demó munkaterületet választja, az `OnboardingService.startDemoWorkspace()` tölti be a mintaraktárat és a demó fiókokat, és `workspace.mode = DEMO` kerül mentésre. Ettől kezdve a bejelentkezési ablak mutatja a demó belépő gombokat. Már használatban lévő adatbázison a program indításkor nem tölt be mintaadatot.
 
+A demó munkaterület nem üres válogatószalaggal nyit: a `SortingDemoSeeder` hat munkanap befejezett válogatását
+tölti be (csapatonként két ember naponta), az osztálykaszkádot a maradékkal együtt, a mai napot félig készen
+(reggeli műszak lezárva, három csapat munka közben, kettő anyagra vár), reális napi normákat a csapatonkénti
+110–180 kg sávban, valamint csomagolásra és regisztrálásra váró zsákhátralékot. A készletbe való regisztrálás
+és a hozamreferencia szándékosan kimarad — az elsőt az állomásvezető végzi, a másodikat a telephely saját
+előzményéből rögzíti a termelésvezető —, és a betöltés nem fut le, ha a munkaterületen már van bármilyen
+válogatási igény.
+
 ### 4.4 Teljes mentés visszaállítása
 
 ```mermaid
@@ -392,7 +400,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **51 tesztosztály, összesen 224 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **53 tesztosztály, összesen 234 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -432,6 +440,8 @@ A rendszer üzleti logikáját, 42 táblás adatbázis-integritását, többdevi
 | `PickListServiceTest` | 7 | Szedési lista bejárási sorrendje (zóna, sor, polc, numerikus rendezés), haladás, több rendelés, targoncás szűrés, üres lista, PDF |
 | `InvoiceLifecycleTest` | 7 | A számla állapotgépe minden állapot × cél párra, kiállítás dátuma, események, jóváíró számla kapcsolata és régi adatok összekapcsolása |
 | `InvoiceAccessTest` | 4 | Pénzügyi műveletek jogosultsága a szerepkör-mátrix szerint, inaktív és ismeretlen felhasználó elutasítása |
+| `TranslationKeyUsageTest` | 2 | Építési őrteszt: minden névvel kért nyelvi kulcs létezik, és a kötegben ismert névtérbe tartozó, kulcsnak látszó szövegliterál sem hiányzik (a hiányzó kulcs `[kulcs.neve]` alakban jelenik meg, hibát nem dob) |
+| `DemoSortingHistoryTest` | 8 | A demó válogatási előzménye egyezik: minden gyűjtés mérlege (kapott = szabad + feldolgozott + munkában), a bezsákolt súly nem több a feldolgozottnál, 10 grammos QR-pontosság, készletbe nem regisztrált zsákok, napi tábla teljesíthető normával, ismételt indítás, már meglévő válogatási adat és saját norma védelme, fedezet nélküli gyűjtés |
 | `RawMaterialSupplyTest` | 5 | Napi begyűjtés anyaggal és gyűjtési területtel, betárolás utáni elérhetőség, tétel igénylése súly nélkül, kifogyott és be nem tárolt tétel, szerepkörök, demó gyűjtési területek |
 | `RoleHierarchyTest` | 3 | A 11 szerepkör megléte és kétnyelvű megnevezése, modulhozzáférés szerepkörönként (két targoncás szerepkör, pénzügy és bérszámfejtés elkülönítése), a régi egységes targoncás szerepkör egyszeri szétválasztása |
 | `RotaServiceTest` | 5 | Beosztás mentése és felülírása, hónap- és hétrács határai, saját napok kontra teljes cég, írási jogosultság, demó beosztás |

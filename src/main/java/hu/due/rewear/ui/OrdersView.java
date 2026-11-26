@@ -273,7 +273,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(4, 4, 4, 4);
         gbc.fill = GridBagConstraints.HORIZONTAL;
-        BrutalistStyle.addFormRow(form, gbc, 0, i18n.t("role.FORKLIFT"), driverCombo);
+        BrutalistStyle.addFormRow(form, gbc, 0, i18n.t("role.DELIVERY_DRIVER"), driverCombo);
         BrutalistStyle.addFormRow(form, gbc, 1, i18n.t("transport.target_dock"), dockCombo);
 
         if (JOptionPane.showConfirmDialog(this, form, i18n.t("orders.assign_forklift") + " — " + order.orderNumber(),
@@ -646,7 +646,7 @@ public final class OrdersView extends JPanel implements NavigableView {
         itemsTable.getColumnModel().getColumn(4).setHeaderValue(cur);
         itemsTable.getTableHeader().repaint();
 
-        String assignInfo = (order.assignedForkliftName() != null ? "   |   " + i18n.t("role.FORKLIFT") + ": " + order.assignedForkliftName() : "")
+        String assignInfo = (order.assignedForkliftName() != null ? "   |   " + i18n.t("role.DELIVERY_DRIVER") + ": " + order.assignedForkliftName() : "")
                 + (order.dispatchLocationCode() != null ? " (" + order.dispatchLocationCode() + ")" : "")
                 + (order.isCustomerArrived() ? "   |   [ " + i18n.t("orders.customer_arrived.badge").toUpperCase(Locale.ROOT) + " ]" : "");
         String deliveryDate = order.deliveryDate() == null ? "" : i18n.t("orders.delivery_date") + "  " + order.deliveryDate() + "   |   ";

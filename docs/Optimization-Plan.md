@@ -1111,6 +1111,93 @@ rather than smuggled into this one.
 
 ---
 
+## Pass 22 — a worked week behind the demo (26 November 2026)
+
+### Why an empty screen is a defect
+
+The demo workspace seeded people, teams, collections and a month of shifts, and then stopped: not one sorting
+request. Four screens opened on nothing as a result. Grade yield had no mix to report, the graded-bag list was
+blank, the station manager had nothing to label, and the daily board listed the whole roster at zero against a
+target of a tonne a head — the schema's placeholder figure, which no hand sorter has ever met and which made
+every line of the board read as a failure. A reader cannot judge a screen that has nothing on it, and the
+first thing anybody does with this application is open it and look.
+
+### Built
+
+- [x] **Six work days of finished sorting**, two people per team per day, the last of them today. Each run is
+  a call for a named collection, a delivery of whatever the driver actually brought, and a settled processed
+  weight — the same three steps the application itself requires, in the same order.
+- [x] **A grade cascade with a residue in it.** Four grades per run, shifting by team and drifting by day,
+  and deliberately never adding up to the whole: what went in and came out as no graded bag at all is what
+  the yield report shows as the residue. A seeded mix that recovered 100% of its input would teach the
+  opposite of the truth.
+- [x] **Today, half-finished.** The morning shift's work is settled, three teams are part-way through a load
+  with bags already reported, and two have called for material no driver has brought yet. The supply queue,
+  the sorter's open delivery and the day's board all have something in them because the day is genuinely in
+  progress rather than over.
+- [x] **Targets a person could meet** — 110 to 180 kg a head by team, because a winter coat weighs what half
+  a dozen t-shirts weigh — and a 5% bonus rate to go with them. Loads vary by ±15 kg around the target, so
+  some days are made and some are missed. A target everybody hits exactly is not a target anybody is
+  managing. A figure a company has already set for its own line is never overwritten.
+- [x] **A backlog that looks like a Monday.** The bags of the last two days are still loose, which is the
+  helper's work; everything older is packed and waiting on the station manager. One call came to nothing and
+  is recorded as cancelled, because that happens.
+
+### Deliberately not seeded
+
+**Registration into stock.** Registering a bag creates an inventory package at a labelling station that has a
+capacity of its own, and putting those away is a further step again. A seeder that went that far would be
+simulating the warehouse rather than furnishing a demo, and it would move the stock figures the rest of the
+demo data states. The chain stops where the station manager picks it up.
+
+**A yield baseline.** Pass 21 ships no target on purpose, and seeding one would undo that in the only place
+anybody would see it. The six days are there to be captured from: two clicks in the yield panel and the
+variance column fills in with this site's own history behind it.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **234 / 234** across 53 classes (+10).
+
+The new tests check that the seeded week *adds up*, because seeded data that does not is worse than none —
+somebody reads a figure off a demo, finds it impossible, and stops trusting the application rather than the
+sample. Every collection still holds exactly what it received minus what was sorted out of it and what is on
+a bench right now; no run produced more in bags than it was given; no bag weight is finer than the ten grams
+a QR label carries; nothing is registered into stock; opening the workspace twice does not sort the week
+twice; and a workspace with any sorting of its own in it is left alone entirely.
+
+Mutation checks: dropping the guard that refuses to seed over existing sorting; debiting a collection its
+delivered weight rather than its processed weight; dropping the check that a collection can cover a delivery;
+leaving bag weights at gram precision; overwriting a target a company had already set; writing sorting
+timestamps as local date-times; and reintroducing each of the two missing translation keys. All eight fail
+the suite — the seventh only after the guard was widened, which is the paragraph below.
+
+One defect was found by the test suite rather than by me: sorting timestamps are stored as instants, not as
+local date-times, and the first version of the seeder wrote the format the rest of the database uses. Every
+sorting screen then threw on the first row it tried to read. The screen walkthrough caught it immediately,
+which is what that test is for.
+
+Two more were found by looking at the rendered screens, and they had been there for passes. The raw supply
+request table's driver column read **[role.FORKLIFT]** and a stocktake column read **[intake.notes]**: keys
+that do not exist. A missing key throws nothing — `I18nManager` renders it in brackets and the build stays
+green — so `TranslationKeyUsageTest` now fails on any key asked for by name that the bundle does not have,
+`I18nManager` records what it could not answer, and the screen walkthrough fails if any screen it drew asked
+for something missing. The first version of that guard only looked at `t("...")` calls and would have missed
+both: the keys were handed to a table-header helper as plain strings. It now also checks every literal shaped
+like a key whose namespace the bundle knows, which is how a mutation reintroducing `role.FORKLIFT` is caught.
+The three dotted literals in the code that are not keys at all — a navigation target, an async task name and
+a file name — are listed as such.
+
+### Not done
+
+The downtime and non-productive-time log, still. The demo could now show it with real waiting time between a
+call and its delivery, which is exactly the data the log would record.
+
+Notifications are not seeded. The real flow tells a driver that material has been called for and a station
+manager that a bag is ready; seeding a week of those would bury the demo's inbox, so the queues are visible
+in the sorting screen itself and nowhere else.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

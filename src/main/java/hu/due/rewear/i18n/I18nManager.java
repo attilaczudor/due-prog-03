@@ -35,6 +35,7 @@ public final class I18nManager {
 
     private final CsvTranslationLoader loader = new CsvTranslationLoader();
     private final List<LanguageChangeListener> listeners = new CopyOnWriteArrayList<>();
+    private final java.util.Set<String> missingKeys = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     private CsvTranslationLoader.TranslationBundle bundle;
     private CsvTranslationLoader.TranslationBundle bundled;
@@ -171,6 +172,22 @@ public final class I18nManager {
         }
     }
 
+    /**
+     * Keys that were asked for and could not be answered.
+     *
+     * <p>A missing key does not throw: it renders as {@code [the.key]} in whatever header or button asked
+     * for it, so nothing fails and nobody finds out until somebody looks at that screen. Recording them lets
+     * the screen walkthrough fail the build instead of a reader finding it in a demo.
+     */
+    public java.util.Set<String> missingKeys() {
+        return java.util.Set.copyOf(missingKeys);
+    }
+
+    /** Forgets what has been asked for so far, so a test can measure only its own screens. */
+    public void forgetMissingKeys() {
+        missingKeys.clear();
+    }
+
     public String t(String key, Object... args) {
         return tForLanguage(activeLanguage, key, args);
     }
@@ -183,6 +200,8 @@ public final class I18nManager {
         if (perLang == null && bundled != null) perLang = bundled.entries().get(key);
         if (perLang == null) {
             LOG.warn("Missing translation key: {}", key);
+            missingKeys.add(key);
+            missingKeys.add(key);
             return "[" + key + "]";
         }
         String normalizedLang = languageCode == null ? FALLBACK_LANGUAGE : languageCode.trim().toLowerCase(Locale.ROOT);

@@ -429,7 +429,7 @@ final class SortingView extends JPanel implements NavigableView {
             select(station, team.stationId());
         }
         if (form(team == null ? "sorting.team.new" : "common.edit", "sorting.team", name, "sorting.team.helpers", memberPane(helpers),
-                "role.FORKLIFT", driver, "sorting.station", station, "sorting.team.sorters", memberPane(sorters),
+                "role.SUPPLY_DRIVER", driver, "sorting.station", station, "sorting.team.sorters", memberPane(sorters),
                 "sorting.target_kg", target, "sorting.bonus_rate", rate)) {
             service.saveTeam(team == null ? 0 : team.id(), name.getText(), helpers.getSelectedValuesList().stream().map(Choice::value).toList(), selected(driver),
                     selected(station), sorters.getSelectedValuesList().stream().map(Choice::value).toList(), decimal(target),
@@ -525,7 +525,7 @@ final class SortingView extends JPanel implements NavigableView {
     @Override public void applyTranslations() {
         sections.applyTranslations();
         actions.forEach(action -> action.button().setText(t(action.key())));
-        columns(requests, "sorting.batch", "common.status", "role.SORTER", "sorting.team", "role.FORKLIFT",
+        columns(requests, "sorting.batch", "common.status", "role.SORTER", "sorting.team", "role.SUPPLY_DRIVER",
                 "sorting.requested_kg", "sorting.delivered_kg", "sorting.processed_kg", "sorting.output_kg",
                 "sorting.returned_kg", "sorting.other_kg", "sorting.lot", "sorting.lot.material",
                 "sorting.requested_at", "sorting.delivered_at", "sorting.finished_at", "sorting.cancelled_at");

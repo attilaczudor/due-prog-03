@@ -24,6 +24,9 @@ class PayrollWorkflowTest {
     void tracksFlexibleRostersActualPackerAndDepartmentPayOnTheSameWorkDay() {
         var ctx = new AppContext(new DatabaseManager(tmp.resolve("payroll.db")),
                 new AppPreferences(tmp.resolve("app.properties")), new I18nManager());
+        // The demo's own worked week would be counted into these figures too, and which sorter its rotation
+        // put on today is not something this test should turn on.
+        hu.due.rewear.TestWorkspaces.clearSeededSortingHistory(ctx);
         var sorting = ctx.getSortingService();
         var payroll = ctx.getPayrollService();
         var day = payroll.today();

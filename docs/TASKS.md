@@ -1,6 +1,6 @@
 # ReWear WMS task board
 
-**Updated · 25 November 2026 (after the optimization passes)**
+**Updated · 26 November 2026 (after the optimization passes)**
 
 ## Completed in this checkpoint
 
@@ -23,6 +23,8 @@
 - [x] Give the company a role hierarchy: production manager and shift leader above the floor, an HR/payroll role, and the single forklift role split into supply (sorting floor) and delivery (customer orders). Menus follow from the role.
 
 - [x] Add the shift rota as its own main menu with month, week and day calendar views, written by the planning roles and visible to everyone for their own days. The demo workspace is filled with a month of rotating shifts.
+
+- [x] Seed a worked week of sorting into the demo workspace: finished runs with a grade cascade and a residue, today half-finished, realistic daily targets, and a packing backlog. It stops short of registering bags into stock, and seeds no yield baseline, so the demo does not quietly ship a target.
 
 ## Next session
 

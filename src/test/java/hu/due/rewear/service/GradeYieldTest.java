@@ -62,7 +62,10 @@ class GradeYieldTest {
         supply = ctx.getUserDao().findByUsername("forklift").orElseThrow();
         shelf = ctx.getLocationDao().findByType(LocationType.STORAGE, true).get(0).id();
         ctx.getSession().login(manager);
+        // These tests measure the arithmetic of runs they make themselves, so the line starts empty.
+        hu.due.rewear.TestWorkspaces.clearSeededSortingHistory(ctx);
     }
+
 
     /**
      * Sorts one load and reports the given grade split.

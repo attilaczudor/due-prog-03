@@ -11,13 +11,48 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 
 final class SortingDemoSeeder {
     private static final String SEED_KEY = "demo.sorting.seeded";
-    private static final String CURRENT_VERSION = "4";
+    private static final String CURRENT_VERSION = "5";
+    /** How many work days of sorting the demo workspace opens with, the last of them today. */
+    private static final int HISTORY_DAYS = 6;
+    /** The order a sorter fills the bags in: the premium grade first, the rags last. */
+    private static final String[] HISTORY_GRADES = {"CR", "A", "B", "C"};
+    /** The rate the demo teams earn on a day they reach the target. */
+    private static final int BONUS_BASIS_POINTS = 500;
+    /**
+     * A day's work for one person, by team. The schema's placeholder target is a tonne a head, which no hand
+     * sorter has ever met and which makes every line of the daily board read as a failure. These are the
+     * weights this kind of material really moves in a shift, and they differ by team because a winter coat
+     * weighs what half a dozen t-shirts weigh.
+     */
+    private static final Map<String, Long> TEAM_TARGET_GRAMS = Map.of(
+            "Gyerek / Kids", 110_000L,
+            "Pólók / Shirts", 120_000L,
+            "Kabátok / Coats", 150_000L,
+            "Lakástextil / Home textiles", 180_000L,
+            "Vegyes / Mixed", 130_000L);
+    /** Which collection each team works, by reference. */
+    private static final Map<String, String> TEAM_LOT = Map.of(
+            "Gyerek / Kids", "RAW-2026-0004",
+            "Pólók / Shirts", "RAW-2026-0001",
+            "Kabátok / Coats", "RAW-2026-0003",
+            "Lakástextil / Home textiles", "RAW-2026-0002",
+            "Vegyes / Mixed", "RAW-2026-0002");
+    /** What each team produces: the target group and product each grade's bag is reported into. */
+    private static final Map<String, String[][]> TEAM_OUTPUT = Map.of(
+            "Gyerek / Kids", new String[][]{{"K", "MIX"}, {"K", "TSH"}, {"B", "MIX"}, {"K", "JNS"}},
+            "Pólók / Shirts", new String[][]{{"L", "TSH"}, {"M", "TSH"}, {"U", "TSH"}, {"L", "DRS"}},
+            "Kabátok / Coats", new String[][]{{"L", "JKT"}, {"M", "JKT"}, {"L", "SWT"}, {"M", "SWT"}},
+            "Lakástextil / Home textiles", new String[][]{{"H", "MIX"}, {"H", "MIX"}, {"H", "MIX"}, {"H", "MIX"}},
+            "Vegyes / Mixed", new String[][]{{"U", "MIX"}, {"L", "DRS"}, {"M", "JNS"}, {"U", "SHO"}});
     private static final Person FULFILMENT_DRIVER = new Person("Kelemen", "Ádám");
     private static final List<Person> HELPERS = List.of(
             new Person("Szűcs", "Bálint"),
@@ -70,6 +105,7 @@ final class SortingDemoSeeder {
             if ("1".equals(version)) upgradeLegacyNames();
             upgradeRawLots();
             upgradeRota();
+            upgradeSortingHistory();
             return;
         }
         var stationManager = users.findByUsername("operator");
@@ -134,6 +170,7 @@ final class SortingDemoSeeder {
             }
             seedRawLots(conn, manager.get().id());
             seedRota(conn, manager.get().id());
+            seedSortingHistory(conn);
         });
     }
 
@@ -305,6 +342,362 @@ final class SortingDemoSeeder {
         }
     }
 
+    /**
+     * A worked week behind the demo workspace: finished sorting runs, the graded bags they produced, and
+     * today's work still in progress.
+     *
+     * <p>Without it every sorting screen opens blank, and a blank screen teaches nobody anything. Grade yield
+     * has no mix to report, the daily board lists the whole roster at nothing against a target no hand sorter
+     * could meet, and there is not one graded bag to label. What is seeded here is the ordinary week this
+     * facility would have had: two people per team per day, a grade cascade with a residue in it, and a
+     * backlog of bags waiting on the station manager.
+     *
+     * <p>It stops deliberately short of registering bags into stock. Registering creates inventory packages
+     * at a labelling station that has a capacity of its own, and putting those away is a further step again;
+     * a seeder that went that far would be simulating the warehouse rather than furnishing a demo, and it
+     * would move the stock figures the rest of the demo data states. The last step is left as the station
+     * manager's work, which is also what a real Monday morning looks like.
+     *
+     * <p>Nothing is seeded if the workspace already holds a single sorting request. This runs on upgrade as
+     * well as on a fresh install, and a workspace with real work in it is never touched.
+     */
+    private static void seedSortingHistory(Connection conn) throws SQLException {
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT 1 FROM sorting_requests LIMIT 1")) {
+            if (rs.next()) return;
+        }
+        try (var ps = conn.prepareStatement("""
+                UPDATE sorting_teams SET target_grams = ?, bonus_basis_points = COALESCE(bonus_basis_points, ?)
+                WHERE name = ? AND target_grams = 1000000
+                """)) {
+            for (var entry : TEAM_TARGET_GRAMS.entrySet()) {
+                ps.setLong(1, entry.getValue());
+                ps.setInt(2, BONUS_BASIS_POINTS);
+                ps.setString(3, entry.getKey());
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        }
+        List<HistoryTeam> teams = historyTeams(conn);
+        Map<String, Long> lots = storedLots(conn);
+        Map<String, Long> targets = dictionary(conn, "target_groups");
+        Map<String, Long> products = dictionary(conn, "garment_types");
+        Map<String, Long> grades = dictionary(conn, "quality_grades");
+        Map<String, Long> packaging = dictionary(conn, "package_types");
+        boolean ready = !teams.isEmpty() && !lots.isEmpty()
+                && grades.keySet().containsAll(List.of(HISTORY_GRADES))
+                && packaging.containsKey("A") && packaging.containsKey("C");
+        if (!ready) return;
+
+        List<LocalDate> days = historyDays();
+        LocalDateTime now = BusinessClock.now();
+        for (int di = 0; di < days.size(); di++) {
+            LocalDate day = days.get(di);
+            boolean today = di == days.size() - 1;
+            for (int ti = 0; ti < teams.size(); ti++) {
+                HistoryTeam team = teams.get(ti);
+                Long lot = lotFor(team, lots);
+                if (lot == null) continue;
+                String[][] output = TEAM_OUTPUT.get(team.name());
+                if (output == null) continue;
+                for (int shift = 0; shift < 2; shift++) {
+                    long sorter = team.sorterIds().get((2 * di + shift + ti) % team.sorterIds().size());
+                    // Earlier days keep to the rota: the morning starts at 06:40 and hands over at 14:20.
+                    // Today is measured back from the clock instead, so that whenever the demo is opened,
+                    // nothing on the screen has a timestamp in the future.
+                    LocalDateTime requested = today
+                            ? now.minusHours(shift == 0 ? 5 : 2)
+                            : day.atTime(shift == 0 ? 6 : 14, shift == 0 ? 40 : 20);
+                    LocalDateTime delivered = requested.plusMinutes(35);
+                    LocalDateTime finished = today
+                            ? now.minusMinutes(30)
+                            : day.atTime(shift == 0 ? 13 : 21, 50);
+                    long weight = deliveredGrams(team.targetGrams(), di, ti, shift);
+                    if (today && shift == 1) {
+                        // Where the afternoon stands right now: three teams are part-way through a load, and
+                        // the other two have called for material that no driver has brought yet.
+                        if (ti >= 3) {
+                            // Called for by name, which is how a sorter asks: the weight is the driver's to
+                            // decide when the material is actually loaded.
+                            insertRequest(conn, team, sorter, lot, null, null,
+                                    now.minusMinutes(40), null, null, null, null);
+                            continue;
+                        }
+                        long open = insertRequest(conn, team, sorter, lot, weight, null,
+                                requested, delivered, null, null, null);
+                        if (open == 0) continue;
+                        for (int g = 0; g < 2; g++) {
+                            insertBag(conn, open, targets.get(output[g][0]), products.get(output[g][1]),
+                                    grades.get(HISTORY_GRADES[g]),
+                                    bagGrams(weight, shareBasisPoints(g, di, ti)),
+                                    between(delivered, now, g, 2), null, null, null);
+                        }
+                        continue;
+                    }
+                    long processed = processedGrams(weight, di, ti, shift);
+                    long request = insertRequest(conn, team, sorter, lot, weight, processed,
+                            requested, delivered, finished, day, null);
+                    if (request == 0) continue;
+                    // The bags of the last two days are still loose: the helper has them to pack, and the
+                    // station manager has everything older than that to register.
+                    boolean packed = di < days.size() - 2;
+                    for (int g = 0; g < HISTORY_GRADES.length; g++) {
+                        String grade = HISTORY_GRADES[g];
+                        insertBag(conn, request, targets.get(output[g][0]), products.get(output[g][1]),
+                                grades.get(grade), bagGrams(processed, shareBasisPoints(g, di, ti)),
+                                between(delivered, finished, g, HISTORY_GRADES.length),
+                                packed ? packaging.get("CR".equals(grade) ? "C" : "A") : null,
+                                packed ? team.helperId() : null,
+                                packed ? day.atTime(shift == 0 ? 14 : 22, 10) : null);
+                    }
+                }
+                if (di == 0 && ti == teams.size() - 1) {
+                    // One call that came to nothing, because that happens: the material was wanted at
+                    // another station before the driver got to it. It is seeded in its own day's turn so
+                    // that request numbers still run in the order the work was done.
+                    LocalDateTime called = day.atTime(9, 15);
+                    insertRequest(conn, team, team.sorterIds().get(0), lot, null, null,
+                            called, null, null, null, called.plusMinutes(50));
+                }
+            }
+        }
+    }
+
+    /**
+     * The work days the history covers, oldest first. Today is in it whatever day of the week it is, so the
+     * demo always opens with work in progress; the days behind it are weekdays, because the line rests.
+     */
+    private static List<LocalDate> historyDays() {
+        var days = new ArrayList<LocalDate>();
+        LocalDate day = BusinessClock.today();
+        days.add(day);
+        while (days.size() < HISTORY_DAYS) {
+            day = day.minusDays(1);
+            if (day.getDayOfWeek().getValue() <= 5) days.add(day);
+        }
+        java.util.Collections.reverse(days);
+        return days;
+    }
+
+    /**
+     * What the driver brought, a day's target give or take fifteen kilos. The spread is what makes the board
+     * worth looking at: a target every single person meets exactly is not a target anybody is managing.
+     */
+    private static long deliveredGrams(long targetGrams, int day, int team, int shift) {
+        return targetGrams + ((7 * day + 13 * team + 5 * shift) % 7 - 3) * 5_000L;
+    }
+
+    /** Most loads are worked through entirely; now and then a few kilos go back to the shelf unsorted. */
+    private static long processedGrams(long delivered, int day, int team, int shift) {
+        return (day + team + shift) % 5 == 0 ? delivered - 8_000 : delivered;
+    }
+
+    /**
+     * The share of processed input that came out as one grade, in basis points. The cascade shifts by team and
+     * drifts by day, because material differs and people get better at reading it; the four grades never add
+     * up to the whole, and what is left over is the residue the yield report shows as a line of its own.
+     */
+    private static int shareBasisPoints(int grade, int day, int team) {
+        return switch (grade) {
+            case 0 -> 400 + 20 * team;
+            case 1 -> 2600 + 40 * day;
+            case 2 -> 3500 - 20 * day;
+            default -> 2300 + 25 * team;
+        };
+    }
+
+    /** A bag weight to the ten grams, because that is the precision the QR label carries. */
+    private static long bagGrams(long processed, int basisPoints) {
+        return processed * basisPoints / 10_000 / 10 * 10;
+    }
+
+    /**
+     * Which collection a team works. The teams and the collections are both seeded here, so the pairing is
+     * stated outright rather than guessed from the names; a team whose own line is not on a shelf yet takes
+     * whatever is stored.
+     */
+    private static Long lotFor(HistoryTeam team, Map<String, Long> storedLots) {
+        Long preferred = storedLots.get(TEAM_LOT.getOrDefault(team.name(), ""));
+        if (preferred != null) return preferred;
+        return storedLots.values().stream().findFirst().orElse(null);
+    }
+
+    /**
+     * When the {@code index}th of {@code count} bags came off the bench: spread evenly between the delivery
+     * and the end of the run, so a bag is never reported before its material arrived or after the run closed.
+     */
+    private static LocalDateTime between(LocalDateTime from, LocalDateTime to, int index, int count) {
+        var step = java.time.Duration.between(from, to).dividedBy(count + 1L);
+        return from.plus(step.multipliedBy(index + 1L));
+    }
+
+    /**
+     * A sorting timestamp, written the way the sorting service writes one: an instant, not a local time. The
+     * module stores the moment and the business day separately, and a local time stored in the instant column
+     * is read back an hour or two wrong — or not at all.
+     */
+    private static String stamp(LocalDateTime localTime) {
+        return localTime == null ? null : localTime.atZone(BusinessClock.ZONE).toInstant().toString();
+    }
+
+    private record HistoryTeam(long id, String name, long driverId, long stationId, long helperId,
+                               long targetGrams, Integer bonusBasisPoints, List<Long> sorterIds) { }
+
+    /** Teams that could actually have worked: they have a helper and at least one sorter. */
+    private static List<HistoryTeam> historyTeams(Connection conn) throws SQLException {
+        var teams = new ArrayList<HistoryTeam>();
+        record Row(long id, String name, long driver, long station, long target, Integer bonus) { }
+        var rows = new ArrayList<Row>();
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT id,name,driver_id,station_id,target_grams,bonus_basis_points"
+                     + " FROM sorting_teams ORDER BY id")) {
+            while (rs.next()) {
+                int bonus = rs.getInt("bonus_basis_points");
+                rows.add(new Row(rs.getLong("id"), rs.getString("name"), rs.getLong("driver_id"),
+                        rs.getLong("station_id"), rs.getLong("target_grams"), rs.wasNull() ? null : bonus));
+            }
+        }
+        for (Row row : rows) {
+            Long helper = null;
+            try (var ps = conn.prepareStatement(
+                    "SELECT helper_id FROM sorting_team_helpers WHERE team_id = ? ORDER BY helper_id LIMIT 1")) {
+                ps.setLong(1, row.id());
+                try (var rs = ps.executeQuery()) { if (rs.next()) helper = rs.getLong(1); }
+            }
+            var sorters = new ArrayList<Long>();
+            try (var ps = conn.prepareStatement(
+                    "SELECT sorter_id FROM sorting_team_members WHERE team_id = ? ORDER BY sorter_id")) {
+                ps.setLong(1, row.id());
+                try (var rs = ps.executeQuery()) { while (rs.next()) sorters.add(rs.getLong(1)); }
+            }
+            if (helper == null || sorters.isEmpty()) continue;
+            teams.add(new HistoryTeam(row.id(), row.name(), row.driver(), row.station(), helper,
+                    row.target(), row.bonus(), List.copyOf(sorters)));
+        }
+        return teams;
+    }
+
+    private static Map<String, Long> storedLots(Connection conn) throws SQLException {
+        var byReference = new java.util.LinkedHashMap<String, Long>();
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT reference, id FROM sorting_raw_lots"
+                     + " WHERE location_id IS NOT NULL AND available_grams > 0 ORDER BY reference")) {
+            while (rs.next()) byReference.put(rs.getString(1), rs.getLong(2));
+        }
+        return byReference;
+    }
+
+    /** Code-to-id for one of the four catalogues. The table name is a literal from this class, never input. */
+    private static Map<String, Long> dictionary(Connection conn, String table) throws SQLException {
+        var byCode = new java.util.LinkedHashMap<String, Long>();
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT code, id FROM " + table + " WHERE active = 1")) {
+            while (rs.next()) byCode.put(rs.getString(1), rs.getLong(2));
+        }
+        return byCode;
+    }
+
+    /**
+     * One request at whatever stage it reached, with the raw lot debited for it.
+     *
+     * <p>A finished request is debited its processed weight and an open one its delivered weight, which is
+     * the same arithmetic the service performs in two steps: delivery takes the whole load off the shelf and
+     * finishing credits back whatever was not worked through. The lot is read before it is written, so the
+     * demo can never leave a collection owing more material than it received.
+     *
+     * @return the new request id, or 0 if the lot could not cover the delivery
+     */
+    private static long insertRequest(Connection conn, HistoryTeam team, long sorter, Long lotId, Long delivered,
+                                      Long processed, LocalDateTime requestedAt, LocalDateTime deliveredAt,
+                                      LocalDateTime finishedAt, LocalDate workDay, LocalDateTime cancelledAt)
+            throws SQLException {
+        if (lotId != null && delivered != null) {
+            long debit = processed == null ? delivered : processed;
+            try (var ps = conn.prepareStatement(
+                    "UPDATE sorting_raw_lots SET available_grams = available_grams - ?"
+                            + " WHERE id = ? AND available_grams >= ?")) {
+                ps.setLong(1, debit);
+                ps.setLong(2, lotId);
+                ps.setLong(3, debit);
+                if (ps.executeUpdate() != 1) return 0;
+            }
+        }
+        long id;
+        try (var ps = conn.prepareStatement("""
+                INSERT INTO sorting_requests(sorter_id,team_id,driver_id,station_id,target_grams,
+                    bonus_basis_points,requested_at,requested_lot_id,lot_id,delivered_grams,delivered_at,
+                    processed_grams,finished_at,work_day,cancelled_at)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) RETURNING id
+                """)) {
+            ps.setLong(1, sorter);
+            ps.setLong(2, team.id());
+            ps.setLong(3, team.driverId());
+            ps.setLong(4, team.stationId());
+            ps.setLong(5, team.targetGrams());
+            if (team.bonusBasisPoints() == null) ps.setNull(6, java.sql.Types.INTEGER);
+            else ps.setInt(6, team.bonusBasisPoints());
+            ps.setString(7, stamp(requestedAt));
+            if (lotId == null) ps.setNull(8, java.sql.Types.INTEGER); else ps.setLong(8, lotId);
+            if (delivered == null) {
+                ps.setNull(9, java.sql.Types.INTEGER);
+                ps.setNull(10, java.sql.Types.INTEGER);
+                ps.setNull(11, java.sql.Types.VARCHAR);
+            } else {
+                ps.setLong(9, lotId);
+                ps.setLong(10, delivered);
+                ps.setString(11, stamp(deliveredAt));
+            }
+            if (processed == null) {
+                ps.setNull(12, java.sql.Types.INTEGER);
+                ps.setNull(13, java.sql.Types.VARCHAR);
+                ps.setNull(14, java.sql.Types.VARCHAR);
+            } else {
+                ps.setLong(12, processed);
+                ps.setString(13, stamp(finishedAt));
+                ps.setString(14, workDay.toString());
+            }
+            ps.setString(15, stamp(cancelledAt));
+            try (var rs = ps.executeQuery()) { rs.next(); id = rs.getLong(1); }
+        }
+        try (var ps = conn.prepareStatement(
+                "INSERT INTO sorting_request_helpers(request_id,helper_id) VALUES (?,?)")) {
+            ps.setLong(1, id);
+            ps.setLong(2, team.helperId());
+            ps.executeUpdate();
+        }
+        return id;
+    }
+
+    private static void insertBag(Connection conn, long requestId, Long target, Long product, Long grade,
+                                  long grams, LocalDateTime reportedAt, Long packageType, Long packedBy,
+                                  LocalDateTime packedAt) throws SQLException {
+        if (target == null || product == null || grade == null || grams <= 0) return;
+        try (var ps = conn.prepareStatement("""
+                INSERT INTO sorting_bags(request_id,target_group_id,garment_type_id,quality_grade_id,
+                    weight_grams,reported_at,package_type_id,packed_at,packed_by,pack_day)
+                VALUES (?,?,?,?,?,?,?,?,?,?)
+                """)) {
+            ps.setLong(1, requestId);
+            ps.setLong(2, target);
+            ps.setLong(3, product);
+            ps.setLong(4, grade);
+            ps.setLong(5, grams);
+            ps.setString(6, stamp(reportedAt));
+            if (packageType == null) {
+                ps.setNull(7, java.sql.Types.INTEGER);
+                ps.setNull(8, java.sql.Types.VARCHAR);
+                ps.setNull(9, java.sql.Types.INTEGER);
+                ps.setNull(10, java.sql.Types.VARCHAR);
+            } else {
+                ps.setLong(7, packageType);
+                ps.setString(8, stamp(packedAt));
+                ps.setLong(9, packedBy);
+                ps.setString(10, packedAt.toLocalDate().toString());
+            }
+            ps.executeUpdate();
+        }
+    }
+
     private String seedVersion() {
         try (var conn = db.getConnection();
              var ps = conn.prepareStatement("SELECT setting_value FROM app_settings WHERE setting_key = ?")) {
@@ -315,6 +708,20 @@ final class SortingDemoSeeder {
         }
     }
 
+    /** Gives an existing demo workspace the worked week, without touching anything else. */
+    private void upgradeSortingHistory() {
+        db.runInTransaction(conn -> {
+            try (var marker = conn.prepareStatement("""
+                    UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '4'
+                    """)) {
+                marker.setString(1, CURRENT_VERSION);
+                marker.setString(2, SEED_KEY);
+                if (marker.executeUpdate() != 1) return;
+            }
+            seedSortingHistory(conn);
+        });
+    }
+
     /** Gives an existing demo workspace a month of shifts, without touching anything else. */
     private void upgradeRota() {
         var manager = users.findByUsername("manager");
@@ -323,7 +730,7 @@ final class SortingDemoSeeder {
             try (var marker = conn.prepareStatement("""
                     UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '3'
                     """)) {
-                marker.setString(1, CURRENT_VERSION);
+                marker.setString(1, "4");
                 marker.setString(2, SEED_KEY);
                 if (marker.executeUpdate() != 1) return;
             }

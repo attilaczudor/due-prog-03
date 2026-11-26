@@ -75,6 +75,8 @@ class ScreenWalkthroughTest {
         ThemeManager.applyTheme(false);
         AppContext ctx = new AppContext(new DatabaseManager(tempDir.resolve("walkthrough.db")),
                 new AppPreferences(tempDir.resolve("app.properties")), i18n);
+        // Only the keys these screens ask for, not whatever ran before them in this JVM.
+        i18n.forgetMissingKeys();
 
         String shotDir = System.getProperty("shot.dir");
         List<String> problems = new ArrayList<>();
@@ -128,6 +130,10 @@ class ScreenWalkthroughTest {
         }
 
         assertTrue(visited.size() > 40, "Expected to walk most of the application: " + visited.size());
+        // A missing translation key throws nothing: the header simply reads [role.FORKLIFT] and the build
+        // stays green until somebody looks at that screen. Two of those survived several passes that way.
+        assertTrue(i18n.missingKeys().isEmpty(),
+                "Screens asked for translation keys the bundle does not have: " + i18n.missingKeys());
         if (!problems.isEmpty()) {
             fail("Screens that did not come up properly:\n" + String.join("\n", problems));
         }

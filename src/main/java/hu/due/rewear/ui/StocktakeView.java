@@ -308,7 +308,7 @@ public final class StocktakeView extends JPanel implements NavigableView {
         missingModel.setColumnIdentifiers(new Object[]{t("intake.generated_code"), t("intake.location"),
                 t("intake.weight_kg")});
         quarantineModel.setColumnIdentifiers(new Object[]{t("intake.generated_code"), t("intake.location"),
-                t("intake.weight_kg"), t("intake.notes")});
+                t("intake.weight_kg"), t("common.notes")});
         returnBtn.setText(t("stocktake.return"));
         writeOffBtn.setText(t("stocktake.write_off"));
         refreshData();
