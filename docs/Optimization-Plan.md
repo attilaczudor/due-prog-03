@@ -1402,6 +1402,103 @@ See [the state of the application](State-of-the-Application.md).
 
 ---
 
+## Pass 25 — the five roles that opened the application to nothing (26 November 2026)
+
+### A screen that draws is not a screen that says anything
+
+`TodoService` branched on three cases: the two drivers, the station manager, and the office. Every role added
+after it was written — the production lead, the shift leader, the payroll role, and the sorters and helpers who
+are most of the workforce — fell through all three and got an empty list. Five of eleven. Nothing threw, nothing
+was logged, and the walkthrough drew the screen happily, because an empty list is a valid list.
+
+The walkthrough had the same shape of hole, and it is the reason nobody noticed: it logged in as six accounts
+written out by hand, covering six roles. The five it left out are exactly the five with nothing to show. It now
+takes one active account per role from the database, and says so when a role has none — which is how the payroll
+role turned out to have no account at all, the same omission pass 24 found for the two leaders.
+
+### Built
+
+**A work list for every role.** `WorkListDao` holds the queries, each taking the person and the day it is asked
+about rather than reading them from the session, because a list is built on somebody's behalf and the caller is
+the one who knows whose it is.
+
+- **A sorter** sees a stoppage covering them that nobody has closed, how long they have been waiting for
+  material, a run on their bench that is not closed, and their day against their team's target.
+- **A helper** sees the bags on their runs waiting to be packed, and what they worked. They are given no target,
+  because a helper works across benches and the target belongs to the sorter whose bench they are on; and they
+  are not asked to close a run, because they cannot.
+- **The supply driver** finally sees the sorting floor. Their list had order staging and putaway on it and said
+  nothing about the person standing at an empty bench. It now names them, says how long they have waited, and
+  lists the collections that arrived and were never stored, which nobody can call for.
+- **The production lead and the shift leader** see every stoppage still open, the handover owed for the shift
+  that has ended, the one nobody has picked up, open issues with their own first and escalated ones beside them,
+  who is waiting for material, and the floor's bag backlog.
+- **The payroll role** is asked about the last completed day rather than about one still being worked: days that
+  cannot be computed because the department and role have no rate effective by then, and a shift missing from the
+  draft entirely — one item with the names in it, because payroll is a day's job and ten identical rows push
+  everything else off the screen.
+
+**A floor band on the dashboard.** The four figures there — bales, weight, today's intake, open orders — measure
+the business as it was understood before the research, and the charts are stock on hand. Three more, for the roles
+that answer for the line: minutes lost yesterday with the availability behind them, kilograms sorted over seven
+days with the grade mix beside them, and open handover issues with the escalated and overdue counts. Yesterday
+for the stoppages, because a day still being worked has no availability worth reading; seven days for the mix,
+because one day of it swings on which collection happened to be opened.
+
+The mix row is ordered by what each grade **earned**, not by what it weighed. A row ordered by weight shows the
+three grades that matter least and leaves out cream, which is a tenth of the output and, by the research, over
+half of the revenue.
+
+**The demo has a payroll clerk.** Fekete Zsuzsanna, with a quick-fill button beside the two leaders pass 24 added.
+
+### Verification
+
+305 tests (277 before), of which 28 are new. Eighteen mutation checks, each one a guard broken on purpose to see
+a test fail:
+
+| | Broken on purpose | Caught by |
+|---|---|---|
+| MUT1 | A stoppage at another bench lands on every sorter | a sorter sees their own team's stoppage only |
+| MUT2 | The progress line rounds instead of flooring | one gram short of target reads 99%, not 100% |
+| MUT3 | A handover is owed for the shift still running | the morning shift is the one owed at half past three |
+| MUT4 | Every issue is P1, so none of them is | an issue with your name on it outranks one without |
+| MUT5 | An issue that went up a tier is ordinary again | escalation makes it pressing for everybody |
+| MUT6 | Open calls are filtered by a work day they do not have | yesterday's unanswered call is still counted |
+| MUT7 | Payroll is asked about the day being worked | today's sorting is not yet anybody's payroll day |
+| MUT8 | A helper is scored against the sorter's target | a helper is told what they worked instead |
+| MUT9 | A sorter is told to do the helper's packing | packing is on the helper's list only |
+| MUT10 | A rate effective next week pays last night | a later rate leaves the day uncomputable |
+| MUT11 | A manager is handed somebody else's bench | a role with no bench has no own shift |
+| MUT12 | Registered stock still counts as backlog | a registered bag leaves the backlog |
+| MUT13 | The floor roles fall through every branch again | eight tests fail at once |
+| MUT14 | An item asks for a key the bundle does not have | no list may show a raw `[key.name]` |
+| MUT15 | Waiting time is measured against the machine clock | the pinned clock test, and the clock guard test |
+| MUT16 | The floor band is shown to every role | the walkthrough: the services refuse the other roles |
+| MUT17 | A helper is asked to close a run they cannot close | only the sorter closes a run |
+| MUT18 | The mix row is ordered by weight | cream is a tenth of the weight and first by value |
+
+Every screen of all eleven roles was rendered and looked at. Four of the five previously empty lists now carry
+real work in the demo workspace; the fifth, the helper's, carries work as soon as there are runs they are on.
+
+### Not done
+
+**The mix row cannot yet show what the research says it should.** Grade value is priced the way the inventory
+screens price it: the garment type's price where there is one, and the grade's price only as a fallback. Every
+garment in the demo has a price, so a kilogram of cream is valued exactly like a kilogram of rags, the value
+ordering ties with the weight ordering, and cream still does not appear on the row. The row is right and the
+prices are not. Making a grade carry a price of its own is a pricing decision and would make the yield screen and
+the inventory valuation disagree on purpose, which is worth doing deliberately or not at all.
+
+**A sorter's dashboard is unchanged.** The floor band is for the roles that answer for the line; the stock and
+order figures still say nothing to a sorter. Their work list is the answer for them, and a dashboard of their own
+was not worth inventing before anybody has asked for one.
+
+**No work list is personalised beyond the role.** A production lead with three shift leaders under them sees every
+open issue rather than the ones on their shift, for the same reason pass 24 escalates to a role rather than to a
+named person.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

@@ -28,6 +28,7 @@ import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.dao.SmartFolderDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.TodoDao;
+import hu.due.rewear.dao.WorkListDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
 import hu.due.rewear.i18n.I18nManager;
@@ -117,6 +118,7 @@ public final class AppContext {
     private final ChatDao chatDao;
     private final NotificationDao notificationDao;
     private final TodoDao todoDao;
+    private final WorkListDao workListDao;
     private final RoleModulePermissionDao roleModulePermissionDao;
 
     private final AuthService authService;
@@ -266,7 +268,6 @@ public final class AppContext {
         this.rotaService = new RotaService(databaseManager, session, userDao);
         this.stocktakeService = new StocktakeService(databaseManager, session, packageDao, movementDao);
         this.pickListPdfExporter = new PickListPdfExporter(i18n);
-        this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao, invoiceDao);
         this.inventoryService.setNotificationService(notificationService);
         this.orderService.setNotificationService(notificationService);
         this.transportService.setNotificationService(notificationService);
@@ -289,6 +290,11 @@ public final class AppContext {
         this.handoverDao = new ShiftHandoverDao(databaseManager);
         this.handoverService = new ShiftHandoverService(databaseManager, session, handoverDao, userDao,
                 notificationService);
+        this.workListDao = new WorkListDao(databaseManager);
+        // The work list is built last because it reads from most of the floor: the stoppage log, the
+        // handover record and the yield baseline all have to exist before a role can be told about them.
+        this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao,
+                invoiceDao, workListDao, downtimeDao, handoverDao, gradeYieldDao);
 
         invoiceService.syncOverdueStatuses();
         // An issue left open for two days goes up a tier on its own, so that the person who raised it does
@@ -518,6 +524,10 @@ public final class AppContext {
 
     public NotificationService getNotificationService() {
         return notificationService;
+    }
+
+    public WorkListDao getWorkListDao() {
+        return workListDao;
     }
 
     public TodoService getTodoService() {

@@ -20,7 +20,7 @@ import java.util.Map;
 
 final class SortingDemoSeeder {
     private static final String SEED_KEY = "demo.sorting.seeded";
-    private static final String CURRENT_VERSION = "7";
+    private static final String CURRENT_VERSION = "8";
     /** How many work days of sorting the demo workspace opens with, the last of them today. */
     private static final int HISTORY_DAYS = 6;
     /** The order a sorter fills the bags in: the premium grade first, the rags last. */
@@ -108,6 +108,7 @@ final class SortingDemoSeeder {
             upgradeSortingHistory();
             upgradeStoppages();
             upgradeHandovers();
+            upgradePayrollRole();
             return;
         }
         var stationManager = users.findByUsername("operator");
@@ -547,6 +548,7 @@ final class SortingDemoSeeder {
 
     private static final Person PRODUCTION_LEAD = new Person("Tóth", "Gergely");
     private static final Person SHIFT_LEADER = new Person("Orsós", "Marianna");
+    private static final Person PAYROLL_CLERK = new Person("Fekete", "Zsuzsanna");
 
     /**
      * The two leaders the demo never had.
@@ -560,7 +562,8 @@ final class SortingDemoSeeder {
         record Leader(String username, String password, RoleCode role, Person person) { }
         for (Leader leader : List.of(
                 new Leader("prodlead", "prodlead123", RoleCode.PRODUCTION_LEAD, PRODUCTION_LEAD),
-                new Leader("shiftlead", "shiftlead123", RoleCode.SHIFT_LEAD, SHIFT_LEADER))) {
+                new Leader("shiftlead", "shiftlead123", RoleCode.SHIFT_LEAD, SHIFT_LEADER),
+                new Leader("payroll", "payroll123", RoleCode.HR_PAYROLL, PAYROLL_CLERK))) {
             if (!available(conn, leader.username())) continue;
             var role = roles.findByCode(leader.role());
             if (role.isEmpty()) continue;
@@ -922,12 +925,31 @@ final class SortingDemoSeeder {
             try (var marker = conn.prepareStatement("""
                     UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '6'
                     """)) {
-                marker.setString(1, CURRENT_VERSION);
+                marker.setString(1, "7");
                 marker.setString(2, SEED_KEY);
                 if (marker.executeUpdate() != 1) return;
             }
             seedLeaders(conn);
             seedHandovers(conn, new hu.due.rewear.dao.ShiftHandoverDao(db));
+        });
+    }
+
+    /**
+     * Gives an existing demo workspace somebody to run the payroll as.
+     *
+     * <p>The same omission as the leaders, found the same way: the payroll role had a menu, a module and now
+     * a work list of its own, and no account anywhere could open any of it.
+     */
+    private void upgradePayrollRole() {
+        db.runInTransaction(conn -> {
+            try (var marker = conn.prepareStatement("""
+                    UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '7'
+                    """)) {
+                marker.setString(1, CURRENT_VERSION);
+                marker.setString(2, SEED_KEY);
+                if (marker.executeUpdate() != 1) return;
+            }
+            seedLeaders(conn);
         });
     }
 

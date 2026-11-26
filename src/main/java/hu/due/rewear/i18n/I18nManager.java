@@ -201,7 +201,6 @@ public final class I18nManager {
         if (perLang == null) {
             LOG.warn("Missing translation key: {}", key);
             missingKeys.add(key);
-            missingKeys.add(key);
             return "[" + key + "]";
         }
         String normalizedLang = languageCode == null ? FALLBACK_LANGUAGE : languageCode.trim().toLowerCase(Locale.ROOT);

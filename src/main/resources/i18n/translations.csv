@@ -394,6 +394,14 @@ invoice.report.pdf_title,Financial P&L & Stock Valuation Report,Pénzügyi eredm
 invoice.report.pnl_section,Per-Currency Profit & Loss Summary (Native Ledgers),Devizánkénti eredményösszesítő (Külön főkönyvek)
 dashboard.valuation.title,Live Warehouse Stock Valuation,Élő raktári készletérték
 dashboard.overdue_alert,! {0} overdue invoice(s),! {0} lejárt számla
+dashboard.kpi.lost_minutes,Minutes lost (yesterday),Kiesett percek (tegnap)
+dashboard.kpi.lost_sub,{0}% available · {1} min waiting,{0}% rendelkezésre · {1} perc várakozás
+dashboard.kpi.no_availability,No sorter hours were rostered,Nem volt beosztott válogatói óra
+dashboard.kpi.sorted_week,"Sorted, 7 days","Válogatva, 7 nap"
+dashboard.kpi.no_sorting,Nothing sorted in the period,Az időszakban nem volt válogatás
+dashboard.kpi.open_issues,Open handover issues,Nyitott átadási tételek
+dashboard.kpi.issues_sub,{0} escalated · {1} overdue,{0} eszkalálva · {1} lejárt
+dashboard.kpi.issues_none,Nothing outstanding,Nincs nyitott tétel
 inventory.bulk_relocate.done,Relocated {0} package(s) to {1}.,{0} csomag áthelyezve ide: {1}.
 invoice.receipt.attach,Attach Receipt,Bizonylat csatolása
 invoice.receipt.view,Receipt Attached,Bizonylat megnyitása
@@ -553,6 +561,55 @@ todo.sys.putaway_backlog,{0} package(s) waiting at Operator Stations for forklif
 todo.cat.customer_arrived,Customer Arrived,Ügyfél megérkezett
 todo.sys.customer_arrived,CUSTOMER HERE: Hand over {0} ({1}),ÜGYFÉL ITT VAN: {0} ({1}) átadása
 todo.sys.customer_arrived_detail,Open Orders and scan all items at {0} to hand over,Nyisd meg a Rendeléseket és szkenneld be az összes csomagot ({0})
+todo.cat.own_bench,My Bench,Saját pad
+todo.cat.supply,Material Supply,Alapanyag-kiszolgálás
+todo.cat.stoppage,Stoppage,Állásidő
+todo.cat.handover,Shift Handover,Műszakátadás
+todo.cat.yield,Grade Yield,Osztályhozam
+todo.cat.payroll,Payroll,Bérszámfejtés
+todo.sys.own_waiting,"Waiting for material: {0} call(s), the oldest for {1} minutes","Alapanyagra vár: {0} hívás, a legrégebbi {1} perce"
+todo.sys.own_waiting_detail,The supply driver has already been notified.,A targoncás értesítést kapott.
+todo.sys.own_bench_open,{0} run(s) on your bench are not closed,{0} futás nincs lezárva a padodon
+todo.sys.own_bench_open_detail,Enter the input weight you worked through — the day's figures start from it.,Add meg a feldolgozott bemenő súlyt — a napi számok ebből indulnak.
+todo.sys.own_unpacked,{0} bag(s) on your runs are waiting to be packed,{0} zsák vár csomagolásra a futásaidon
+todo.sys.own_unpacked_detail,A bag is not stock until it is packed and registered.,A zsák csak csomagolás és rögzítés után lesz készlet.
+todo.sys.own_target,Today: {0} of {1} kg ({2}%),Ma: {0} / {1} kg ({2}%)
+todo.sys.own_target_detail,Your own day against your team's target.,A saját napod a csapat célértékéhez mérve.
+todo.sys.own_helped,Today you worked {0} kg on other benches,Ma {0} kg-ot dolgoztál más padokon
+todo.sys.own_helped_detail,A helper has no target of their own: the weight counts on the sorter's bench.,A segédnek nincs saját célértéke: a súly a válogató padján számít.
+todo.sys.supply_call,{0} is waiting for material at {1} — {2} min,{0} alapanyagra vár a(z) {1} állomáson — {2} perc
+todo.sys.supply_call_detail,Asked for: {0} · {1},Kért: {0} · {1}
+todo.sys.supply_any_lot,any available collection,bármelyik elérhető tétel
+todo.sys.supply_no_amount,no weight specified,nincs megadva súly
+todo.sys.lot_unstored,Collection {0} ({1} kg) is not stored yet,A(z) {0} tétel ({1} kg) még nincs betárolva
+todo.sys.lot_unstored_detail,Material: {0}. No sorter can call for it until it has a location.,Anyag: {0}. Hely nélkül egy válogató sem tudja kérni.
+todo.sys.stoppage_open,A stoppage is still open: {0},Nyitott állásidő: {0}
+todo.sys.stoppage_open_detail,Started {0} · {1} person(s) · {2},Kezdés: {0} · {1} fő · {2}
+todo.sys.no_reason,no reason recorded yet,még nincs megadva ok
+todo.sys.handover_missing,No handover written for {0} {1},Nincs műszakátadás: {0} {1}
+todo.sys.handover_missing_detail,Write it before the next shift's meeting.,Írd meg a következő műszak eleje előtt.
+todo.sys.handover_unacknowledged,The {0} handover has not been picked up,A(z) {0} műszak átadását még nem vette át senki
+todo.sys.handover_unacknowledged_detail,{0} wrote it at {1}.,{0} írta {1}-kor.
+todo.sys.issue_mine,Your handover issue: {1},Rád bízott átadási tétel: {1}
+todo.sys.issue_open,Handover issue with {0}: {1},Átadási tétel ({0}): {1}
+todo.sys.issue_detail,Due {0} · open {1} h,Határidő: {0} · nyitva {1} óra
+todo.sys.issue_escalated,escalated,eszkalálva
+todo.sys.issue_overdue,overdue,lejárt
+todo.sys.calls_waiting,"{0} sorter(s) waiting for material, the oldest for {1} minutes","{0} válogató vár alapanyagra, a legrégebbi {1} perce"
+todo.sys.calls_waiting_detail,Oldest call: {0},Legrégebbi hívás: {0}
+todo.sys.lots_unstored,{0} collection(s) received and not stored,{0} beérkezett tétel nincs betárolva
+todo.sys.lots_unstored_detail,A collection without a location cannot be called for.,Hely nélküli tételt nem lehet kérni.
+todo.sys.bag_backlog,"{0} bag(s) not packed, {1} packed and not registered","{0} zsák nincs csomagolva, {1} csomagolva de nincs rögzítve"
+todo.sys.bag_backlog_detail,Neither counts as stock yet.,Egyik sem számít még készletnek.
+todo.sys.no_yield_baseline,No grade-yield baseline has been captured,Nincs rögzített osztályhozam-alapvonal
+todo.sys.no_yield_baseline_detail,Capture one from a period you would stand behind; until then a shift's grade mix has nothing to be compared against.,"Rögzíts egyet egy olyan időszakból, amelyet vállalni tudsz; addig nincs mihez mérni egy műszak összetételét."
+todo.sys.payroll_no_rate,{0} has no daily rate in {1} as {2},{0} napidíja nincs megadva: {1} / {2}
+todo.sys.payroll_no_rate_detail,The day of {0} cannot be computed without a rate effective by then.,A(z) {0} napi bére nem számolható ki az akkor érvényes díj nélkül.
+todo.sys.payroll_missing_day,{0} sorted on {1} and has no payroll day,"{0} dolgozott {1}-én, de nincs hozzá bérnap"
+todo.sys.payroll_missing_day_detail,{0} kg through the line that day.,Aznap {0} kg ment át a soron.
+todo.sys.payroll_missing_days,{0} people sorted on {1} and have no payroll day,"{0} fő dolgozott {1}-én, és nincs hozzájuk bérnap"
+todo.sys.payroll_missing_days_detail,{0} — add their shifts so the draft covers them,"{0} — vedd fel a műszakokat, hogy a tervezet teljes legyen"
+todo.sys.and_others,and {0} more,és további {0} fő
 transport.scan_collect_label,Scan QR to Collect,QR beolvasás összekészítéshez
 transport.scan_collect_btn,Scan & Collect,Beolvasás és kiadóba
 transport.scan_collected_ok,Scanned {0} for {1} -> placed at {2}.,Beolvasva ({0} — {1}) -> elhelyezve: {2}.

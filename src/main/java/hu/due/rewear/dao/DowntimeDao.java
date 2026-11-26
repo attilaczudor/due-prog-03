@@ -275,6 +275,33 @@ public final class DowntimeDao {
         }
     }
 
+    /**
+     * Stoppages still running that cover one person or one team, by the same rule the report filter uses:
+     * a stoppage with nobody named covers the team, and a stoppage with no team covers the whole line.
+     *
+     * <p>Both arguments null means every running stoppage, which is what a production leader's work list
+     * wants to see.
+     */
+    public List<DowntimeEvent> findRunningCovering(Long teamId, Long sorterId) {
+        StringBuilder sql = new StringBuilder(EVENT_SELECT + " WHERE e.ended_at IS NULL");
+        List<Object> params = new ArrayList<>();
+        appendCovering(sql, teamId, sorterId, params);
+        sql.append(" ORDER BY e.started_at");
+        try (Connection conn = db.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+            bind(ps, params);
+            try (ResultSet rs = ps.executeQuery()) {
+                List<DowntimeEvent> events = new ArrayList<>();
+                while (rs.next()) {
+                    events.add(mapEvent(rs));
+                }
+                return events;
+            }
+        } catch (SQLException ex) {
+            throw new DaoException("Failed to read running downtime", ex);
+        }
+    }
+
     public List<ReasonMinutes> minutesByReason(Scope scope) {
         List<Object> params = new ArrayList<>();
         // When the scope is one person, the person-minutes are that person's minutes. The other three people

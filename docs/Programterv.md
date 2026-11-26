@@ -373,7 +373,10 @@ köztük egy még tartó, amelyet a demót olvasó első dolga lezárni és megi
 műszakátadásai, a műszakvezető tollából — a `prodlead` és a `shiftlead` fiók ezzel a lépéssel születik meg,
 mert a szerepkör-hierarchia létrehozta a két vezetői szerepkört, de egyikhez sem tartozott felhasználó. A
 legutóbbi átadás szándékosan átvétel nélkül marad, és három ügy nyitva: az egyik elég régóta ahhoz, hogy az
-alkalmazás indításkor magától feljebb küldje.
+alkalmazás indításkor magától feljebb küldje. Ugyanebből az okból kapott fiókot a bérszámfejtő szerepkör is
+(`payroll`): menüje, modulja és azóta saját teendőlistája is volt, felhasználója egy sem, így senkinek nem
+lehetett megmutatni. A hiányra az a képernyőbejárás mutatott rá, amely szerepkörönként egy fiókot keres az
+adatbázisban a kézzel írt névsor helyett.
 
 ### 4.4 Teljes mentés visszaállítása
 
@@ -405,16 +408,16 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 55 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **55 tesztosztály, összesen 277 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 55 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **57 tesztosztály, összesen 305 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
 | `SortingToSaleWorkflowTest` | 2 | Alapanyag, válogatás, csomagolás és készletre vétel. Webshopimport, készletfoglalás, ellenőrzött kiadás és számlázás. |
 | `PayrollWorkflowTest` | 1 | Rugalmas csapatlétszám, tényleges segédteljesítmény, megosztott műszak és dátumfüggő díjtételek. |
 | `OfflineIntegrationTest` | 2 | A NAV demó adatainak mentése hitelesítő adatok nélkül. Több bankszámla, új deviza és pontos egyenleg újranyitás után. |
-| `I18nManagerTest` | 5 | EN/HU fordítások, paraméteres formázás, 3. nyelv (`de`) dinamikus CSV betöltése, export/újratöltés, teljes **847 kulcsos** `translations.csv` szerkezeti integritás-ellenőrzés |
+| `I18nManagerTest` | 5 | EN/HU fordítások, paraméteres formázás, 3. nyelv (`de`) dinamikus CSV betöltése, export/újratöltés, teljes **1131 kulcsos** `translations.csv` szerkezeti integritás-ellenőrzés |
 | `ProductCodeServiceTest` | 4 | `YYYY-MM-DD-HH-MM-...` konvenció, tizedes súlyok, szegmens-normalizálás, 40 ütközésmentes hex végződés, hibás kódok elutasítása |
-| `DatabaseLayerIntegrationTest` | 4 | 42 táblás séma + idempotens demo seed, BCrypt ellenőrzés, egyedi kódtörzsek, `UNIQUE` és `FOREIGN KEY` megszorítások, telítettség és statisztikák |
+| `DatabaseLayerIntegrationTest` | 4 | 55 táblás séma + idempotens demo seed, BCrypt ellenőrzés, egyedi kódtörzsek, `UNIQUE` és `FOREIGN KEY` megszorítások, telítettség és statisztikák |
 | `SmartFolderTest` | 2 | Mentett szűrések perzisztenciája, tulajdonos és nézet szerinti elkülönítése, valamint többfeltételes számla- és levélegyezés |
 | `AuthServiceTest` | 5 | BCrypt-hitelesítés, jelszócsere, profil- és preferenciamentés, valamint az adminisztrátori fiókszerkesztés és e-mail-módosítás jogosultságai |
 | `Wave2MultiLineCreditNoteAndBulkTest` | 4 | Többsoros kézi számlák, 1-kattintásos jóváíró számla (`CN-`), kettős EUR/HUF készletértékelés & P&L PDF, atomi kötegelt áthelyezés |
@@ -446,13 +449,16 @@ A rendszer üzleti logikáját, 55 táblás adatbázis-integritását, többdevi
 | `InvoiceLifecycleTest` | 7 | A számla állapotgépe minden állapot × cél párra, kiállítás dátuma, események, jóváíró számla kapcsolata és régi adatok összekapcsolása |
 | `InvoiceAccessTest` | 4 | Pénzügyi műveletek jogosultsága a szerepkör-mátrix szerint, inaktív és ismeretlen felhasználó elutasítása |
 | `TranslationKeyUsageTest` | 2 | Építési őrteszt: minden névvel kért nyelvi kulcs létezik, és a kötegben ismert névtérbe tartozó, kulcsnak látszó szövegliterál sem hiányzik (a hiányzó kulcs `[kulcs.neve]` alakban jelenik meg, hibát nem dob) |
-| `ShiftHandoverTest` | 20 | Műszakátadás: egyik írott mező sem maradhat üresen, egy műszakról egy lap (szolgáltatásban és `UNIQUE` megszorításban is), a számok záráskor befagynak és a műszak saját óráira vonatkoznak, a fő ok a legtöbb percet vivő ok, minden ügy mellett név és határidő, 48 óra után magától feljebb kerül (lezárt ügy soha), a képernyő az előző műszakra nyit, átvétel névvel és egyszer, hajnali ötkor az előző napi éjszakás a soros, jogosultságok, demó |\n| `DowntimeTest` | 23 | A leállásnapló: a perc az óráról jön, ok nélkül semmi nem zárható (szolgáltatásban és táblamegszorításban is), a csapat saját ideje külön, főperc a leállított létszámmal súlyozva, egy emberre saját perc, rendelkezésre állás a beosztott válogatóórákhoz mérve, anyagra várás számítva és a naplótól elkülönítve, az egész üzemet érintő leállás minden csapatnál, egyszerre egy leállás ugyanazokra az emberekre, kivezetett ok megőrzi a múltat, jogosultságok |
+| `ShiftHandoverTest` | 20 | Műszakátadás: egyik írott mező sem maradhat üresen, egy műszakról egy lap (szolgáltatásban és `UNIQUE` megszorításban is), a számok záráskor befagynak és a műszak saját óráira vonatkoznak, a fő ok a legtöbb percet vivő ok, minden ügy mellett név és határidő, 48 óra után magától feljebb kerül (lezárt ügy soha), a képernyő az előző műszakra nyit, átvétel névvel és egyszer, hajnali ötkor az előző napi éjszakás a soros, jogosultságok, demó |
+| `RoleWorkListTest` | 26 | Szerepkörönkénti teendőlista: mind a 11 szerepkör kap listát és minden sora feloldott szöveg, a korábban üresen maradt öt szerepkör a saját munkáját látja, a válogató a saját hívását és leállását (más padját nem), a norma lefelé kerekítve, a segédnek nincs saját normája és nem ő zárja a futást, a csomagolás az övé, a targoncás névvel és percben látja, ki áll üresen, a műszakátadás a lezárult műszakra jár, a rád bízott ügy előrébb, az eszkalált mindenkinél előrébb, a bérszámfejtés a lezárt napot kérdezi és a hiányzó napot egy sorban nevekkel, díjtétel nélküli nap, a zsákhátralék mindkét fele |
+| `DashboardFloorBandTest` | 2 | A vezérlőpult osztályösszetétel-sora érték szerint rendez, nem súly szerint: a krém a kiadott súly tizede és a bevétel fele, súly szerint rendezve éppen az maradna le |
+| `DowntimeTest` | 23 | A leállásnapló: a perc az óráról jön, ok nélkül semmi nem zárható (szolgáltatásban és táblamegszorításban is), a csapat saját ideje külön, főperc a leállított létszámmal súlyozva, egy emberre saját perc, rendelkezésre állás a beosztott válogatóórákhoz mérve, anyagra várás számítva és a naplótól elkülönítve, az egész üzemet érintő leállás minden csapatnál, egyszerre egy leállás ugyanazokra az emberekre, kivezetett ok megőrzi a múltat, jogosultságok |
 | `DemoSortingHistoryTest` | 8 | A demó válogatási előzménye egyezik: minden gyűjtés mérlege (kapott = szabad + feldolgozott + munkában), a bezsákolt súly nem több a feldolgozottnál, 10 grammos QR-pontosság, készletbe nem regisztrált zsákok, napi tábla teljesíthető normával, ismételt indítás, már meglévő válogatási adat és saját norma védelme, fedezet nélküli gyűjtés |
 | `RawMaterialSupplyTest` | 5 | Napi begyűjtés anyaggal és gyűjtési területtel, betárolás utáni elérhetőség, tétel igénylése súly nélkül, kifogyott és be nem tárolt tétel, szerepkörök, demó gyűjtési területek |
 | `RoleHierarchyTest` | 3 | A 11 szerepkör megléte és kétnyelvű megnevezése, modulhozzáférés szerepkörönként (két targoncás szerepkör, pénzügy és bérszámfejtés elkülönítése), a régi egységes targoncás szerepkör egyszeri szétválasztása |
 | `RotaServiceTest` | 5 | Beosztás mentése és felülírása, hónap- és hétrács határai, saját napok kontra teljes cég, írási jogosultság, demó beosztás |
 | `RotaViewTest` | 1 | A beosztásnaptár kirajzolása tervezőnek és dolgozónak, mindkét nyelven (kijelző nélküli környezetben kimarad) |
-| `ScreenWalkthroughTest` | 2 | Minden szerepkör minden elérhető képernyőjének megnyitása a valódi főablakon át, kirajzolás-ellenőrzéssel, valamint az első indítási ablak két nyelven (kijelző nélküli környezetben kimarad) |
+| `ScreenWalkthroughTest` | 2 | Mind a 11 szerepkör minden elérhető képernyőjének megnyitása a valódi főablakon át (szerepkörönként egy fiókkal, nem kézzel írt névsorral: egy fiók nélküli szerepkör képernyőit senki nem tudja megnyitni), kirajzolás-, oldalsáv-gomb- és nyelvikulcs-ellenőrzéssel, valamint az első indítási ablak két nyelven (kijelző nélküli környezetben kimarad) |
 | `DialogWalkthroughTest` | 3 | Modális ablakok megnyitása és ellenőrzése: számla előzményei, csak az engedélyezett állapotváltások felkínálása, jogosultság nélküli felhasználónál kikapcsolt gombok, targoncás szedési listája (kijelző nélküli környezetben kimarad) |
 | `StocktakeServiceTest` | 7 | Polc számolása, rossz polcon talált csomag áthelyezése, súlytűrés, sérült áru leírása lezáráskor, hiányzó tételek jelentése leírás nélkül, egyszerre egy leltár és szerepkörök, zónaleltár |
 | `QuarantineMigrationTest` | 2 | A karantén két `CHECK` megszorítást bővít: a készlet- és mozgástábla újraépítése minden sor, azonosító és index megőrzésével, valamint a már naprakész adatbázis érintetlenül hagyása |

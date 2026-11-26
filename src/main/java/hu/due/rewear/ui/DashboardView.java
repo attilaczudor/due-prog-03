@@ -2,12 +2,17 @@ package hu.due.rewear.ui;
 
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.ThemeManager;
+import hu.due.rewear.dao.DowntimeDao;
+import hu.due.rewear.dao.GradeYieldDao;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.CategoryWeightStat;
 import hu.due.rewear.model.CurrencyDef;
+import hu.due.rewear.model.HandoverIssue;
 import hu.due.rewear.model.InventoryPackage;
 import hu.due.rewear.model.StockMovement;
 import hu.due.rewear.model.StockValuation;
+import hu.due.rewear.service.DowntimeService;
+import hu.due.rewear.service.GradeYieldService;
 import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.util.FormatUtil;
 import org.knowm.xchart.CategoryChart;
@@ -36,6 +41,7 @@ import java.awt.Window;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -69,6 +75,22 @@ public final class DashboardView extends JPanel implements NavigableView {
     private final JLabel kpiSub2 = new JLabel(" ");
     private final JLabel kpiSub4 = new JLabel(" ");
 
+    // The floor band. Stock and orders say nothing about how the line ran, so the roles that answer for it
+    // get a second row: what the line lost, what mix came out of it, and what the last shift left behind.
+    private final JPanel floorGrid = new JPanel(new GridLayout(1, 3, 12, 0));
+    private final JPanel floorCard1 = new JPanel();
+    private final JPanel floorCard2 = new JPanel();
+    private final JPanel floorCard3 = new JPanel();
+    private final JLabel floorTitle1 = new JLabel();
+    private final JLabel floorTitle2 = new JLabel();
+    private final JLabel floorTitle3 = new JLabel();
+    private final JLabel floorValue1 = new JLabel("0");
+    private final JLabel floorValue2 = new JLabel("0");
+    private final JLabel floorValue3 = new JLabel("0");
+    private final JLabel floorSub1 = new JLabel(" ");
+    private final JLabel floorSub2 = new JLabel(" ");
+    private final JLabel floorSub3 = new JLabel(" ");
+
     private final JPanel chartsGrid = new JPanel(new GridLayout(1, 2, 14, 0));
     private final JPanel qualityChartHost = new JPanel(new BorderLayout());
     private final JPanel garmentChartHost = new JPanel(new BorderLayout());
@@ -100,7 +122,22 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiGrid.add(kpiCard2);
         kpiGrid.add(kpiCard3);
         kpiGrid.add(kpiCard4);
-        add(kpiGrid, BorderLayout.NORTH);
+
+        configureKpiCard(floorCard1, floorTitle1, floorValue1, floorSub1);
+        configureKpiCard(floorCard2, floorTitle2, floorValue2, floorSub2);
+        configureKpiCard(floorCard3, floorTitle3, floorValue3, floorSub3);
+        floorGrid.add(floorCard1);
+        floorGrid.add(floorCard2);
+        floorGrid.add(floorCard3);
+        floorGrid.setVisible(runsProduction());
+
+        JPanel north = new JPanel();
+        north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.setOpaque(false);
+        north.add(kpiGrid);
+        north.add(Box.createVerticalStrut(12));
+        north.add(floorGrid);
+        add(north, BorderLayout.NORTH);
 
         // Center: Charts + Recent Movements
         JPanel center = new JPanel(new BorderLayout(0, 14));
@@ -162,6 +199,67 @@ public final class DashboardView extends JPanel implements NavigableView {
             card.add(Box.createVerticalStrut(4));
             card.add(sub);
         }
+    }
+
+    /** Whether this user answers for how the line ran, which is who the floor band is for. */
+    private boolean runsProduction() {
+        return ctx.getSession().getCurrentUser().map(u -> u.roleCode().runsProduction()).orElse(false);
+    }
+
+    /**
+     * The floor band: what the line lost, what mix came out of it, and what the last shift left behind.
+     *
+     * <p>Yesterday for the stoppages, because a day still being worked has no availability figure worth
+     * reading, and seven days for the grade mix, because one day of it swings on which collection happened
+     * to be opened. Neither is a target: the application does not have one, and the roadmap's own finding is
+     * that it should learn the site's baseline rather than ship a number from the literature.
+     */
+    private void refreshFloorBand() {
+        boolean show = runsProduction();
+        floorGrid.setVisible(show);
+        if (!show) {
+            return;
+        }
+        I18nManager i18n = ctx.getI18n();
+        LocalDate today = BusinessClock.today();
+        LocalDate yesterday = today.minusDays(1);
+
+        DowntimeService.Report lost = ctx.getDowntimeService()
+                .report(new DowntimeDao.Scope(yesterday, yesterday, null, null));
+        floorValue1.setText(Long.toString(lost.stoppedMinutes()));
+        BigDecimal availability = lost.availabilityPercent();
+        floorSub1.setText(availability == null
+                ? i18n.t("dashboard.kpi.no_availability")
+                : i18n.t("dashboard.kpi.lost_sub", FormatUtil.stripZeros(availability),
+                lost.waitingForStockMinutes()));
+
+        GradeYieldService.Report yield = ctx.getGradeYieldService()
+                .report(GradeYieldDao.Scope.all().withPeriod(today.minusDays(6), today));
+        floorValue2.setText(FormatUtil.stripZeros(yield.processedKg()) + " " + i18n.t("common.kg"));
+        floorSub2.setText(yield.isEmpty() ? i18n.t("dashboard.kpi.no_sorting") : topGrades(yield));
+
+        List<HandoverIssue> issues = ctx.getShiftHandoverService().openIssues();
+        long escalated = issues.stream().filter(HandoverIssue::escalated).count();
+        long overdue = issues.stream().filter(i -> i.overdue(today)).count();
+        floorValue3.setText(Integer.toString(issues.size()));
+        floorSub3.setText(issues.isEmpty()
+                ? i18n.t("dashboard.kpi.issues_none")
+                : i18n.t("dashboard.kpi.issues_sub", escalated, overdue));
+    }
+
+    /**
+     * The three grades that earned the most, with the share of input each of them took.
+     *
+     * <p>By value rather than by weight, which is the whole point of the measurement. Cream grade is roughly
+     * a tenth of what the line puts out and over half of what it earns, so a row ordered by weight shows the
+     * three grades that matter least and leaves out the one the business runs on.
+     */
+    static String topGrades(GradeYieldService.Report yield) {
+        return yield.lines().stream()
+                .sorted(java.util.Comparator.comparing(GradeYieldService.Line::valueEur).reversed())
+                .limit(3)
+                .map(line -> line.code() + " " + FormatUtil.stripZeros(line.sharePercent()) + "%")
+                .collect(java.util.stream.Collectors.joining("  ·  "));
     }
 
     private void rebuildCharts() {
@@ -278,6 +376,7 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiValue4.setText(Integer.toString(openOrders));
         kpiSub4.setText(overdueCount > 0 ? i18n.t("dashboard.overdue_alert", overdueCount) : " ");
 
+        refreshFloorBand();
         rebuildCharts();
 
         recentModel.setRowCount(0);
@@ -303,6 +402,10 @@ public final class DashboardView extends JPanel implements NavigableView {
         kpiTitle3.setText(i18n.t("dashboard.kpi.today_intake").toUpperCase());
         kpiTitle4.setText(i18n.t("dashboard.kpi.open_orders").toUpperCase());
 
+        floorTitle1.setText(i18n.t("dashboard.kpi.lost_minutes").toUpperCase());
+        floorTitle2.setText(i18n.t("dashboard.kpi.sorted_week").toUpperCase());
+        floorTitle3.setText(i18n.t("dashboard.kpi.open_issues").toUpperCase());
+
         recentTitleLabel.setText(i18n.t("dashboard.recent_movements").toUpperCase());
 
         recentModel.setColumnIdentifiers(new Object[]{
@@ -323,6 +426,19 @@ public final class DashboardView extends JPanel implements NavigableView {
         BrutalistStyle.applyBoxCard(kpiCard2, 14, 16);
         BrutalistStyle.applyBoxCard(kpiCard3, 14, 16);
         BrutalistStyle.applyBoxCard(kpiCard4, 14, 16);
+        for (JPanel card : new JPanel[]{floorCard1, floorCard2, floorCard3}) {
+            BrutalistStyle.applyBoxCard(card, 14, 16);
+        }
+        for (JLabel title : new JLabel[]{floorTitle1, floorTitle2, floorTitle3}) {
+            title.setForeground(ThemeManager.muted());
+        }
+        for (JLabel value : new JLabel[]{floorValue1, floorValue2, floorValue3}) {
+            value.setForeground(ThemeManager.fg());
+        }
+        for (JLabel sub : new JLabel[]{floorSub1, floorSub2, floorSub3}) {
+            sub.setForeground(ThemeManager.muted());
+        }
+        floorGrid.setBackground(ThemeManager.bg());
         kpiTitle1.setForeground(ThemeManager.muted());
         kpiTitle2.setForeground(ThemeManager.muted());
         kpiTitle3.setForeground(ThemeManager.muted());

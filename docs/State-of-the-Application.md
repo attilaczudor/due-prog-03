@@ -52,7 +52,7 @@ a regression in a guard written in pass 15 would not announce itself.
 
 ## 3. Four findings, in the order I would act on them
 
-### 3.1 Five of eleven roles open the application to an empty work list
+### 3.1 Five of eleven roles open the application to an empty work list — *done in pass 25*
 
 `TodoService.buildSystemTodosFor` branches on three cases: the two driver roles, the station manager, and
 management. A production lead, a shift leader, an HR/payroll user, a sorter and a sorting helper fall through all
@@ -67,6 +67,13 @@ up. Every query needed for all three already exists and is already tested.
 
 This is the cheapest work left and the most visible, and it is what makes the last five passes legible to the people
 they were built for.
+
+**Done on 26 November, pass 25.** Every role has a list; the supply driver gained the sorting floor, which was
+missing from theirs as well; the dashboard gained a floor band for the roles that answer for the line; and the
+walkthrough now takes one account per role instead of a hand-written list of six, which is what had hidden all of
+it. One thing the pass could not finish: the mix row is ordered by what each grade earned, but grade value is
+priced from the garment type, so cream is valued like rags and still does not appear. That is a pricing decision,
+not a defect in the row.
 
 ### 3.2 The database has no version marker
 
@@ -143,11 +150,7 @@ badly inside it.
 
 ## 6. Recommendation
 
-Do finding 3.1 next — the two leader roles and the three floor roles get a work list, and the dashboard shows grade
-mix, lost minutes and open handover issues. It is a day's work on queries that already exist and it is the first
-thing any of these users would notice.
-
-Then 3.2 and 3.3 together, as one pass: a schema version, and one timestamp convention with a guard test to hold it.
+Finding 3.1 was done next, on 26 November. What remains is 3.2 and 3.3 together, as one pass: a schema version, and one timestamp convention with a guard test to hold it.
 That is the honest first half of the handheld, done where it can be tested without a device.
 
 The handheld itself after that, with the offline problem stated rather than discovered.

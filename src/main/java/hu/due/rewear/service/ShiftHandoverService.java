@@ -93,6 +93,16 @@ public final class ShiftHandoverService {
         return new ShiftSlot(now.toLocalDate(), ShiftCode.NIGHT);
     }
 
+    /**
+     * The shift before a given one, which is the shift a handover is already owed for.
+     *
+     * <p>Written as a minute before the given shift began rather than as a case for each code, so that the
+     * rule for which day a night shift belongs to is stated in exactly one place.
+     */
+    public static ShiftSlot previousSlot(ShiftSlot slot) {
+        return currentSlot(window(slot)[0].minusMinutes(1));
+    }
+
     /** The window a shift covers, with the night shift running into the next morning. */
     public static LocalDateTime[] window(ShiftSlot slot) {
         LocalDateTime from = slot.workDay().atStartOfDay().plusMinutes(slot.shift().defaultStart());

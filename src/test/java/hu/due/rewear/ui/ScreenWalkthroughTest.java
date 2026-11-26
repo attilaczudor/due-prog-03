@@ -6,6 +6,7 @@ import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.config.ThemeManager;
 import hu.due.rewear.i18n.I18nManager;
 import hu.due.rewear.model.AppModule;
+import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -98,7 +99,20 @@ class ScreenWalkthroughTest {
         List<String> problems = new ArrayList<>();
         List<String> visited = new ArrayList<>();
 
-        for (String username : List.of("superadmin", "manager", "operator", "sorter01", "forklift", "forklift2")) {
+        // One account per role rather than a list written by hand. The hand-written list was six names
+        // covering six roles, and the five it left out are exactly the five whose screens nobody had
+        // looked at: a role with no account cannot be shown to anybody, which is a defect in itself.
+        List<String> usernames = new ArrayList<>();
+        for (RoleCode role : RoleCode.values()) {
+            ctx.getUserDao().findAll().stream()
+                    .filter(candidate -> candidate.active() && candidate.roleCode() == role)
+                    .min(java.util.Comparator.comparing(User::username))
+                    .ifPresentOrElse(candidate -> usernames.add(candidate.username()),
+                            () -> problems.add(role + " has no account in the demo workspace, so nobody"
+                                    + " can open the screens it is given"));
+        }
+
+        for (String username : usernames) {
             User user = ctx.getUserDao().findByUsername(username).orElseThrow();
             ctx.getSession().login(user);
 
@@ -156,7 +170,7 @@ class ScreenWalkthroughTest {
             ctx.getSession().logout();
         }
 
-        assertTrue(visited.size() > 40, "Expected to walk most of the application: " + visited.size());
+        assertTrue(visited.size() > 80, "Expected to walk most of the application: " + visited.size());
         // A missing translation key throws nothing: the header simply reads [role.FORKLIFT] and the build
         // stays green until somebody looks at that screen. Two of those survived several passes that way.
         assertTrue(i18n.missingKeys().isEmpty(),

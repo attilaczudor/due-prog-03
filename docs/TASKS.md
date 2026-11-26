@@ -29,6 +29,8 @@
 - [x] Add the shift handover record: the sheet, its frozen figures, open issues with an owner and a date, and forty-eight-hour escalation that happens without anybody pressing anything. The demo finally has a production lead and a shift leader to log in as.
 - [x] Add the downtime and non-productive-time log: eight fixed loss groups with a short, supervisor-reworded reason list inside them, nothing closing without a reason, the crew's own time separated from what was done to them, and availability measured against rostered sorter-hours. The wait between calling for material and getting it is worked out from the timestamps and reported beside the log, never added to it.
 
+- [x] Give every role a work list. Five of eleven opened the application to an empty screen; the supply driver's list said nothing about the sorter standing at an empty bench; and the walkthrough logged in as six accounts written out by hand, which is why nobody noticed. The dashboard gained a floor band — minutes lost, the grade mix by what it earned, and open handover issues — for the roles that answer for the line. The demo finally has a payroll clerk.
+
 ## Next session
 
 - [x] Walk every screen each role can open, through the real main window, and look at the rendered result. Covered by `ScreenWalkthroughTest`; remaining dialogs (invoice details, pick list preview, package intake preview) are still only compile-verified.
