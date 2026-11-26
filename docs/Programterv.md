@@ -6,7 +6,7 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**215 fő Java forrásfájl**, **54 JUnit 5 tesztosztály**, **257 teszt**, ebből 1 csak kérésre fut):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**220 fő Java forrásfájl**, **55 JUnit 5 tesztosztály**, **277 teszt**, ebből 1 csak kérésre fut):
 
 ```mermaid
 flowchart TD
@@ -15,7 +15,7 @@ flowchart TD
     I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (917 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
     DAO["Adatelérési Réteg (hu.due.rewear.dao)<br/>JDBC DAO-k, például RoleDao, UserDao, RoleModulePermissionDao, SettingsDao,<br/>FinanceConfigDao, DictionaryDao, WarehouseLocationDao, InventoryPackageDao,<br/>StockMovementDao, CustomerDao, OrderDao, OrderItemDao, InvoiceDao,<br/>EmailDao, ChatDao, NotificationDao, TodoDao<br/>(összesen 20 DAO osztály)"]
     MODEL["Domain Modellek (hu.due.rewear.model)<br/>Java 17 Record POJO-k és Enumok (AppModule, RoleCode, LocationType,<br/>InventoryPackage, Order, Invoice, EmailMessage, ChatRoom, AppNotification, ...)"]
-    DB[("Beágyazott SQLite 3 (53 tábla, 35 deklarált index)<br/>data/rewear-wms.db + data/invoices/ + data/receipts/ + data/mail-attachments/")]
+    DB[("Beágyazott SQLite 3 (55 tábla, 37 deklarált index)<br/>data/rewear-wms.db + data/invoices/ + data/receipts/ + data/mail-attachments/")]
 
     UI --> SVC
     UI --> I18N
@@ -369,7 +369,11 @@ tölti be (csapatonként két ember naponta), az osztálykaszkádot a maradékka
 és a hozamreferencia szándékosan kimarad — az elsőt az állomásvezető végzi, a másodikat a telephely saját
 előzményéből rögzíti a termelésvezető —, és a betöltés nem fut le, ha a munkaterületen már van bármilyen
 válogatási igény. A hét leállásai is bekerülnek: tucatnyi rögzített leállás a nyolc veszteségcsoportból,
-köztük egy még tartó, amelyet a demót olvasó első dolga lezárni és megindokolni.
+köztük egy még tartó, amelyet a demót olvasó első dolga lezárni és megindokolni. Végül a hét
+műszakátadásai, a műszakvezető tollából — a `prodlead` és a `shiftlead` fiók ezzel a lépéssel születik meg,
+mert a szerepkör-hierarchia létrehozta a két vezetői szerepkört, de egyikhez sem tartozott felhasználó. A
+legutóbbi átadás szándékosan átvétel nélkül marad, és három ügy nyitva: az egyik elég régóta ahhoz, hogy az
+alkalmazás indításkor magától feljebb küldje.
 
 ### 4.4 Teljes mentés visszaállítása
 
@@ -401,7 +405,7 @@ sequenceDiagram
 
 ## 5. Tesztelési terv és eredmények (JUnit 5)
 
-A rendszer üzleti logikáját, 53 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **54 tesztosztály, összesen 257 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
+A rendszer üzleti logikáját, 55 táblás adatbázis-integritását, többdevizás pénzügyi számításait, targoncás és átadási folyamatait, levelezését és csatolmánytárát, belső chatjét, értesítéseit, modul-jogosultsági mátrixát, számla-életciklusát, teljes mentését és első indítását, valamint háttérszálú UI-futtatását **55 tesztosztály, összesen 277 automatizált JUnit 5 teszt** ellenőrzi (a terhelésmérés csak külön kérésre fut). A `./mvnw clean verify` ezeket futtatja, kijelző nélküli (headless) környezetben is lefut, ilyenkor az egyetlen kijelzőt igénylő teszt kimarad. Külön CI szolgáltatást a projekt nem használ.
 
 | Tesztosztály | Tesztek | Ellenőrzött funkcionalitás |
 |---|:---:|---|
@@ -442,7 +446,7 @@ A rendszer üzleti logikáját, 53 táblás adatbázis-integritását, többdevi
 | `InvoiceLifecycleTest` | 7 | A számla állapotgépe minden állapot × cél párra, kiállítás dátuma, események, jóváíró számla kapcsolata és régi adatok összekapcsolása |
 | `InvoiceAccessTest` | 4 | Pénzügyi műveletek jogosultsága a szerepkör-mátrix szerint, inaktív és ismeretlen felhasználó elutasítása |
 | `TranslationKeyUsageTest` | 2 | Építési őrteszt: minden névvel kért nyelvi kulcs létezik, és a kötegben ismert névtérbe tartozó, kulcsnak látszó szövegliterál sem hiányzik (a hiányzó kulcs `[kulcs.neve]` alakban jelenik meg, hibát nem dob) |
-| `DowntimeTest` | 23 | A leállásnapló: a perc az óráról jön, ok nélkül semmi nem zárható (szolgáltatásban és táblamegszorításban is), a csapat saját ideje külön, főperc a leállított létszámmal súlyozva, egy emberre saját perc, rendelkezésre állás a beosztott válogatóórákhoz mérve, anyagra várás számítva és a naplótól elkülönítve, az egész üzemet érintő leállás minden csapatnál, egyszerre egy leállás ugyanazokra az emberekre, kivezetett ok megőrzi a múltat, jogosultságok |
+| `ShiftHandoverTest` | 20 | Műszakátadás: egyik írott mező sem maradhat üresen, egy műszakról egy lap (szolgáltatásban és `UNIQUE` megszorításban is), a számok záráskor befagynak és a műszak saját óráira vonatkoznak, a fő ok a legtöbb percet vivő ok, minden ügy mellett név és határidő, 48 óra után magától feljebb kerül (lezárt ügy soha), a képernyő az előző műszakra nyit, átvétel névvel és egyszer, hajnali ötkor az előző napi éjszakás a soros, jogosultságok, demó |\n| `DowntimeTest` | 23 | A leállásnapló: a perc az óráról jön, ok nélkül semmi nem zárható (szolgáltatásban és táblamegszorításban is), a csapat saját ideje külön, főperc a leállított létszámmal súlyozva, egy emberre saját perc, rendelkezésre állás a beosztott válogatóórákhoz mérve, anyagra várás számítva és a naplótól elkülönítve, az egész üzemet érintő leállás minden csapatnál, egyszerre egy leállás ugyanazokra az emberekre, kivezetett ok megőrzi a múltat, jogosultságok |
 | `DemoSortingHistoryTest` | 8 | A demó válogatási előzménye egyezik: minden gyűjtés mérlege (kapott = szabad + feldolgozott + munkában), a bezsákolt súly nem több a feldolgozottnál, 10 grammos QR-pontosság, készletbe nem regisztrált zsákok, napi tábla teljesíthető normával, ismételt indítás, már meglévő válogatási adat és saját norma védelme, fedezet nélküli gyűjtés |
 | `RawMaterialSupplyTest` | 5 | Napi begyűjtés anyaggal és gyűjtési területtel, betárolás utáni elérhetőség, tétel igénylése súly nélkül, kifogyott és be nem tárolt tétel, szerepkörök, demó gyűjtési területek |
 | `RoleHierarchyTest` | 3 | A 11 szerepkör megléte és kétnyelvű megnevezése, modulhozzáférés szerepkörönként (két targoncás szerepkör, pénzügy és bérszámfejtés elkülönítése), a régi egységes targoncás szerepkör egyszeri szétválasztása |

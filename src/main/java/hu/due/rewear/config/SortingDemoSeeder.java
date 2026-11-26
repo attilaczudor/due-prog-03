@@ -20,7 +20,7 @@ import java.util.Map;
 
 final class SortingDemoSeeder {
     private static final String SEED_KEY = "demo.sorting.seeded";
-    private static final String CURRENT_VERSION = "6";
+    private static final String CURRENT_VERSION = "7";
     /** How many work days of sorting the demo workspace opens with, the last of them today. */
     private static final int HISTORY_DAYS = 6;
     /** The order a sorter fills the bags in: the premium grade first, the rags last. */
@@ -107,6 +107,7 @@ final class SortingDemoSeeder {
             upgradeRota();
             upgradeSortingHistory();
             upgradeStoppages();
+            upgradeHandovers();
             return;
         }
         var stationManager = users.findByUsername("operator");
@@ -173,6 +174,8 @@ final class SortingDemoSeeder {
             seedRota(conn, manager.get().id());
             seedSortingHistory(conn);
             seedStoppages(conn, new hu.due.rewear.dao.DowntimeDao(db), manager.get().id());
+            seedLeaders(conn);
+            seedHandovers(conn, new hu.due.rewear.dao.ShiftHandoverDao(db));
         });
     }
 
@@ -542,6 +545,127 @@ final class SortingDemoSeeder {
             new Stoppage(5, 0, "SUP-WAIT", 7, 55, 22, null),
             new Stoppage(5, 4, "EXT-DOCK", 9, 45, 35, "A kapu foglalt volt a kiszállítás miatt"));
 
+    private static final Person PRODUCTION_LEAD = new Person("Tóth", "Gergely");
+    private static final Person SHIFT_LEADER = new Person("Orsós", "Marianna");
+
+    /**
+     * The two leaders the demo never had.
+     *
+     * <p>The role hierarchy pass created a production lead and a shift leader and gave neither of them an
+     * account, which left the one feature that is squarely the shift leader's — handing a shift over —
+     * impossible to show to anybody.
+     */
+    private void seedLeaders(Connection conn) throws SQLException {
+        var now = BusinessClock.now();
+        record Leader(String username, String password, RoleCode role, Person person) { }
+        for (Leader leader : List.of(
+                new Leader("prodlead", "prodlead123", RoleCode.PRODUCTION_LEAD, PRODUCTION_LEAD),
+                new Leader("shiftlead", "shiftlead123", RoleCode.SHIFT_LEAD, SHIFT_LEADER))) {
+            if (!available(conn, leader.username())) continue;
+            var role = roles.findByCode(leader.role());
+            if (role.isEmpty()) continue;
+            users.insert(conn, leader.username(), BCrypt.hashpw(leader.password(), BCrypt.gensalt(10)),
+                    leader.person().fullName(), role.get().id(), true, now);
+        }
+    }
+
+    /**
+     * A week of shift handovers, written by the shift leader.
+     *
+     * <p>They are seeded with their figures frozen the way a real one is, so the sheet reads as a document of
+     * a shift rather than as a live query. One is left unacknowledged — today's morning, the one the person
+     * opening the demo is taking over from — and three issues are left open, one of them old enough that the
+     * application escalates it the moment it starts.
+     */
+    private static void seedHandovers(Connection conn, hu.due.rewear.dao.ShiftHandoverDao handovers)
+            throws SQLException {
+        try (var stmt = conn.createStatement();
+             var rs = stmt.executeQuery("SELECT 1 FROM shift_handovers LIMIT 1")) {
+            if (rs.next()) return;
+        }
+        Long author = userId(conn, "shiftlead");
+        Long station = userId(conn, "operator");
+        Long supply = userId(conn, "forklift");
+        Long manager = userId(conn, "manager");
+        if (author == null || manager == null) return;
+
+        List<LocalDate> days = historyDays();
+        LocalDateTime now = BusinessClock.now();
+        for (Sheet sheet : SHEETS) {
+            if (sheet.dayIndex() >= days.size()) continue;
+            LocalDate day = days.get(sheet.dayIndex());
+            var shift = hu.due.rewear.model.RotaShift.ShiftCode.valueOf(sheet.shift());
+            var window = hu.due.rewear.service.ShiftHandoverService.window(
+                    new hu.due.rewear.service.ShiftHandoverService.ShiftSlot(day, shift));
+            var figures = handovers.figuresBetween(conn, window[0], window[1]);
+            LocalDateTime submitted = window[1].isAfter(now) ? now : window[1];
+            long id = handovers.insert(conn, day, shift, author, sheet.equipment(), sheet.staffing(),
+                    sheet.safety(), sheet.mustKnow(), figures, submitted);
+            // Everything except the last one has been picked up; the newest is what the reader takes over.
+            if (sheet.dayIndex() < days.size() - 1) {
+                handovers.acknowledge(conn, id, manager, submitted.plusMinutes(12));
+            }
+            if (sheet.issue() == null) continue;
+            Long owner = switch (sheet.owner()) {
+                case "operator" -> station;
+                case "forklift" -> supply;
+                default -> manager;
+            };
+            if (owner == null) owner = manager;
+            long issue = handovers.insertIssue(conn, id, sheet.issue(), owner,
+                    day.plusDays(sheet.dueInDays()), submitted);
+            if (sheet.resolved()) {
+                handovers.resolveIssue(conn, issue, manager, "Megrendelve, másnap megérkezett",
+                        submitted.plusHours(20));
+            }
+        }
+    }
+
+    private static Long userId(Connection conn, String username) throws SQLException {
+        try (var ps = conn.prepareStatement("SELECT id FROM users WHERE lower(username) = ?")) {
+            ps.setString(1, username);
+            try (var rs = ps.executeQuery()) {
+                return rs.next() ? rs.getLong(1) : null;
+            }
+        }
+    }
+
+    /** One seeded handover sheet. The wording is a shift leader's, not a technical writer's. */
+    private record Sheet(int dayIndex, String shift, String equipment, String staffing, String safety,
+                         String mustKnow, String issue, String owner, int dueInDays, boolean resolved) { }
+
+    private static final List<Sheet> SHEETS = List.of(
+            new Sheet(1, "MORNING",
+                    "A 2-es mérleg kalibrálva, a bálázó rendben.",
+                    "Teljes létszám, Kiss Zsófia délután jött be.",
+                    "Nem volt esemény.",
+                    "A 3-as állomásra papír kell a címkenyomtatóba, mielőtt elindul a szalag.",
+                    "Címkenyomtató papír utánrendelése", "operator", 2, true),
+            new Sheet(2, "AFTERNOON",
+                    "Minden eszköz működik, a bálázót átzsíroztuk.",
+                    "Két ember hiányzott, a vegyes csapat vette át a munkát.",
+                    "Nedves padló a kapunál, feltörölve, tábla kint.",
+                    "A nedves tétel a 4-es állomáson külön van rakva, ne menjen bele a bálába.",
+                    "Nedves tétel szétválogatása és átmérlegelése", "operator", 3, false),
+            new Sheet(3, "MORNING",
+                    "A kézi szkenner akkumulátora gyorsan merül, töltőn hagytuk.",
+                    "Új válogató betanítása folyik, Takács Petra mellett.",
+                    "Nem volt esemény.",
+                    "A szkennert reggel ellenőrizni kell, délután megállt vele a címkézés.",
+                    "Tartalék szkenner akkumulátor beszerzése", "manager", 4, false),
+            new Sheet(4, "AFTERNOON",
+                    "A targonca bal oldali villája ferde, bejelentve.",
+                    "Teljes létszám.",
+                    "A targonca ferde villájával nem szabad bálát emelni.",
+                    "A targoncát a szerviz érkezéséig csak üres raklaphoz használjátok.",
+                    "Targoncaszerviz kihívása", "forklift", 1, false),
+            new Sheet(5, "MORNING",
+                    "Minden rendben, a mérlegek reggel ellenőrizve.",
+                    "Teljes létszám, a délutános műszakból egy ember átjött segíteni.",
+                    "Nem volt esemény.",
+                    "A 2-es állomáson áll egy lezáratlan leállás, zárjátok le az okával együtt.",
+                    null, "manager", 1, false));
+
     /**
      * The work days the history covers, oldest first. Today is in it whatever day of the week it is, so the
      * demo always opens with work in progress; the days behind it are weekdays, because the line rests.
@@ -787,6 +911,26 @@ final class SortingDemoSeeder {
         }
     }
 
+    /**
+     * Gives an existing demo workspace the two leaders it never had and the week's handovers.
+     *
+     * <p>The role hierarchy created a production lead and a shift leader; nobody held either, which made the
+     * one feature that is squarely the shift leader's impossible to show. They have accounts now.
+     */
+    private void upgradeHandovers() {
+        db.runInTransaction(conn -> {
+            try (var marker = conn.prepareStatement("""
+                    UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '6'
+                    """)) {
+                marker.setString(1, CURRENT_VERSION);
+                marker.setString(2, SEED_KEY);
+                if (marker.executeUpdate() != 1) return;
+            }
+            seedLeaders(conn);
+            seedHandovers(conn, new hu.due.rewear.dao.ShiftHandoverDao(db));
+        });
+    }
+
     /** Gives an existing demo workspace the week's stoppages, without touching anything else. */
     private void upgradeStoppages() {
         var manager = users.findByUsername("manager");
@@ -795,7 +939,7 @@ final class SortingDemoSeeder {
             try (var marker = conn.prepareStatement("""
                     UPDATE app_settings SET setting_value = ? WHERE setting_key = ? AND setting_value = '5'
                     """)) {
-                marker.setString(1, CURRENT_VERSION);
+                marker.setString(1, "6");
                 marker.setString(2, SEED_KEY);
                 if (marker.executeUpdate() != 1) return;
             }

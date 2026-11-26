@@ -1036,3 +1036,40 @@ downtime.group.facility,Building,Épület
 downtime.group.staffing,People,Létszám
 downtime.group.admin,Meetings and admin,Értekezlet és adminisztráció
 downtime.group.external,Outside the floor,Külső ok
+nav.handover,Shift Handover,Műszakátadás
+handover.sheet,The shift being handed over,Az átadott műszak
+handover.history,Recent handovers,Legutóbbi átadások
+handover.show,Show This Shift,Ez a műszak
+handover.last_shift,Last Shift,Előző műszak
+handover.write,Write Handover,Átadás írása
+handover.pick_up,Pick It Up,Átvétel
+handover.add_issue,Add Issue,Nyitott ügy hozzáadása
+handover.resolve,Close Issue,Ügy lezárása
+handover.resolution,What was done about it,Mi történt vele
+handover.issue,Open issue,Nyitott ügy
+handover.issues,Open issues,Nyitott ügyek
+handover.no_issues,Nothing left open.,Semmi nem maradt nyitva.
+handover.open_issues,Open,Nyitott
+handover.owner,Owner,Felelős
+handover.owner_required,Give the issue an owner by name.,Nevezd meg az ügy felelősét.
+handover.due,Wanted by (YYYY-MM-DD),Határidő (ÉÉÉÉ-HH-NN)
+handover.hours_open,Hours open,Nyitva (óra)
+handover.outgoing,Handed over by,Átadta
+handover.picked_up_by,Picked up by,Átvette
+handover.not_picked_up,Not picked up yet,Még nincs átvéve
+handover.none,No shift has been handed over yet.,Még nem volt műszakátadás.
+handover.none_for_shift,Nothing was handed over for this shift.,Ehhez a műszakhoz nem készült átadás.
+handover.select_issue,Select an open issue first.,Előbb válassz egy nyitott ügyet.
+handover.must_know,Must know before the line starts,Indulás előtt tudni kell
+handover.measured,The shift's own figures,A műszak saját számai
+handover.equipment,Equipment,Eszközök állapota
+handover.staffing,Staffing,Létszám
+handover.safety,Safety,Munkavédelem
+handover.processed,Processed,Feldolgozva
+handover.graded,Graded out,Minősítve
+handover.downtime,Stopped,Állás
+handover.primary_cause,Main cause,Fő ok
+handover.open,Open,Nyitott
+handover.overdue,Past due,Határidőn túl
+handover.escalated,Escalated,Felsőbb szintre került
+handover.resolved,Closed,Lezárva

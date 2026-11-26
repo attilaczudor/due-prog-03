@@ -405,6 +405,40 @@ Indexek: `idx_downtime_day`, `idx_downtime_reason`.
 
 ---
 
+### 3.54–3.55 Műszakátadás (`shift_handovers`, `shift_handover_issues`)
+
+| Oszlop (`shift_handovers`) | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `work_day`, `shift_code` | `TEXT` | `NOT NULL`, `UNIQUE` együtt | Melyik nap melyik műszakja; egy műszakról egy lap készülhet |
+| `outgoing_by` | `INTEGER` | `NOT NULL FK -> users` | Ki adta át |
+| `equipment_status`, `staffing_notes`, `safety_items`, `must_know` | `TEXT` | `NOT NULL` | A négy írott mező. Egyik sem maradhat üresen: a „nincs esemény" is válasz, az üres mező nem |
+| `processed_grams`, `target_grams`, `output_grams` | `INTEGER` | `NOT NULL DEFAULT 0` | A műszak saját számai, záráskor befagyasztva |
+| `downtime_minutes`, `primary_cause_reason_id` | | `FK -> downtime_reasons` | Mennyit állt és mi volt a fő ok (a legtöbb percet vivő ok, nem lista) |
+| `submitted_at` | `TEXT` | `NOT NULL` | Mikor írták meg |
+| `acknowledged_by`, `acknowledged_at` | | elhagyható | Ki vette át és mikor; amíg üres, az átadás nem történt meg |
+
+| Oszlop (`shift_handover_issues`) | Típus | Megszorítások | Leírás |
+|---|---|---|---|
+| `handover_id` | `INTEGER` | `NOT NULL FK ... ON DELETE CASCADE` | Melyik átadásból maradt |
+| `summary` | `TEXT` | `NOT NULL` | Mi az ügy |
+| `owner_id`, `due_on` | | `NOT NULL` | Felelős és határidő — mindkettő kötelező: felelős nélküli ügy csak egy feljegyzés |
+| `state` | `TEXT` | `CHECK ('OPEN','RESOLVED')` | Nyitott vagy lezárt |
+| `created_at` | `TEXT` | `NOT NULL` | Innen ketyeg a 48 óra |
+| `escalated_at`, `escalated_to` | | elhagyható | Mikor és kihez került feljebb |
+| `resolved_at`, `resolved_by`, `resolution` | | `CHECK` párban a `state`-tel | Lezárni csak azzal lehet, hogy mi történt vele |
+
+A szakirodalom hat mezőt ír elő, tíz percben, a műszak vége előtt — és a hatból **négy nem mérőszám**. Ez a
+tábla ezért nem jelentés: a mérőszám egyetlen mezője (`processed/target/output/downtime/primary_cause`) a
+válogatási és leállási nyilvántartásból töltődik, a többi öt emberi szöveg és nevesített felelősség. A
+figures záráskor **befagy**: az átadás arról szól, ami akkor elhangzott, és egy héttel később újraszámolva
+átírná azt. A „legutóbbi műszak" rendezése nem a beküldés ideje, hanem az, melyik műszak **ért véget**
+utoljára (délelőtt → délután → éjszaka), mert aki ma délután írja meg a tegnapi papírt, attól még nem ő az,
+akitől átveszik a szalagot.
+
+Indexek: `idx_handover_day`, `idx_handover_issue_open`.
+
+---
+
 ### 3.31b Nyersanyag-tételek és igénylés (`sorting_raw_lots`, `sorting_requests`)
 
 - **`sorting_raw_lots`:** egy napi begyűjtés a `reference` (egyedi) mellett `material` (mit tartalmaz), `source_area`

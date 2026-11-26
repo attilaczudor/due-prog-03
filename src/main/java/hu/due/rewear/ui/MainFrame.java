@@ -74,6 +74,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
     public static final String VIEW_ORDERS = "orders";
     public static final String VIEW_PAYROLL = "payroll";
     public static final String VIEW_ROTA = "rota";
+    public static final String VIEW_HANDOVER = "handover";
     public static final String VIEW_STOCKTAKE = "stocktake";
     public static final String VIEW_INVOICES = "invoices";
     public static final String VIEW_EMAIL = "email";
@@ -301,7 +302,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         addModuleGroup(session, false,
                 AppModule.DASHBOARD, AppModule.TODO,
                 AppModule.SORTING, AppModule.INTAKE, AppModule.PUTAWAY, AppModule.STAGING,
-                AppModule.SCANNER, AppModule.INVENTORY, AppModule.STOCKTAKE);
+                AppModule.SCANNER, AppModule.INVENTORY, AppModule.STOCKTAKE, AppModule.HANDOVER);
 
         // Management modules (Locations, Dictionaries, Customers, Orders, Invoices)
         addModuleGroup(session, true,
@@ -530,6 +531,7 @@ public final class MainFrame extends JFrame implements LanguageChangeListener, T
         registerViewFactory(VIEW_ORDERS, () -> new OrdersView(ctx));
         registerViewFactory(VIEW_PAYROLL, () -> new PayrollView(ctx));
         registerViewFactory(VIEW_ROTA, () -> new RotaView(ctx));
+        registerViewFactory(VIEW_HANDOVER, () -> new HandoverView(ctx));
         registerViewFactory(VIEW_STOCKTAKE, () -> new StocktakeView(ctx));
         registerViewFactory(VIEW_INVOICES, () -> new InvoicesView(ctx));
         registerViewFactory(VIEW_EMAIL, () -> new EmailView(ctx));

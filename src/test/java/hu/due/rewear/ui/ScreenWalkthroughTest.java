@@ -19,6 +19,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -54,6 +55,21 @@ class ScreenWalkthroughTest {
             }
         }
         return different / (double) sampled;
+    }
+
+    /** The i18n key of every navigation button in the window, however the sidebar happens to be built. */
+    private static void collectNavKeys(java.awt.Container root, Set<String> into) {
+        for (java.awt.Component child : root.getComponents()) {
+            if (child instanceof javax.swing.JToggleButton button) {
+                Object key = button.getClientProperty("i18nKey");
+                if (key != null) {
+                    into.add(key.toString());
+                }
+            }
+            if (child instanceof java.awt.Container container) {
+                collectNavKeys(container, into);
+            }
+        }
     }
 
     private static BufferedImage paint(MainFrame frame) {
@@ -96,6 +112,17 @@ class ScreenWalkthroughTest {
             });
             MainFrame frame = frameRef.get();
             try {
+                // A screen that draws but has no way in is not reachable at all: the sidebar's groups are
+                // written out by hand, so a module added to the registry and forgotten there is invisible to
+                // everybody except a test that navigates by view key.
+                Set<String> navKeys = new java.util.HashSet<>();
+                collectNavKeys(frame.getContentPane(), navKeys);
+                for (AppModule module : AppModule.values()) {
+                    if (ctx.getSession().canAccessModule(module) && !navKeys.contains(module.navI18nKey())) {
+                        problems.add(username + "/" + module.name().toLowerCase()
+                                + " has no way into it from the sidebar");
+                    }
+                }
                 for (AppModule module : AppModule.values()) {
                     if (!ctx.getSession().canAccessModule(module)) {
                         continue;

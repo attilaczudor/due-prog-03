@@ -56,6 +56,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
     private final JButton sorterBtn = new JButton();
     private final JButton helperBtn = new JButton();
     private final JButton fulfilmentDriverBtn = new JButton();
+    private final JButton productionLeadBtn = new JButton();
+    private final JButton shiftLeadBtn = new JButton();
     private final JButton forkliftBtn = new JButton();
 
     private final JComboBox<String> langCombo = new JComboBox<>();
@@ -177,6 +179,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         sorterBtn.addActionListener(e -> fill.accept(new String[]{"sorter01", "sorter123"}));
         helperBtn.addActionListener(e -> fill.accept(new String[]{"helper01", "helper123"}));
         fulfilmentDriverBtn.addActionListener(e -> fill.accept(new String[]{"forklift2", "forklift2123"}));
+        productionLeadBtn.addActionListener(e -> fill.accept(new String[]{"prodlead", "prodlead123"}));
+        shiftLeadBtn.addActionListener(e -> fill.accept(new String[]{"shiftlead", "shiftlead123"}));
 
         quickFillPanel.add(superAdminBtn);
         quickFillPanel.add(adminBtn);
@@ -186,8 +190,11 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         quickFillPanel.add(helperBtn);
         quickFillPanel.add(forkliftBtn);
         quickFillPanel.add(fulfilmentDriverBtn);
+        quickFillPanel.add(productionLeadBtn);
+        quickFillPanel.add(shiftLeadBtn);
         for (var entry : java.util.Map.of(sorterBtn, "sorter01", helperBtn, "helper01",
-                fulfilmentDriverBtn, "forklift2").entrySet()) {
+                fulfilmentDriverBtn, "forklift2", productionLeadBtn, "prodlead",
+                shiftLeadBtn, "shiftlead").entrySet()) {
             entry.getKey().setEnabled(ctx.getUserDao().findByUsername(entry.getValue()).isPresent());
         }
         footer.add(quickFillPanel);
@@ -210,7 +217,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         usernameLabel.setForeground(ThemeManager.fg());
         passwordLabel.setForeground(ThemeManager.fg());
         BrutalistStyle.stylePrimaryButton(loginButton);
-        BrutalistStyle.styleSecondaryButtons(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn, helperBtn, forkliftBtn, fulfilmentDriverBtn);
+        BrutalistStyle.styleSecondaryButtons(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn,
+                helperBtn, forkliftBtn, fulfilmentDriverBtn, productionLeadBtn, shiftLeadBtn);
         BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn, helperBtn, forkliftBtn, fulfilmentDriverBtn);
         loginAsLabel.setForeground(ThemeManager.muted());
     }
@@ -257,6 +265,8 @@ public final class LoginFrame extends JFrame implements LanguageChangeListener, 
         operatorBtn.setText(i18n.t("role.OPERATOR"));
         sorterBtn.setText(i18n.t("role.SORTER"));
         helperBtn.setText(i18n.t("role.SORTING_HELPER"));
+        productionLeadBtn.setText(i18n.t("role.PRODUCTION_LEAD"));
+        shiftLeadBtn.setText(i18n.t("role.SHIFT_LEAD"));
         forkliftBtn.setText(i18n.t("login.supply_driver"));
         fulfilmentDriverBtn.setText(i18n.t("login.fulfilment_driver"));
         BrutalistStyle.matchButtonSizes(superAdminBtn, adminBtn, managerBtn, operatorBtn, sorterBtn, helperBtn, forkliftBtn, fulfilmentDriverBtn);

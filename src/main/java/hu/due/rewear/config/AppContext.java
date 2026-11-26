@@ -9,9 +9,11 @@ import hu.due.rewear.dao.FinanceConfigDao;
 import hu.due.rewear.dao.InventoryPackageDao;
 import hu.due.rewear.dao.NavReportDao;
 import hu.due.rewear.dao.DowntimeDao;
+import hu.due.rewear.dao.ShiftHandoverDao;
 import hu.due.rewear.dao.GradeYieldDao;
 import hu.due.rewear.dao.PurchaseLotDao;
 import hu.due.rewear.service.DowntimeService;
+import hu.due.rewear.service.ShiftHandoverService;
 import hu.due.rewear.service.GradeYieldService;
 import hu.due.rewear.service.PurchaseLotService;
 import hu.due.rewear.nav.NavCredentialStore;
@@ -97,6 +99,8 @@ public final class AppContext {
     private final GradeYieldService gradeYieldService;
     private final DowntimeDao downtimeDao;
     private final DowntimeService downtimeService;
+    private final ShiftHandoverDao handoverDao;
+    private final ShiftHandoverService handoverService;
     private final PurchaseLotService purchaseLotService;
     private final NavReportingService navReportingService;
     private final NavCredentialStore navCredentialStore;
@@ -282,8 +286,14 @@ public final class AppContext {
                 dictionaryDao, purchaseLotDao, settingsDao);
         this.downtimeDao = new DowntimeDao(databaseManager);
         this.downtimeService = new DowntimeService(databaseManager, session, downtimeDao);
+        this.handoverDao = new ShiftHandoverDao(databaseManager);
+        this.handoverService = new ShiftHandoverService(databaseManager, session, handoverDao, userDao,
+                notificationService);
 
         invoiceService.syncOverdueStatuses();
+        // An issue left open for two days goes up a tier on its own, so that the person who raised it does
+        // not have to keep pushing it. Nobody is logged in yet, which is the point: it is the record's doing.
+        handoverService.escalateStaleIssues();
         initLocalizationFromPreferences();
     }
 
@@ -340,6 +350,14 @@ public final class AppContext {
 
     public GradeYieldService getGradeYieldService() {
         return gradeYieldService;
+    }
+
+    public ShiftHandoverService getShiftHandoverService() {
+        return handoverService;
+    }
+
+    public ShiftHandoverDao getShiftHandoverDao() {
+        return handoverDao;
     }
 
     public DowntimeService getDowntimeService() {

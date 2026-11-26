@@ -781,3 +781,63 @@ CREATE TABLE IF NOT EXISTS downtime_events (
 
 CREATE INDEX IF NOT EXISTS idx_downtime_day ON downtime_events(work_day);
 CREATE INDEX IF NOT EXISTS idx_downtime_reason ON downtime_events(reason_id);
+
+-- The shift handover. The best-specified feature in the whole research set, and the smallest: a published
+-- template is six written fields completed in ten minutes or less, before the outgoing supervisor leaves.
+-- Four of those six are not KPI data at all, which is the point — an application that offers a shift summary
+-- and calls it a handover has covered one field of six. The other five are structured notes with names
+-- against them.
+--
+-- Two companion rules shape the record as much as the fields do. The board has to be current before the next
+-- shift's meeting, so writing it belongs to shift *close* rather than shift open, and the incoming
+-- supervisor's first screen is therefore the last shift rather than today so far. And an issue left open for
+-- more than forty-eight hours escalates by itself, so that the person who raised it does not have to keep
+-- pushing it.
+CREATE TABLE IF NOT EXISTS shift_handovers (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    work_day TEXT NOT NULL,
+    shift_code TEXT NOT NULL CHECK (shift_code IN ('MORNING', 'AFTERNOON', 'NIGHT')),
+    outgoing_by INTEGER NOT NULL REFERENCES users(id),
+    -- The four written fields. All of them are required: "nothing to report" is an answer somebody has to
+    -- give, and a blank is the thing the record exists to prevent.
+    equipment_status TEXT NOT NULL,
+    staffing_notes TEXT NOT NULL,
+    safety_items TEXT NOT NULL,
+    -- One sentence on the single thing the incoming supervisor must do before the line starts.
+    must_know TEXT NOT NULL,
+    -- The measured field, frozen as it stood at close. A handover is a document of what was said at that
+    -- moment; recomputing it later, after another day of data entry, would quietly rewrite what was handed
+    -- over. The figures cover the shift's own hours, not the whole work day.
+    processed_grams INTEGER NOT NULL DEFAULT 0,
+    target_grams INTEGER NOT NULL DEFAULT 0,
+    output_grams INTEGER NOT NULL DEFAULT 0,
+    downtime_minutes INTEGER NOT NULL DEFAULT 0,
+    primary_cause_reason_id INTEGER REFERENCES downtime_reasons(id),
+    submitted_at TEXT NOT NULL,
+    -- Who picked it up, and when. A handover nobody acknowledged is a handover that did not happen.
+    acknowledged_by INTEGER REFERENCES users(id),
+    acknowledged_at TEXT,
+    UNIQUE (work_day, shift_code)
+);
+
+-- An open issue with a name and a date against it. Both are required: an issue with no owner is a note, and
+-- a note is what a handover sheet is meant to replace.
+CREATE TABLE IF NOT EXISTS shift_handover_issues (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    handover_id INTEGER NOT NULL REFERENCES shift_handovers(id) ON DELETE CASCADE,
+    summary TEXT NOT NULL,
+    owner_id INTEGER NOT NULL REFERENCES users(id),
+    due_on TEXT NOT NULL,
+    state TEXT NOT NULL CHECK (state IN ('OPEN', 'RESOLVED')),
+    created_at TEXT NOT NULL,
+    escalated_at TEXT,
+    escalated_to INTEGER REFERENCES users(id),
+    resolved_at TEXT,
+    resolved_by INTEGER REFERENCES users(id),
+    resolution TEXT,
+    CHECK ((state = 'OPEN' AND resolved_at IS NULL AND resolved_by IS NULL)
+        OR (state = 'RESOLVED' AND resolved_at IS NOT NULL AND resolved_by IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_handover_day ON shift_handovers(work_day, shift_code);
+CREATE INDEX IF NOT EXISTS idx_handover_issue_open ON shift_handover_issues(state, created_at);

@@ -15,12 +15,14 @@ public final class TestWorkspaces {
      * itself: a figure for the whole line would be a figure for somebody else's work as well, and which
      * sorter the seeded rotation happened to put on today is not something a test should depend on. The
      * collections are credited back what was taken off them, so the workspace is left consistent, and the
-     * week's stoppages go with the week they belong to. The reason list itself stays: it is reference data
-     * every installation has, not sample data.
+     * week's stoppages and handovers go with the week they belong to. The reason list itself stays: it is
+     * reference data every installation has, not sample data.
      */
     public static void clearSeededSortingHistory(AppContext ctx) {
         ctx.getDatabaseManager().runInTransaction(conn -> {
             try (var stmt = conn.createStatement()) {
+                stmt.executeUpdate("DELETE FROM shift_handover_issues");
+                stmt.executeUpdate("DELETE FROM shift_handovers");
                 stmt.executeUpdate("DELETE FROM downtime_events");
                 stmt.executeUpdate("DELETE FROM sorting_bags");
                 stmt.executeUpdate("DELETE FROM sorting_request_helpers");

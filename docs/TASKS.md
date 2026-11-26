@@ -26,6 +26,7 @@
 
 - [x] Seed a worked week of sorting into the demo workspace: finished runs with a grade cascade and a residue, today half-finished, realistic daily targets, and a packing backlog. It stops short of registering bags into stock, and seeds no yield baseline, so the demo does not quietly ship a target.
 
+- [x] Add the shift handover record: the sheet, its frozen figures, open issues with an owner and a date, and forty-eight-hour escalation that happens without anybody pressing anything. The demo finally has a production lead and a shift leader to log in as.
 - [x] Add the downtime and non-productive-time log: eight fixed loss groups with a short, supervisor-reworded reason list inside them, nothing closing without a reason, the crew's own time separated from what was done to them, and availability measured against rostered sorter-hours. The wait between calling for material and getting it is worked out from the timestamps and reported beside the log, never added to it.
 
 ## Next session
@@ -61,9 +62,9 @@ Build in this order:
 - [x] **Downtime and non-productive-time log.** Done 26 November, pass 23. The research pairs this with grade yield: separating
       non-attributable time is what makes a bonus defensible, and the request and delivery timestamps already
       held "sorter waiting for stock" as a derivable quantity.
-- [ ] **Shift handover record with 48-hour escalation.** The cheapest high-value item: six structured fields at
-      shift close, escalation through the notification infrastructure that already exists. One of its six
-      fields — downtime minutes and primary cause — is now a query rather than something to type.
+- [x] **Shift handover record with 48-hour escalation.** Done 26 November, pass 24. Six fields at shift close, four of which are
+      not figures at all; issues with an owner and a date; escalation that runs by itself rather than on a
+      button. The figures field is filled from the sorting and stoppage records rather than typed.
 - [ ] *Conditional swap:* if the operation ships outside the EU, the Article 22d(9) bale record and export document
       pack displace the handover record — 21 May 2027 is a hard date and a handover sheet is not.
 - [ ] A handheld client is the right sixth item, not the first: it brings the whole offline-synchronisation problem

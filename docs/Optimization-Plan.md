@@ -1297,6 +1297,98 @@ week rather than to the stoppage record, and it belongs with whatever next revis
 
 ---
 
+## Pass 24 — the shift handover (26 November 2026)
+
+### Six fields, and four of them are not figures
+
+This is the best-specified item in the whole research set and the smallest. A published template asks for six
+fields written in ten minutes or less, before the outgoing supervisor leaves: the shift's figures, open issues
+each with an owner and a date, equipment, staffing, safety, and one sentence on the single thing the incoming
+supervisor must do before the line starts.
+
+**Four of those six are not KPI data.** That is the finding worth acting on, because a shift summary report is
+easy and a structured note with somebody's name against it is not — so an application that offers the first
+and calls it a handover has covered one field of six. Everything here other than the figures is written by a
+person, and every written field is required: "nothing to report" is an answer somebody has to give, and a
+blank is exactly what the record exists to prevent.
+
+### Built
+
+- [x] **The sheet.** Day, shift, who wrote it, the one thing that must be done before the line starts, the
+  shift's own figures, equipment, staffing, safety, and the issues being left behind. It reads top-down as a
+  sheet rather than as a table, because that is how it is read at a shift change.
+- [x] **The figures are frozen at close** and cover the shift's own hours, not the work day's. A handover is a
+  document of what was said at that moment; recomputing it a week later, after another day of data entry,
+  would quietly rewrite what was handed over. The stoppage figure carries one primary cause — the reason that
+  cost the most minutes — because a sheet read in ten minutes cannot carry a list.
+- [x] **Every issue has a name and a date against it**, both required. An issue with no owner is a note, and a
+  note is what the sheet replaces. One more can be added afterwards, because somebody always remembers one on
+  the way out, and closing one requires saying what was done about it.
+- [x] **Forty-eight hours and an issue goes up a tier by itself** — to the production lead, or to management
+  above them — with a notification. It runs when the application starts and whenever the screen is read,
+  rather than waiting for a button somebody would have to remember: the point of the rule is that the person
+  who raised the issue does not have to keep pushing it. It happens once per issue, and never to one that
+  somebody has closed.
+- [x] **The screen opens on the last shift, not on today.** Daily management practice is that the board has to
+  be current before the next shift's meeting, which makes writing the handover a closing task and reading it
+  the first thing the incoming supervisor does. "Last" means the shift that *ended* last, not the sheet that
+  was typed last: somebody catching up on yesterday's paperwork this afternoon has not thereby become the
+  shift you are taking over from.
+- [x] **Picking it up is recorded by name.** A handover nobody acknowledged is a handover that did not happen.
+- [x] **A production lead and a shift leader exist at last.** The role hierarchy created both roles and gave
+  neither an account, which left the one feature that is squarely the shift leader's impossible to show. The
+  demo now logs in as either of them, and the week's handovers are written by the shift leader.
+- [x] **Its own module in the permission matrix**, defaulting on for the two production leaders and
+  management. An installation that has already edited the matrix for a role keeps what it chose: a new module
+  is off there until somebody ticks it, which is the right way round.
+
+### Verification
+
+`./mvnw clean verify`: BUILD SUCCESS, **277 / 277** across 55 classes (+20).
+
+Fourteen mutation checks: a blank field accepted; the figures not frozen into the sheet; the window covering
+the whole day rather than the shift; the main cause taken as the smallest rather than the largest; nothing
+ever old enough to escalate; a closed issue escalating anyway; an issue escalating again every time anybody
+looks; the last sheet typed counting as the last shift; a handover picked up twice; an issue wanted before the
+shift it came out of; five in the morning counted as today's night shift; anybody allowed to hand a shift
+over; the table accepting two sheets for one shift; and the module dropped from the sidebar.
+
+One defect came out of writing the tests. "The last shift" was ordered by when the sheet was submitted, so two
+sheets written in the same minute came back in whatever order the database felt like, and a sheet written late
+for an earlier shift would have displaced the shift actually being taken over from. It is ordered by the shift
+that ended last now — within a day that is morning, then afternoon, then night, because the night shift ends
+the next morning. The mutation for it survived the first run too, for a related reason: the test wrote both
+sheets at the same pinned instant, so no ordering could tell them apart. It writes the second one an hour
+later now, which is also what catching up on paperwork actually looks like.
+
+The second defect was found by looking at the rendered screen, and it is the kind only looking finds. The
+screen drew perfectly and had **no way into it**: the sidebar's groups are written out module by module in
+code, so a module added to the registry and forgotten there is invisible to everybody except a test that
+navigates by view key — which is exactly what the screen walkthrough does. The walkthrough now also checks
+that every module a role can reach has a button, which is the assertion that would have caught it.
+
+Two more mutations survived, and in both cases the guard was real but the test was reaching it through
+something else.
+Escalation reads only open, unescalated issues, so the predicate's own refusal to escalate a closed issue and
+the write's refusal to mark one twice both sat behind that filter and could not be observed. They are
+exercised directly now. A guard nothing exercises is a guard nobody can rely on the day a second caller
+appears.
+
+### Not done
+
+The handheld client, which is the remaining roadmap item and deliberately last: it brings the whole offline
+synchronisation problem with it, and its evidence base is a mechanism and a preference survey rather than a
+measured cost.
+
+The escalation notifies the production lead and management as roles rather than one named person, while the
+issue record names the person it went to. That is the right shape for a small site where one person holds the
+role, and the wrong shape for a site with three production leads on different shifts.
+
+The conditional swap the research flagged is still open: if the operation ships outside the EU, the Article
+22d(9) bale record and export document pack displace this item in priority, and 21 May 2027 is a hard date.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
