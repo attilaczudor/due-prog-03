@@ -1607,6 +1607,113 @@ timestamps written by hand into the rota or a handover, not for anything the clo
 
 ---
 
+## Pass 27 — an outbox, and which machine the change was made on (26 November 2026)
+
+### What was missing
+
+Two of the handheld's four prerequisites were built in pass 26. These are the other two. The application had
+no record that a row had changed in any form another process could replay: `invoice_events`,
+`nav_report_events`, `purchase_lot_events` and `downtime_events` are records of business steps, written where
+somebody thought to write them, and none of them answers "what has changed since number 412". And nothing
+said which machine a change had been made on, because until now there was only one.
+
+### Written by the database, not by the application
+
+The log is written by triggers. That is the whole design: a write that forgets to log itself is exactly the
+defect the log exists to prevent, and the way to make something unforgettable is to take it out of the hands
+of whoever would forget it. An update made by a repair script, a future screen or a migration is logged
+without anybody remembering to.
+
+Pass 26 built a statement splitter that handles trigger bodies, and said at the time that nothing in the
+schema needed it yet. Forty-two triggers later it does.
+
+**What is logged.** Fourteen tables: stock and its movements, orders and their lines, purchase lots, the
+sorting line, stoppages, handovers and their issues, stocktakes and their counts. The office's work is not —
+users, roles, permissions, settings, invoices, payroll, mail and chat are not changed on a handheld in a dead
+spot, and an outbox is only owed for what a device can change while it is out of contact. Reference data
+moves the other way and needs no outbox at all.
+
+**What a row holds.** The sequence, the table, the row's id, the operation, and the device. There is no
+timestamp, and that is deliberate: a trigger can only read SQLite's own clock, which is not the business
+clock and cannot be pinned by a test, so the log carries the *order* things happened in — which is what a
+replay needs — and the business moment stays in the row's own `_at` columns, where pass 26 put it properly.
+
+**The sequence is `AUTOINCREMENT`.** A plain rowid may be handed out again after a delete, and "everything
+after 412" has to mean the same thing tomorrow as it does today.
+
+**Work that is not work is not logged.** `ChangeLog.withoutLogging` switches the log off for the sample
+warehouse and for the schema's own upgrade steps. Loading the demo is not something the night shift did, and
+rewriting a column into a new format is the application tidying up after itself; a device syncing afterwards
+should not be handed every row in the database. It comes back on even when the work fails, and startup
+switches it on unconditionally, because an installation that quietly stops recording is worse than one that
+fails loudly.
+
+It is a setting the triggers read rather than a dropping and rewriting of them, and that was a correction
+made during the pass: taking eighty-four triggers away and putting them back around every piece of
+housekeeping added a minute and a half to the test suite, which opens a workspace for almost every test. The
+triggers are now written once and left alone unless their text changes, and the flag costs one indexed
+lookup on a write that is already doing two.
+
+**Device identity.** This installation registers itself once and keeps the id beside the data, where a
+trigger can read it without being told. The name is generated — `DESKTOP-3F9A21C4` — rather than taken from
+the computer: a machine name is the owner's, it would travel in a backup bundle, and nothing here needs it.
+
+**Admin shows all three.** The schema version and when it was reached, this device, and how many changes the
+log holds. Pass 26's work was invisible until now.
+
+### What it costs
+
+Measured at 50,000 packages, the same harness as pass 16:
+
+| | |
+|---|---|
+| Writing 5,000 packages with the log | 737 ms — 147 ms per 1,000 rows |
+| The same 5,000 without it | 148 ms — 30 ms per 1,000 rows |
+
+About five times slower on a bulk write: roughly 0.12 ms added per logged write, for an insert into the log
+and two indexed lookups. For one sorter reporting one bag that is nothing, and nothing in the application
+writes in bulk — the seeder that does has the log off. It is the number to know before deciding the log
+should cover more tables than it does. Every reading figure is unchanged from pass 16: the bounded inventory
+screen is 60 ms against 50,021 packages.
+
+### Verification
+
+346 tests (330 before), of which 16 are new. Ten mutation checks: a table added to the logged list without
+anybody deciding to, the log not coming back on after work that failed, the switch doing nothing at all, a
+sequence number handed out twice, a change that does not say which machine made it, a deleted row logged by
+an id that means nothing, an installation that registers itself again on every start, a device named after
+the computer, a device told about changes it has already seen, and housekeeping recorded as somebody's work.
+
+The list of logged tables is spelled out in a test rather than derived, because every other check here
+compares the triggers against that same list and would agree with it whatever it said. The first run of the
+mutations found exactly that: adding a table nobody meant to log passed every test.
+
+One build failed on something unrelated and worth keeping: `ScreenWalkthroughTest` could not delete its
+temporary directory, with every assertion passing. It opens eleven SQLite workspaces in a run, and whether
+the last journal file has gone by the time the directory is removed is a question about the filesystem. It
+makes and removes its own directory now, and a failure to tidy up is no longer a verdict on the screens.
+
+### Not done — and the question that is not mine
+
+**There is no conflict policy, and this pass deliberately does not invent one.** What is built is everything
+needed to *detect* a conflict: every change carries the row it touched, the machine it was made on and its
+place in the order. What to do when two machines have changed the same row since they last spoke is a
+business decision before it is a technical one, and it differs by table. If two sorters report bags against
+the same run, both are true and both should be kept. If a stocktake count and a putaway disagree about where
+a package is, one of them is wrong and the site has to say which authority wins. Shipping a rule like
+last-write-wins would quietly throw away one of those answers every time.
+
+**The log holds what changed, not what it changed to.** A device replaying it has to come back and read the
+row. For a sync against one server that is right — the row is the truth and the log is the index — and for
+a device that has been away for a month it is fewer bytes than the values would be. A log that carried the
+values could be replayed into a database that is offline, which this one cannot.
+
+**Nothing trims the log.** It grows by one row per change for ever. At the floor's rate that is a few
+thousand rows a month, which matters to nobody for years; it will matter eventually, and trimming needs the
+conflict policy first, since a change that has not reached every device cannot be thrown away.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

@@ -134,16 +134,18 @@ stock sharpens that into something concrete. A handheld that works offline needs
 - ~~**One timestamp convention**, because a record created on a device in a dead spot and merged an hour later
   is ordered by its timestamp and nothing else.~~ Done in pass 26: UTC instants to the second, held by three
   guard tests.
-- **A change log the application writes to.** There is none. `invoice_events`, `nav_report_events`,
-  `purchase_lot_events` and `downtime_events` are per-domain histories, not an outbox, and no table records that a
-  row changed in a form another process could replay.
-- **A device identity and a conflict policy**, neither of which exists in any form. Two sorters registering the same
-  bag from two devices is the easy case; a stocktake count and a putaway racing over the same package is not.
+- ~~**A change log the application writes to.**~~ Done in pass 27: fourteen tables logged by trigger, with a
+  sequence that is never handed out twice.
+- ~~**A device identity**~~, done in the same pass — but **the conflict policy is not**, and was deliberately
+  left alone. Detecting a conflict is built: every change carries the row, the machine and its place in the
+  order. Deciding who wins is a business question that differs by table. Two sorters reporting bags against
+  the same run are both right and both should be kept; a stocktake count and a putaway that disagree about
+  where a package is cannot both be right, and the site has to say which authority wins.
 
-Two of those four were findings 3.2 and 3.3, and they were built first on 26 November, which was the point:
-they cost little outside a sync and a great deal inside one. The other two are untouched, and they are the
-larger pair — an outbox changes how every write is recorded, and a conflict policy is a decision about whose
-version of a row wins, which is a business question before it is a technical one.
+Three and a half of the four were built on 26 November, in passes 26 and 27. What is left is the half that
+is not code: the rule for who wins when two machines have changed the same row since they last spoke. That
+is the first thing to settle before a handheld is built, and the one thing on this page that cannot be
+settled by building it.
 
 ## 5. Still open, and not mine to decide
 

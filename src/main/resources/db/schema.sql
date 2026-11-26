@@ -852,3 +852,31 @@ CREATE TABLE IF NOT EXISTS schema_versions (
     applied_at  TEXT,
     recorded_at TEXT    NOT NULL
 );
+
+-- 30. The devices that may change this data, and every change they make.
+-- An application that only ever ran in one place needs neither. A handheld that works in a dead spot and
+-- merges afterwards needs both: something to replay, and a way to say who made each change. The log is
+-- written by triggers rather than by the application, because a write that forgets to log itself is the one
+-- defect this table exists to prevent, and triggers cannot be forgotten.
+CREATE TABLE IF NOT EXISTS devices (
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    name          TEXT    NOT NULL UNIQUE COLLATE NOCASE,
+    kind          TEXT    NOT NULL CHECK (kind IN ('DESKTOP', 'HANDHELD')),
+    registered_at TEXT    NOT NULL,
+    last_seen_at  TEXT
+);
+
+-- The sequence is AUTOINCREMENT on purpose: a plain rowid may be handed out again after a delete, and
+-- "everything that happened after number 412" has to mean the same thing tomorrow as it does today.
+-- There is no timestamp here. A trigger can only read SQLite's own clock, which is not the business clock
+-- and cannot be pinned by a test, so the log carries the order in which things happened — which is what a
+-- replay needs — and the business moment stays in the row's own _at columns, where it was written properly.
+CREATE TABLE IF NOT EXISTS change_log (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name TEXT   NOT NULL,
+    row_id    INTEGER NOT NULL,
+    operation TEXT    NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
+    device_id INTEGER REFERENCES devices(id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_change_log_row ON change_log(table_name, row_id);

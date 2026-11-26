@@ -9,7 +9,6 @@ import hu.due.rewear.model.AppModule;
 import hu.due.rewear.model.RoleCode;
 import hu.due.rewear.model.User;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
 
 import javax.imageio.ImageIO;
 import javax.swing.SwingUtilities;
@@ -17,9 +16,11 @@ import java.awt.GraphicsEnvironment;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -39,8 +40,37 @@ class ScreenWalkthroughTest {
     private static final int WIDTH = 1400;
     private static final int HEIGHT = 900;
 
-    @TempDir
-    Path tempDir;
+    /**
+     * A workspace of its own, taken down afterwards without making a verdict of it.
+     *
+     * <p>This test opens eleven SQLite workspaces in one run, and whether the last journal file has gone by
+     * the time the directory is removed is a question about the filesystem, not about whether every screen
+     * came up. It failed a build once on exactly that, with every assertion passing.
+     */
+    private Path tempDir;
+
+    @org.junit.jupiter.api.BeforeEach
+    void makeWorkspaceDirectory() throws java.io.IOException {
+        tempDir = Files.createTempDirectory("rewear-walkthrough");
+    }
+
+    @org.junit.jupiter.api.AfterEach
+    void removeWorkspaceDirectory() {
+        if (tempDir == null) {
+            return;
+        }
+        try (Stream<Path> paths = Files.walk(tempDir)) {
+            paths.sorted(java.util.Comparator.reverseOrder()).forEach(path -> {
+                try {
+                    Files.deleteIfExists(path);
+                } catch (java.io.IOException ignored) {
+                    // Scratch files are not what this test is about.
+                }
+            });
+        } catch (java.io.IOException ignored) {
+            // Nor is the directory itself.
+        }
+    }
 
     /** Share of sampled pixels that differ from the corner, i.e. how much was really painted. */
     private static double inkFraction(BufferedImage image) {

@@ -33,6 +33,8 @@
 
 - [x] Give the database a version it carries itself, and bring every stored moment into one format: UTC instants to the second for anything that happened, local dates for the day work belongs to, one writer, one reader, and a guard test that reads the database rather than the code. Found three defects on the way: the schema's own `datetime('now')` default, `Instant.now()` the clock guard never forbade, and the evening's intake being counted on the next day.
 
+- [x] Add the outbox and device identity the handheld needs: fourteen tables logged by trigger rather than by the application, a sequence that never repeats, the machine each change was made on, and nothing recorded for the sample warehouse or for the schema's own upgrade steps. The conflict policy is deliberately not invented — detecting a conflict is built, deciding who wins is a business question, and it differs by table.
+
 ## Next session
 
 - [x] Walk every screen each role can open, through the real main window, and look at the rendered result. Covered by `ScreenWalkthroughTest`; remaining dialogs (invoice details, pick list preview, package intake preview) are still only compile-verified.

@@ -2,7 +2,7 @@
 
 **Adatbázis-kezelő rendszer:** Beágyazott SQLite 3 (JDBC `sqlite-jdbc`, `PRAGMA foreign_keys = ON`)  
 **Séma fájl:** `src/main/resources/db/schema.sql`  
-**Séma:** **56 alkalmazástábla**, **36 név szerint deklarált index** (plusz egy kódból létrehozott) és a kulcsmegszorítások SQLite-indexei  
+**Séma:** **58 alkalmazástábla**, **37 név szerint deklarált index** (plusz egy kódból létrehozott) és a kulcsmegszorítások SQLite-indexei  
 **Sémaverzió:** a `schema_versions` tábla mondja meg, milyen alakban van egy adott adatbázis
 
 ---
@@ -22,7 +22,7 @@ Az alkalmazástáblák tíz logikai csoportot alkotnak.
 9. **Válogatás (7 tábla, nyersanyag-tételekkel):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
 10. **Bérszámfejtési előkészítés (4 tábla):** `payroll_departments`, `payroll_worker_base`, `payroll_department_rates`, `payroll_shifts`
 11. **Eredet, hozam, állásidő és műszakátadás (8 tábla):** `purchase_lots`, `purchase_lot_events`, `grade_yield_baselines`, `grade_yield_baseline_shares`, `downtime_reasons`, `downtime_events`, `shift_handovers`, `shift_handover_issues`
-12. **NAV adatszolgáltatás és sémaverzió (3 tábla):** `nav_invoice_reports`, `nav_report_events`, `schema_versions`
+12. **NAV adatszolgáltatás, sémaverzió és szinkronizáció (5 tábla):** `nav_invoice_reports`, `nav_report_events`, `schema_versions`, `devices`, `change_log`
 
 ---
 
@@ -502,6 +502,28 @@ soha nem írja le magától, mert annak eldöntése emberi felelősség.
 | `recorded_at` | TEXT NOT NULL | Mikor került a sorba |
 
 Huszonöt körön át nem volt ilyen tábla: a sémát egymás után lefutó, ismételhető lépések tartották naprakészen, és azt, hogy egy adott fájlon mi futott le, csak az oszlopai alapján lehetett kitalálni. Ez addig elég, amíg egy program nyit egy fájlt egy gépen. Abban a pillanatban, hogy egy második program is beszél ugyanarra az adatra — például egy offline is működő kézi eszköz —, a „nézd meg, megvan-e az az oszlop” nem válasz, amit a vonal túloldalára el lehet küldeni. A verziót ezért az adatbázis magáról írja le, és a sor csak egyszer keletkezik: az elérés dátuma nyilvántartás, nem utolsó-indítás bélyeg.
+
+---
+
+### 3.57–3.58 `devices` és `change_log` (Eszközök és változásnapló)
+
+| `devices` | Típus | Megjegyzés |
+|---|---|---|
+| `id` | INTEGER PK | |
+| `name` | TEXT NOT NULL UNIQUE | Generált név (`DESKTOP-3F9A21C4`), nem a számítógépé: a gépnév a tulajdonosé, és a mentéscsomaggal elhagyná a telephelyet |
+| `kind` | TEXT NOT NULL | `DESKTOP` vagy `HANDHELD` |
+| `registered_at`, `last_seen_at` | TEXT | Mikor jelentkezett be először, és mikor futott utoljára |
+
+| `change_log` | Típus | Megjegyzés |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | A sorszám. Az `AUTOINCREMENT` szándékos: a sima rowid törlés után újra kiosztható, a „minden, ami a 412. után történt” viszont holnap is ugyanazt kell hogy jelentse |
+| `table_name`, `row_id` | TEXT / INTEGER NOT NULL | Melyik tábla melyik sora változott. Törölt sornál ez marad belőle, és ez elég: ez a sor már nincs meg |
+| `operation` | TEXT NOT NULL | `INSERT`, `UPDATE` vagy `DELETE` |
+| `device_id` | INTEGER | Melyik gépen történt |
+
+A naplót **triggerek írják, nem az alkalmazás**: pontosan az a hiba, amit ez a tábla meg akar előzni, az, hogy egy írás elfelejti naplózni magát, és ezt úgy lehet lehetetlenné tenni, hogy kivesszük annak a kezéből, aki elfelejtené. Tizennégy tábla van naplózva — a készlet és mozgásai, a rendelések és tételeik, a beszerzési tételek, a válogatósor, a leállások, a műszakátadások és ügyeik, a leltárak és számlálásaik —, táblánként három trigger. Az iroda munkája nem: felhasználót, jogosultságot, beállítást, számlát, bért, levelet és chatet nem egy lefedettség nélküli sarokban álló kézi eszközön módosítanak.
+
+**Időbélyeg nincs benne.** Egy trigger csak az SQLite saját óráját tudná olvasni, ami nem az üzleti óra, és amit teszt nem tud rögzíteni. A napló ezért a *sorrendet* hordozza — a visszajátszáshoz ez kell —, az üzleti időpont pedig a sor saját `_at` oszlopában marad, ahol rendesen készült. Ami nem munka, az nem is kerül a naplóba: a mintaadat betöltése és a séma saját frissítő lépései kikapcsolt triggerekkel futnak, és a triggerek akkor is visszakerülnek, ha közben hiba történt.
 
 ---
 

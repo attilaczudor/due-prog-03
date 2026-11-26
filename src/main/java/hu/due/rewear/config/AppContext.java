@@ -28,6 +28,7 @@ import hu.due.rewear.dao.SettingsDao;
 import hu.due.rewear.dao.SmartFolderDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.TodoDao;
+import hu.due.rewear.dao.ChangeLogDao;
 import hu.due.rewear.dao.WorkListDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
@@ -119,6 +120,7 @@ public final class AppContext {
     private final NotificationDao notificationDao;
     private final TodoDao todoDao;
     private final WorkListDao workListDao;
+    private final ChangeLogDao changeLogDao;
     private final RoleModulePermissionDao roleModulePermissionDao;
 
     private final AuthService authService;
@@ -291,6 +293,7 @@ public final class AppContext {
         this.handoverService = new ShiftHandoverService(databaseManager, session, handoverDao, userDao,
                 notificationService);
         this.workListDao = new WorkListDao(databaseManager);
+        this.changeLogDao = new ChangeLogDao(databaseManager);
         // The work list is built last because it reads from most of the floor: the stoppage log, the
         // handover record and the yield baseline all have to exist before a role can be told about them.
         this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao,
@@ -524,6 +527,10 @@ public final class AppContext {
 
     public NotificationService getNotificationService() {
         return notificationService;
+    }
+
+    public ChangeLogDao getChangeLogDao() {
+        return changeLogDao;
     }
 
     public WorkListDao getWorkListDao() {

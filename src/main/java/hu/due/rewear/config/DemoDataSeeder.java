@@ -87,16 +87,20 @@ public final class DemoDataSeeder {
     }
 
     public void seedIfEmpty() {
-        if (userDao.count() == 0) {
-            LOG.info("Seeding initial ReWear WMS demo data...");
-            db.runInTransaction(this::seedAll);
-            LOG.info("Demo data seeded successfully.");
-        } else {
-            LOG.debug("Database already populated; skipping core demo data seed.");
-        }
-        new SortingDemoSeeder(db).seedForDemoWorkspace();
-        seedStarterInvoicesIfEmpty();
-        seedStarterEmailsAndChatsIfEmpty();
+        // Sample data is not work anybody did, so it is not in the change log. A device syncing against a
+        // demo workspace should see an empty outbox, not ten thousand changes nobody made.
+        ChangeLog.withoutLogging(db, () -> {
+            if (userDao.count() == 0) {
+                LOG.info("Seeding initial ReWear WMS demo data...");
+                db.runInTransaction(this::seedAll);
+                LOG.info("Demo data seeded successfully.");
+            } else {
+                LOG.debug("Database already populated; skipping core demo data seed.");
+            }
+            new SortingDemoSeeder(db).seedForDemoWorkspace();
+            seedStarterInvoicesIfEmpty();
+            seedStarterEmailsAndChatsIfEmpty();
+        });
     }
 
     /**
@@ -105,7 +109,7 @@ public final class DemoDataSeeder {
      * operator account still has its published password, so a real company is never touched.
      */
     public void upgradeDemoWorkspace() {
-        new SortingDemoSeeder(db).seedForDemoWorkspace();
+        ChangeLog.withoutLogging(db, () -> new SortingDemoSeeder(db).seedForDemoWorkspace());
     }
 
     private void seedStarterEmailsAndChatsIfEmpty() {

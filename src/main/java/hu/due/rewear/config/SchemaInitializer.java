@@ -74,16 +74,27 @@ public final class SchemaInitializer {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_sorting_pack_worker_day ON sorting_bags(packed_by, pack_day)");
             }
         });
-        new SortingRosterMigration(dbManager).upgrade(sql);
-        new SortingRawMaterialMigration(dbManager).upgrade(sql);
-        new QuarantineMigration(dbManager).upgrade(sql);
-        new ExactDecimalMigration(dbManager).upgrade(sql);
-        // Last of the migrations, because the ones above write timestamps of their own as they go.
-        new TimestampMigration(dbManager).upgrade();
+        // The schema's own tidying up is not a change anybody made, so the log is off while it happens.
+        ChangeLog.withoutLogging(dbManager, () -> {
+            new SortingRosterMigration(dbManager).upgrade(sql);
+            new SortingRawMaterialMigration(dbManager).upgrade(sql);
+            new QuarantineMigration(dbManager).upgrade(sql);
+            new ExactDecimalMigration(dbManager).upgrade(sql);
+            // Last of the migrations, because the ones above write timestamps of their own as they go.
+            new TimestampMigration(dbManager).upgrade();
+        });
         // The stoppage reason list is reference data an existing installation needs as much as a new one, so
         // it is filled here rather than with the first-run sample data — but only when it is empty.
         new DowntimeReasonStarterList(dbManager).ensure();
-        dbManager.runInTransaction(conn -> SchemaVersion.record(conn, existed[0]));
+        dbManager.runInTransaction(conn -> {
+            SchemaVersion.record(conn, existed[0]);
+            // This installation registers itself before the triggers go on, so that the first change
+            // anybody makes already says which machine it was made on.
+            DeviceRegistry.registerThisInstallation(conn);
+            ChangeLog.install(conn);
+            // A run that fell over while the log was off would otherwise leave it off for ever.
+            ChangeLog.setLogging(conn, true);
+        });
         LOG.info("SQLite schema initialized at {} (version {})",
                 dbManager.getDatabasePath(), SchemaVersion.CURRENT);
     }

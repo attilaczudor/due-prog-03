@@ -686,6 +686,11 @@ invoice.entry.tax_match_multiple,Select an active partner with this tax number o
 invoice.entry.partner_both,Use {0} as both customer and supplier?,A(z) {0} partner vevő és szállító is legyen?
 admin.tab.nav,NAV Integration,NAV-integráció
 admin.tab.bank,Bank Integration,Banki integráció
+admin.system.schema_version,Schema,Séma
+admin.system.device,This device,Ez az eszköz
+admin.system.change_log,Change log,Változásnapló
+admin.system.changes_recorded,"{0} changes, last number {1}","{0} változás, utolsó sorszám: {1}"
+admin.system.before_the_record,before the record,a nyilvántartás előtt
 invoice.folder.all,All Invoices,Összes számla
 bank.accounts,Bank Accounts,Bankszámlák
 bank.add_account,Add Account,Számla hozzáadása

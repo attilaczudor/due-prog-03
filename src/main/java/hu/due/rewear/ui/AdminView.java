@@ -667,6 +667,50 @@ public final class AdminView extends JPanel implements NavigableView {
         }
     }
 
+    /**
+     * What shape this database is in, and when it got there.
+     *
+     * <p>Worth a line on the screen because it is the first thing anybody will ask when a second thing —
+     * a handheld, a copy on another machine — starts talking to the same data and disagrees with it.
+     */
+    private String schemaLine() {
+        try (var conn = ctx.getDatabaseManager().getConnection()) {
+            var history = hu.due.rewear.config.SchemaVersion.history(conn);
+            if (history.isEmpty()) {
+                return "—";
+            }
+            var reached = history.get(history.size() - 1);
+            String when = reached.appliedAt() == null
+                    ? ctx.getI18n().t("admin.system.before_the_record")
+                    : reached.appliedAt().toLocalDate().toString();
+            return "v" + reached.version() + " (" + when + ")";
+        } catch (Exception ex) {
+            return "—";
+        }
+    }
+
+    /** Which machine this is, as the change log records it. */
+    private String deviceLine() {
+        try (var conn = ctx.getDatabaseManager().getConnection()) {
+            var id = hu.due.rewear.config.DeviceRegistry.currentDeviceId(conn);
+            if (id.isEmpty()) {
+                return "—";
+            }
+            var device = hu.due.rewear.config.DeviceRegistry.find(conn, id.get());
+            int devices = hu.due.rewear.config.DeviceRegistry.all(conn).size();
+            return device.map(d -> d.name() + " · " + d.kind()).orElse("#" + id.get())
+                    + (devices > 1 ? " (" + devices + ")" : "");
+        } catch (Exception ex) {
+            return "—";
+        }
+    }
+
+    /** How much a device that has never synced would have to catch up on. */
+    private String changeLogLine() {
+        var log = ctx.getChangeLogDao();
+        return ctx.getI18n().t("admin.system.changes_recorded", log.count(), log.latestSequence());
+    }
+
     private void updateSystemDiagnostics() {
         Runtime rt = Runtime.getRuntime();
         long usedMb = (rt.totalMemory() - rt.freeMemory()) / (1024 * 1024);
@@ -696,6 +740,9 @@ public final class AdminView extends JPanel implements NavigableView {
                 + " (" + i18n.t("admin.system.file_count", receiptCount) + ")<br>"
                 + "<b>UI:</b> Brutalist Monochrome (" + theme + ") &nbsp;|&nbsp; <b>Active Language:</b> "
                 + ctx.getI18n().getActiveLanguage().toUpperCase(java.util.Locale.ROOT)
+                + "<br><b>" + i18n.t("admin.system.schema_version") + ":</b> " + schemaLine()
+                + " &nbsp;|&nbsp; <b>" + i18n.t("admin.system.device") + ":</b> " + deviceLine()
+                + " &nbsp;|&nbsp; <b>" + i18n.t("admin.system.change_log") + ":</b> " + changeLogLine()
                 + "</html>");
 
         packagesModel.setRowCount(0);

@@ -59,6 +59,11 @@ class LoadMeasurementTest {
      * point is to measure reading a large warehouse, not to re-measure the intake service.
      */
     private void seedPackages(DatabaseManager db, int rows) throws SQLException {
+        seedPackages(db, rows, 0);
+    }
+
+    /** @param offset keeps the generated codes unique across several batches in one run */
+    private void seedPackages(DatabaseManager db, int rows, int offset) throws SQLException {
         try (Connection conn = db.getConnection()) {
             conn.setAutoCommit(false);
             List<Long> shelves = new ArrayList<>();
@@ -88,7 +93,7 @@ class LoadMeasurementTest {
                     VALUES (?,?,?,?,?,?,?,?,?,NULL,?,?,?)
                     """)) {
                 for (int i = 0; i < rows; i++) {
-                    ps.setString(1, String.format("2026-01-01-08-00-L-TSH-A-A-25-%06X", i));
+                    ps.setString(1, String.format("2026-01-01-08-00-L-TSH-A-A-25-%06X", i + offset));
                     ps.setLong(2, target);
                     ps.setLong(3, garment);
                     ps.setLong(4, grade);
@@ -98,8 +103,8 @@ class LoadMeasurementTest {
                     ps.setString(8, String.format("%02X", i % 256));
                     ps.setString(9, i % 25 == 0 ? "RESERVED" : "IN_STOCK");
                     ps.setLong(10, user);
-                    ps.setString(11, "2026-01-01 08:00:00");
-                    ps.setString(12, "2026-01-01 08:00:00");
+                    ps.setString(11, "2026-01-01T07:00:00Z");
+                    ps.setString(12, "2026-01-01T07:00:00Z");
                     ps.addBatch();
                     if (i % 5000 == 0) {
                         ps.executeBatch();
@@ -109,6 +114,20 @@ class LoadMeasurementTest {
             }
             conn.commit();
         }
+    }
+
+    private int seeded;
+
+    private long timeSeeding(AppContext ctx, int rows) throws SQLException {
+        long start = System.nanoTime();
+        seeded += 1_000_000;
+        seedPackages(ctx.getDatabaseManager(), rows, seeded);
+        return (System.nanoTime() - start) / 1_000_000;
+    }
+
+    private static String perThousand(long millis, int rows) {
+        return rows == 0 ? "" : String.format(java.util.Locale.ROOT, "%.1f ms per 1000 rows",
+                millis * 1000.0 / rows);
     }
 
     private static long first(Statement st, String sql) throws SQLException {
@@ -165,6 +184,26 @@ class LoadMeasurementTest {
         time("invoice ledger", () -> ctx.getInvoiceDao().findAll());
         time("rota month", () -> ctx.getRotaService().month(java.time.YearMonth.from(ctx.getRotaService().today())).size());
 
+        timings.add(new Timing("write " + rows + " packages (change log on)", seedMillis,
+                perThousand(seedMillis, rows)));
+
+        // What the change log costs on a bulk write: the same work twice, once with the triggers on and
+        // once with them off. It is measured last so the reading figures above are of the warehouse that
+        // was asked for and not of a bigger one.
+        long withTriggers = timeSeeding(ctx, 5000);
+        long withoutTriggers;
+        try (Connection conn = ctx.getDatabaseManager().getConnection();
+             Statement stmt = conn.createStatement()) {
+            for (String name : hu.due.rewear.config.ChangeLog.triggerNames()) {
+                stmt.execute("DROP TRIGGER IF EXISTS " + name);
+            }
+            withoutTriggers = timeSeeding(ctx, 5000);
+        }
+        timings.add(new Timing("write 5000 packages with the change log", withTriggers,
+                perThousand(withTriggers, 5000)));
+        timings.add(new Timing("write 5000 packages without it", withoutTriggers,
+                perThousand(withoutTriggers, 5000)));
+
         // How much of a query is spent opening a connection, which this application does per call.
         long connectStart = System.nanoTime();
         for (int i = 0; i < 50; i++) {
@@ -183,7 +222,10 @@ class LoadMeasurementTest {
         System.out.println(report);
 
         // The unbounded listing is measured for comparison; no screen loads it, so it is not held to the budget.
+        // Writing tens of thousands of rows at once is a measurement, not a screen: nobody waits for it in
+        // the application, and the seeder that does it has the change log switched off.
         List<String> slow = timings.stream()
+                .filter(t -> !t.what().startsWith("write "))
                 .filter(t -> !t.what().equals("inventory list, every row") && !t.what().equals("count all packages"))
                 .filter(t -> t.millis() > SLOW_MILLIS)
                 .map(t -> t.what() + " took " + t.millis() + " ms").toList();
