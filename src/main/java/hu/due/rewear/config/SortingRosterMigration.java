@@ -57,7 +57,8 @@ final class SortingRosterMigration {
              var update = conn.prepareStatement("UPDATE sorting_bags SET packed_by=?, pack_day=? WHERE id=?")) {
             while (rows.next()) {
                 update.setLong(1, rows.getLong("helper_id"));
-                update.setString(2, Instant.parse(rows.getString("packed_at")).atZone(BusinessClock.ZONE).toLocalDate().toString());
+                update.setString(2, hu.due.rewear.dao.DaoDateUtil.parse(rows.getString("packed_at"))
+                        .toLocalDate().toString());
                 update.setLong(3, rows.getLong("id"));
                 update.addBatch();
             }

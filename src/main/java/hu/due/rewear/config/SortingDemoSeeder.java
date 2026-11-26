@@ -277,7 +277,8 @@ final class SortingDemoSeeder {
                 ps.setLong(5, weight);
                 ps.setLong(6, weight);
                 ps.setLong(7, receivedBy);
-                ps.setString(8, Instant.now().minusSeconds(86_400L * (lots.length - i)).toString());
+                ps.setString(8, hu.due.rewear.dao.DaoDateUtil.format(
+                        BusinessClock.clock().instant().minusSeconds(86_400L * (lots.length - i))));
                 if (purchaseLots[i] > 0) ps.setLong(9, purchaseLots[i]); else ps.setNull(9, java.sql.Types.INTEGER);
                 ps.executeUpdate();
             }
@@ -598,6 +599,17 @@ final class SortingDemoSeeder {
             if (sheet.dayIndex() >= days.size()) continue;
             LocalDate day = days.get(sheet.dayIndex());
             var shift = hu.due.rewear.model.RotaShift.ShiftCode.valueOf(sheet.shift());
+            // Today's work is anchored to whatever time the demo is opened at, so the shift it falls in is
+            // not known when the sheet is written out: opened in the evening, the morning's window holds
+            // nothing and the sheet would read nought kilograms beside a week of real ones.
+            if (day.equals(BusinessClock.today())) {
+                LocalDateTime finished = lastFinishedOn(conn, day);
+                var slot = finished == null ? null
+                        : hu.due.rewear.service.ShiftHandoverService.currentSlot(finished);
+                if (slot != null && slot.workDay().equals(day)) {
+                    shift = slot.shift();
+                }
+            }
             var window = hu.due.rewear.service.ShiftHandoverService.window(
                     new hu.due.rewear.service.ShiftHandoverService.ShiftSlot(day, shift));
             var figures = handovers.figuresBetween(conn, window[0], window[1]);
@@ -620,6 +632,17 @@ final class SortingDemoSeeder {
             if (sheet.resolved()) {
                 handovers.resolveIssue(conn, issue, manager, "Megrendelve, másnap megérkezett",
                         submitted.plusHours(20));
+            }
+        }
+    }
+
+    /** When the last run of a day was finished, which says which shift that day's work belongs to. */
+    private static LocalDateTime lastFinishedOn(Connection conn, LocalDate day) throws SQLException {
+        try (var ps = conn.prepareStatement(
+                "SELECT MAX(finished_at) FROM sorting_requests WHERE work_day = ?")) {
+            ps.setString(1, day.toString());
+            try (var rs = ps.executeQuery()) {
+                return rs.next() ? hu.due.rewear.dao.DaoDateUtil.parse(rs.getString(1)) : null;
             }
         }
     }
@@ -743,7 +766,7 @@ final class SortingDemoSeeder {
      * is read back an hour or two wrong — or not at all.
      */
     private static String stamp(LocalDateTime localTime) {
-        return localTime == null ? null : localTime.atZone(BusinessClock.ZONE).toInstant().toString();
+        return hu.due.rewear.dao.DaoDateUtil.format(localTime);
     }
 
     private record HistoryTeam(long id, String name, long driverId, long stationId, long helperId,

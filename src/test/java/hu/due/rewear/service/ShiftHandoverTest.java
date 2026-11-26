@@ -200,15 +200,21 @@ class ShiftHandoverTest {
 
     @Test
     void theFiguresCoverTheShiftsOwnHoursAndNotTheWholeDay() {
+        // Two loads on the same day, one in each shift. A window that is really just "this date" would
+        // give both of them to both shifts, and each sheet would claim the other's work.
+        pinClockAt(9, 20);
+        sortSomething("HO-MORNING", "100");
+        pinClockAt(19, 0);
         sortSomething("HO-SHIFT", "250");
 
         long morning = handovers.submit(sheet(ShiftCode.MORNING, List.of()));
         long afternoon = handovers.submit(sheet(ShiftCode.AFTERNOON, List.of()));
 
-        assertEquals(0, handovers.find(BusinessClock.today(), ShiftCode.MORNING).orElseThrow()
-                .processedGrams(), "Nothing was finished between six and two");
+        assertEquals(100_000L, handovers.find(BusinessClock.today(), ShiftCode.MORNING).orElseThrow()
+                .processedGrams(), "The morning's own load, finished at twenty past nine");
         assertEquals(250_000L, handovers.find(BusinessClock.today(), ShiftCode.AFTERNOON).orElseThrow()
-                .processedGrams(), "It was finished at seven in the evening, which is the afternoon shift");
+                .processedGrams(),
+                "And only the one finished at seven in the evening, not the morning's as well");
         assertTrue(morning != afternoon);
     }
 
@@ -444,6 +450,10 @@ class ShiftHandoverTest {
         assertEquals(leader.id(), recent.get(0).outgoingBy(), "Written by the shift leader, who now exists");
         assertFalse(recent.get(0).acknowledged(),
                 "The newest is the one the person opening the demo is taking over from");
+        assertTrue(recent.get(0).processedGrams() > 0,
+                "And it shows the shift's own work rather than nought kilograms: today's seeded work is"
+                        + " anchored to the hour the demo is opened at, so which shift it falls in is only"
+                        + " known once it is there");
         assertTrue(recent.stream().anyMatch(ShiftHandoverLike::picked), "The older ones were picked up");
         assertFalse(service.latest().orElseThrow().mustKnow().isBlank());
 

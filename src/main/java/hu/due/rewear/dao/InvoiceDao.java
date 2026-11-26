@@ -253,7 +253,7 @@ public final class InvoiceDao {
                 while (rs.next()) {
                     events.add(new InvoiceEvent(rs.getLong(1), rs.getLong(2), rs.getString(3), rs.getString(4),
                             rs.getString(5), rs.getString(6), rs.getString(7),
-                            LocalDateTime.parse(rs.getString(8).replace(' ', 'T'))));
+                            DaoDateUtil.parse(rs.getString(8))));
                 }
                 return events;
             }

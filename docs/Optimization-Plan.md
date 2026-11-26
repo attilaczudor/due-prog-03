@@ -1499,6 +1499,114 @@ named person.
 
 ---
 
+## Pass 26 — one clock, one format, and a number on the database (26 November 2026)
+
+### What the stock-taking found
+
+Two of the four findings were the handheld's prerequisites rather than separate work: a database with no
+version marker, and two timestamp conventions with nothing enforcing either. A record created on a device in
+a dead spot and merged an hour later is ordered by its timestamp and nothing else, and the other end has to
+know what the first end is speaking. Both are cheap now and expensive inside a sync.
+
+### The convention, stated
+
+The database stores two different things and they are not the same thing:
+
+- A **moment** — when something happened — is a UTC instant, ISO-8601, truncated to whole seconds, always
+  exactly twenty characters: `2026-11-26T07:12:00Z`. Its column name ends in `_at`.
+- A **business date** — which day's work something belongs to — is a local date, `2026-11-26`. Its column
+  name ends in `_day`, `_date`, `_on`, `_from` or `_until`. A business day belongs to the site rather than to
+  a time zone; turning one into an instant would move the night shift to the following day.
+
+The sorting module already stored instants and everything else stored local date-times. A local date-time is
+a moment plus a time zone somebody has to remember, and for one hour every autumn it names two different
+moments, so it cannot order two records — which is the first thing an offline handheld has to do.
+
+### Built
+
+**One writer and one reader.** `DaoDateUtil` converts, and nothing else does. Nineteen files already called
+it, so the storage changed underneath them without a single call site moving.
+
+**A migration that reads the column names.** Every `_at` column of every table, found by asking the database
+rather than from a list that would rot, is rewritten unless it is already canonical. Row by row in Java,
+because SQLite has no time zone database: it can add a fixed offset but it does not know Budapest was an
+hour ahead in November and two in July. It is idempotent, so it can be interrupted.
+
+**A version in the database.** `schema_versions`: one row per version reached, with the note that says what
+the version is for somebody reading the table rather than the code. A database that predates the record gets
+its row with `applied_at` left null — nobody wrote down when it was brought up to date, and a plausible date
+would be worse than an admitted gap. It is readable with one query and no application.
+
+**The DDL is no longer cut on every semicolon.** `SqlScript` tells the semicolons that end a statement from
+the ones inside a string, a quoted identifier, a comment or a trigger body. The old `split(";")` worked for
+twenty-five passes and would have failed the first time somebody wrote a trigger — by running half a
+statement, which is a worse failure than refusing to start.
+
+### Three defects this turned up
+
+**The schema reached for SQLite's own clock.** `role_module_permissions.updated_at` defaulted to
+`datetime('now')`: UTC, in a format nothing else used, from a clock no test can pin. The guard test that
+forbids exactly this had only ever scanned Java. It scans the schema file now.
+
+**`Instant.now()` was never forbidden.** The same guard listed `LocalDate.now()` and its relatives but not
+`Instant.now()` or `Clock.system…`, so three of them sat in the application — the mail-export housekeeping
+and the NAV request timestamps — reading the machine clock. All three take the business clock now.
+
+**The evening's intake was counted on the wrong day.** `countCreatedOnDate` compared the first ten characters
+of the stored moment against a local date, and the downtime report asked for its window with `date()` the
+same way. Between eleven at night and midnight the stored moment is already tomorrow, so a package made at
+half past eleven was counted on the next day, and the night shift's waiting for material fell outside its own
+shift. Both ask for a local day as a range of moments now.
+
+### Also
+
+The demo's newest handover read nought kilograms beside a week of real ones: today's seeded work is anchored
+to the hour the demo is opened at, so by the evening it no longer falls in the morning window the sheet was
+written for. The sheet is now written for the shift the day's work actually finished in.
+
+### Verification
+
+330 tests (305 before), of which 25 are new. Sixteen mutation checks:
+
+| | Broken on purpose | Caught by |
+|---|---|---|
+| MUT1 | A local time is written as though Budapest were UTC | the round trip, and the summer-time pair |
+| MUT2 | A moment read back keeps the fraction it was stored with | a value and its re-reading must be equal |
+| MUT3 | A moment written before the convention is read as UTC | it meant Budapest, the only clock there was |
+| MUT4 | A local day is taken to be a prefix of a stored moment | the day range, and the evening's intake |
+| MUT5 | The day's intake is counted by the first ten characters | the package made at half past eleven |
+| MUT6 | The migration finds no moments to convert | the older database is still full of local times |
+| MUT7 | The migration reads every old value as UTC | every converted moment would move an hour |
+| MUT8 | A database from before versioning is given a date anyway | it must admit it does not know |
+| MUT9 | The version is recorded again on every start | the record is written once |
+| MUT10 | A semicolon inside a string ends the statement | two statements, not three |
+| MUT11 | A trigger body is cut into pieces | the trigger is one statement |
+| MUT12 | The schema reaches for SQLite's own clock again | the guard now reads the schema file |
+| MUT13 | A machine clock is read in application code | the guard now knows `Instant.now()` |
+| MUT14 | The shift window is bound as a local time again | the morning's load must stay the morning's |
+| MUT15 | The night shift's wait is asked for by date again | half past midnight is still that shift |
+| MUT16 | Today's demo sheet is written for a shift its work never fell in | the newest sheet shows its own work |
+
+Every screen of all eleven roles was rendered and looked at: timestamps read as Budapest times on every one
+of them, which is what they always did — the change is underneath.
+
+### Not done
+
+**The schema version is one number, not a chain of named steps.** The twenty-odd idempotent upgrade steps
+still run on every start and still record nothing individually; what is recorded is that the database has
+reached the shape the bundled schema describes. That is what a sync needs to compare. Turning the steps
+themselves into numbered, recorded migrations is a bigger change and nothing needs it yet.
+
+**No change log.** A handheld that syncs needs an outbox — a record that a row changed, in a form another
+process can replay. `invoice_events`, `nav_report_events`, `purchase_lot_events` and `downtime_events` are
+per-domain histories, not that. Device identity and a conflict policy do not exist either.
+
+**One hour a year is still a guess.** A local time written during the repeated autumn hour names two moments;
+the earlier one is taken, because that is the only choice that can be made without asking. It matters for
+timestamps written by hand into the rota or a handover, not for anything the clock writes.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

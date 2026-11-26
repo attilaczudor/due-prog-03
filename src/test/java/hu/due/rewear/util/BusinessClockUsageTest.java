@@ -17,13 +17,16 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Architectural guard: application code must take the current time from {@link BusinessClock}.
  * <p>
  * A direct {@code LocalDate.now()} reads the machine's own time zone, which silently shifts a record
- * across midnight whenever the application runs outside Hungary. The same applies to SQLite's
- * {@code datetime('now')}, which is UTC. This fails the build the moment either is reintroduced.
+ * across midnight whenever the application runs outside Hungary. {@code Instant.now()} and
+ * {@code Clock.system…} are the same hole with the zone left out, and no test can pin either of them. The
+ * same applies to SQLite's {@code datetime('now')}, which is UTC and ignores the business clock entirely —
+ * in the bundled DDL as much as in a query. This fails the build the moment any of them is reintroduced.
  */
 class BusinessClockUsageTest {
 
     private static final Pattern SYSTEM_CLOCK_CALL = Pattern.compile(
-            "\\b(LocalDate|LocalDateTime|LocalTime|YearMonth|Year|ZonedDateTime|OffsetDateTime)\\.now\\(\\s*\\)");
+            "\\b(LocalDate|LocalDateTime|LocalTime|YearMonth|Year|ZonedDateTime|OffsetDateTime|Instant)"
+                    + "\\.now\\(\\s*\\)|\\bClock\\.(system|systemUTC|systemDefaultZone)\\(");
     private static final Pattern SQLITE_UTC_CLOCK = Pattern.compile("datetime\\('now'\\)|CURRENT_TIMESTAMP");
 
     /** Column defaults in the DDL are fallbacks that every DAO overrides, so only DML is checked. */
@@ -58,6 +61,28 @@ class BusinessClockUsageTest {
 
         assertTrue(offenders.isEmpty(),
                 "Use BusinessClock.today()/now() instead of the machine clock or SQLite's UTC clock:\n"
+                        + String.join("\n", offenders));
+    }
+
+    /**
+     * The bundled DDL is not application code and was never scanned, which is how a column default of
+     * {@code datetime('now')} sat in the schema for twenty-five passes. It is UTC, it ignores the business
+     * clock, and it writes a moment in a format nothing else uses — three different wrongs in one default
+     * that only fires when a writer forgets the column, which is exactly when nobody is looking.
+     */
+    @Test
+    void theBundledSchemaNeverReachesForSqlitesOwnClock() throws IOException {
+        Path schema = Path.of("src/main/resources/db/schema.sql");
+        List<String> offenders = new ArrayList<>();
+        String[] lines = Files.readString(schema, StandardCharsets.UTF_8).split("\n");
+        for (int i = 0; i < lines.length; i++) {
+            if (SQLITE_UTC_CLOCK.matcher(lines[i]).find()) {
+                offenders.add("schema.sql:" + (i + 1) + "  " + lines[i].trim());
+            }
+        }
+
+        assertTrue(offenders.isEmpty(),
+                "Every moment is written by the application from the business clock:\n"
                         + String.join("\n", offenders));
     }
 }

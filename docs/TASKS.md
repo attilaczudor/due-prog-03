@@ -31,6 +31,8 @@
 
 - [x] Give every role a work list. Five of eleven opened the application to an empty screen; the supply driver's list said nothing about the sorter standing at an empty bench; and the walkthrough logged in as six accounts written out by hand, which is why nobody noticed. The dashboard gained a floor band — minutes lost, the grade mix by what it earned, and open handover issues — for the roles that answer for the line. The demo finally has a payroll clerk.
 
+- [x] Give the database a version it carries itself, and bring every stored moment into one format: UTC instants to the second for anything that happened, local dates for the day work belongs to, one writer, one reader, and a guard test that reads the database rather than the code. Found three defects on the way: the schema's own `datetime('now')` default, `Instant.now()` the clock guard never forbade, and the evening's intake being counted on the next day.
+
 ## Next session
 
 - [x] Walk every screen each role can open, through the real main window, and look at the rendered result. Covered by `ScreenWalkthroughTest`; remaining dialogs (invoice details, pick list preview, package intake preview) are still only compile-verified.

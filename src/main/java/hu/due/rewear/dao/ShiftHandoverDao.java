@@ -13,7 +13,6 @@ import java.sql.Statement;
 import java.sql.Types;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -236,10 +235,11 @@ public final class ShiftHandoverDao {
 
     /** The same, on a caller's connection, for code that is already inside a transaction. */
     public ShiftFigures figuresBetween(Connection conn, LocalDateTime from, LocalDateTime to) {
-        String utcFrom = from.atZone(hu.due.rewear.util.BusinessClock.ZONE)
-                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime().toString().replace('T', ' ');
-        String utcTo = to.atZone(hu.due.rewear.util.BusinessClock.ZONE)
-                .withZoneSameInstant(ZoneOffset.UTC).toLocalDateTime().toString().replace('T', ' ');
+        // One window for both halves of the figures. It used to be two, because the sorting half was stored
+        // as an instant and the stoppage half as a local date-time, and this method had to convert the same
+        // window twice in two different ways to ask one question.
+        String windowFrom = DaoDateUtil.format(from);
+        String windowTo = DaoDateUtil.format(to);
         long processed = 0;
         long target = 0;
         long output = 0;
@@ -249,16 +249,15 @@ public final class ShiftHandoverDao {
                            COALESCE((SELECT SUM(b.weight_grams) FROM sorting_bags b
                                      JOIN sorting_requests q ON q.id = b.request_id
                                      WHERE q.finished_at IS NOT NULL
-                                       AND datetime(q.finished_at) >= datetime(?)
-                                       AND datetime(q.finished_at) < datetime(?)), 0)
+                                       AND q.finished_at >= ? AND q.finished_at < ?), 0)
                     FROM sorting_requests r
                     WHERE r.finished_at IS NOT NULL
-                      AND datetime(r.finished_at) >= datetime(?) AND datetime(r.finished_at) < datetime(?)
+                      AND r.finished_at >= ? AND r.finished_at < ?
                     """)) {
-                ps.setString(1, utcFrom);
-                ps.setString(2, utcTo);
-                ps.setString(3, utcFrom);
-                ps.setString(4, utcTo);
+                ps.setString(1, windowFrom);
+                ps.setString(2, windowTo);
+                ps.setString(3, windowFrom);
+                ps.setString(4, windowTo);
                 try (ResultSet rs = ps.executeQuery()) {
                     if (rs.next()) {
                         processed = rs.getLong(1);
@@ -274,8 +273,8 @@ public final class ShiftHandoverDao {
                     WHERE minutes IS NOT NULL AND started_at >= ? AND started_at < ?
                     GROUP BY reason_id ORDER BY total DESC
                     """)) {
-                ps.setString(1, DaoDateUtil.format(from));
-                ps.setString(2, DaoDateUtil.format(to));
+                ps.setString(1, windowFrom);
+                ps.setString(2, windowTo);
                 try (ResultSet rs = ps.executeQuery()) {
                     while (rs.next()) {
                         long reason = rs.getLong("reason_id");

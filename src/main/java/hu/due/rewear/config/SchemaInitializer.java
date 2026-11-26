@@ -37,13 +37,12 @@ public final class SchemaInitializer {
 
     public void initialize() {
         String sql = loadSchemaSql();
+        boolean[] existed = new boolean[1];
         dbManager.runInTransaction(conn -> {
+            existed[0] = anyTableExists(conn);
             try (Statement stmt = conn.createStatement()) {
-                for (String raw : sql.split(";")) {
-                    String trimmed = raw.trim();
-                    if (!trimmed.isEmpty()) {
-                        stmt.execute(trimmed);
-                    }
+                for (String statement : SqlScript.statements(sql)) {
+                    stmt.execute(statement);
                 }
             }
             ensureUserProfileColumns(conn);
@@ -79,10 +78,29 @@ public final class SchemaInitializer {
         new SortingRawMaterialMigration(dbManager).upgrade(sql);
         new QuarantineMigration(dbManager).upgrade(sql);
         new ExactDecimalMigration(dbManager).upgrade(sql);
+        // Last of the migrations, because the ones above write timestamps of their own as they go.
+        new TimestampMigration(dbManager).upgrade();
         // The stoppage reason list is reference data an existing installation needs as much as a new one, so
         // it is filled here rather than with the first-run sample data — but only when it is empty.
         new DowntimeReasonStarterList(dbManager).ensure();
-        LOG.info("SQLite schema initialized at {}", dbManager.getDatabasePath());
+        dbManager.runInTransaction(conn -> SchemaVersion.record(conn, existed[0]));
+        LOG.info("SQLite schema initialized at {} (version {})",
+                dbManager.getDatabasePath(), SchemaVersion.CURRENT);
+    }
+
+    /**
+     * Whether this database already had tables before this run.
+     *
+     * <p>The difference matters for the version record: a version this run brought about is dated, and one
+     * that was already true when the record started being kept is not, because nobody wrote down when it
+     * happened and a plausible date is worse than an admitted gap.
+     */
+    private static boolean anyTableExists(Connection conn) throws SQLException {
+        try (Statement stmt = conn.createStatement();
+             ResultSet rs = stmt.executeQuery(
+                     "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' LIMIT 1")) {
+            return rs.next();
+        }
     }
 
     /**

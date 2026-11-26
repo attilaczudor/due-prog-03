@@ -445,7 +445,7 @@ CREATE TABLE IF NOT EXISTS role_module_permissions (
     role_id     INTEGER NOT NULL REFERENCES roles(id) ON DELETE CASCADE,
     module_code TEXT    NOT NULL,
     enabled     INTEGER NOT NULL DEFAULT 1,
-    updated_at  TEXT    NOT NULL DEFAULT (datetime('now')),
+    updated_at  TEXT    NOT NULL,
     PRIMARY KEY (role_id, module_code)
 );
 
@@ -841,3 +841,14 @@ CREATE TABLE IF NOT EXISTS shift_handover_issues (
 
 CREATE INDEX IF NOT EXISTS idx_handover_day ON shift_handovers(work_day, shift_code);
 CREATE INDEX IF NOT EXISTS idx_handover_issue_open ON shift_handover_issues(state, created_at);
+
+-- 29. What shape this database is in, written down inside it.
+-- One row per version it has reached. applied_at is null for a version that was already in place before
+-- the record started being kept: nobody wrote down when it happened, and a plausible date would be worse
+-- than an admitted gap.
+CREATE TABLE IF NOT EXISTS schema_versions (
+    version     INTEGER PRIMARY KEY,
+    note        TEXT    NOT NULL,
+    applied_at  TEXT,
+    recorded_at TEXT    NOT NULL
+);

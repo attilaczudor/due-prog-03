@@ -1,5 +1,6 @@
 package hu.due.rewear.nav;
 
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.model.NavSettings;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,7 @@ public final class NavHttpClient implements NavClient {
 
     @Override
     public String tokenExchange() {
-        Instant at = Instant.now();
+        Instant at = BusinessClock.clock().instant();
         String requestId = NavRequestSigner.newRequestId();
         String reply = post("/tokenExchange",
                 NavEnvelope.tokenExchange(settings, credentials, requestId, at));
@@ -68,7 +69,7 @@ public final class NavHttpClient implements NavClient {
                     .encodeToString(submission.invoiceXml().getBytes(StandardCharsets.UTF_8));
             operations.add(new NavEnvelope.InvoiceOperation(submission.operation().name(), base64));
         }
-        Instant at = Instant.now();
+        Instant at = BusinessClock.clock().instant();
         String requestId = NavRequestSigner.newRequestId();
         String reply = post("/manageInvoice", NavEnvelope.manageInvoice(
                 settings, credentials, requestId, at, exchangeToken, operations));
@@ -81,7 +82,7 @@ public final class NavHttpClient implements NavClient {
 
     @Override
     public List<NavResponses.ProcessingResult> queryTransactionStatus(String transactionId) {
-        Instant at = Instant.now();
+        Instant at = BusinessClock.clock().instant();
         String requestId = NavRequestSigner.newRequestId();
         String reply = post("/queryTransactionStatus", NavEnvelope.queryTransactionStatus(
                 settings, credentials, requestId, at, transactionId));

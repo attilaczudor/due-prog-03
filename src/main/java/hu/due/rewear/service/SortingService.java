@@ -566,7 +566,8 @@ public final class SortingService {
     }
 
     /** Sorting records UTC instants; only the source of "now" is shared with the rest of the app. */
-    private String now() { return BusinessClock.clock().instant().toString(); }
+    /** The one way a moment is written down, truncated to the second like every other one. */
+    private String now() { return hu.due.rewear.dao.DaoDateUtil.now(); }
 
     private static Request mapRequest(ResultSet r) throws SQLException {
         return new Request(r.getLong("id"), r.getString("sorter"), r.getString("helper"), r.getString("driver"),

@@ -2,6 +2,7 @@ package hu.due.rewear;
 
 import hu.due.rewear.config.AppContext;
 import hu.due.rewear.config.AppPaths;
+import hu.due.rewear.util.BusinessClock;
 import hu.due.rewear.config.AppPreferences;
 import hu.due.rewear.config.DatabaseManager;
 import hu.due.rewear.config.ThemeManager;
@@ -97,8 +98,9 @@ public final class App {
         try {
             var referenced = context.getEmailDao().findAttachmentPaths();
             MailExportJanitor.pruneUnreferenced(AppPaths.exportsDir(), referenced,
-                    Duration.ofDays(MAIL_EXPORT_RETENTION_DAYS), Instant.now());
-            context.getMailAttachmentVault().pruneUnreferenced(referenced, Duration.ofDays(1), Instant.now());
+                    Duration.ofDays(MAIL_EXPORT_RETENTION_DAYS), BusinessClock.clock().instant());
+            context.getMailAttachmentVault().pruneUnreferenced(referenced, Duration.ofDays(1),
+                    BusinessClock.clock().instant());
         } catch (RuntimeException ex) {
             LOG.debug("Skipped mail attachment housekeeping", ex);
         }

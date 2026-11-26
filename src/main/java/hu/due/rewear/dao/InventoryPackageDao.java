@@ -417,11 +417,20 @@ public final class InventoryPackageDao {
         }
     }
 
+    /**
+     * How many packages were created on one Budapest day.
+     *
+     * <p>Asked as a range rather than as the first ten characters of the stored moment: the moment is in UTC
+     * and the day is local, so between eleven at night and midnight the two disagree about the date and a
+     * prefix would put the evening's intake on tomorrow.
+     */
     public int countCreatedOnDate(LocalDate date) {
-        String sql = "SELECT COUNT(*) FROM inventory_packages WHERE substr(created_at, 1, 10) = ?";
+        String sql = "SELECT COUNT(*) FROM inventory_packages WHERE created_at >= ? AND created_at < ?";
+        String[] day = DaoDateUtil.dayRange(date);
         try (Connection conn = db.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setString(1, date.toString());
+            ps.setString(1, day[0]);
+            ps.setString(2, day[1]);
             try (ResultSet rs = ps.executeQuery()) {
                 return rs.next() ? rs.getInt(1) : 0;
             }

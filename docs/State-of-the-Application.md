@@ -75,7 +75,7 @@ it. One thing the pass could not finish: the mix row is ordered by what each gra
 priced from the garment type, so cream is valued like rags and still does not appear. That is a pricing decision,
 not a defect in the row.
 
-### 3.2 The database has no version marker
+### 3.2 The database has no version marker — *done in pass 26*
 
 `SchemaInitializer` is 569 lines: it executes `schema.sql` idempotently, then adds eleven columns one by one if they
 are missing, renames a role, inserts two others, migrates the NAV demo settings, and hands off to four separate
@@ -86,7 +86,11 @@ inspect it for the columns a given pass added. Second, the DDL is applied by spl
 safe today, because the schema contains no triggers, no views and no string literal with a semicolon in it, and
 unsafe the first time it contains one.
 
-### 3.3 Two timestamp conventions coexist, and nothing enforces either
+**Done on 26 November, pass 26.** `schema_versions` records the shape the database is in, readable with one
+query and no application, and the DDL is cut into statements by something that knows a semicolon inside a
+string from one that ends a statement.
+
+### 3.3 Two timestamp conventions coexist, and nothing enforces either — *done in pass 26*
 
 The sorting module stores instants (`2026-11-26T07:12:00Z`). Purchase lots, the rota, the downtime log and the
 handover store local date-times (`2026-11-26 07:12:00`). Both are defensible, and the application has one of each.
@@ -96,6 +100,10 @@ screen threw a parse exception; and the handover's figures query has to convert 
 read the sorting half and keep it local to read the downtime half. `BusinessClock` has a guard test that stops a new
 class reaching for `Instant.now()`. Nothing comparably stops a new table picking the wrong format, and the cost of
 getting it wrong is a screen that throws rather than a figure that is slightly off.
+
+**Done on 26 November, pass 26.** A moment is a UTC instant to the second and a business date is a local
+date; one helper writes both, a migration converted everything already stored, and three guard tests hold it
+— one reading every value in the database, one the code, one the schema file.
 
 ### 3.4 The research's headline finding is measured but not operative
 
@@ -121,19 +129,21 @@ The handheld is the last roadmap item and was placed last on purpose: its eviden
 preference survey rather than a measured cost, and it brings the whole offline-synchronisation problem with it. Taking
 stock sharpens that into something concrete. A handheld that works offline needs, at minimum:
 
-- **A schema version in the database**, so a device and the server can agree on what they are speaking. That is
-  finding 3.2.
-- **One timestamp convention**, because a record created on a device in a dead spot and merged an hour later is
-  ordered by its timestamp and nothing else. That is finding 3.3.
+- ~~**A schema version in the database**, so a device and the server can agree on what they are speaking.~~
+  Done in pass 26: `schema_versions`, readable with one query.
+- ~~**One timestamp convention**, because a record created on a device in a dead spot and merged an hour later
+  is ordered by its timestamp and nothing else.~~ Done in pass 26: UTC instants to the second, held by three
+  guard tests.
 - **A change log the application writes to.** There is none. `invoice_events`, `nav_report_events`,
   `purchase_lot_events` and `downtime_events` are per-domain histories, not an outbox, and no table records that a
   row changed in a form another process could replay.
 - **A device identity and a conflict policy**, neither of which exists in any form. Two sorters registering the same
   bag from two devices is the easy case; a stocktake count and a putaway racing over the same package is not.
 
-So two of the four findings above are the handheld's prerequisites rather than separate work. Building them first
-costs little and is useful whether or not the handheld is ever built; building the handheld first means building them
-badly inside it.
+Two of those four were findings 3.2 and 3.3, and they were built first on 26 November, which was the point:
+they cost little outside a sync and a great deal inside one. The other two are untouched, and they are the
+larger pair — an outbox changes how every write is recorded, and a conflict policy is a decision about whose
+version of a row wins, which is a business question before it is a technical one.
 
 ## 5. Still open, and not mine to decide
 
@@ -150,7 +160,8 @@ badly inside it.
 
 ## 6. Recommendation
 
-Finding 3.1 was done next, on 26 November. What remains is 3.2 and 3.3 together, as one pass: a schema version, and one timestamp convention with a guard test to hold it.
-That is the honest first half of the handheld, done where it can be tested without a device.
+Findings 3.1, 3.2 and 3.3 were all done on 26 November, in passes 25 and 26. What is left of this list is
+3.4, which is a pricing decision rather than code, and of the handheld's prerequisites: a change log the
+application writes to, a device identity, and a conflict policy. None of those exists in any form.
 
 The handheld itself after that, with the offline problem stated rather than discovered.

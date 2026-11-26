@@ -523,7 +523,8 @@ public final class TodoService {
         if (instantText == null || instantText.isBlank()) {
             return 0;
         }
-        return Math.max(0, Duration.between(Instant.parse(instantText), BusinessClock.clock().instant()).toMinutes());
+        return Math.max(0, Duration.between(hu.due.rewear.dao.DaoDateUtil.parseInstant(instantText),
+                BusinessClock.clock().instant()).toMinutes());
     }
 
     /** A whole-number percentage, floored, so a bench one gram short of target never reads as finished. */

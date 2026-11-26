@@ -24,6 +24,7 @@ import java.time.ZoneId;
 import java.util.TimeZone;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 
 /**
@@ -109,8 +110,15 @@ class BusinessClockTest {
             ps.setString(2, RoleCode.MANAGER.name());
             try (ResultSet rs = ps.executeQuery()) {
                 rs.next();
-                assertEquals("2026-11-25 00:30:00", rs.getString(1),
-                        "UTC would have given 2026-11-24 23:30:00");
+                // The moment is stored as a UTC instant, which is the same moment the pinned business
+                // clock names. SQLite's own clock would have ignored the pin and written the real time,
+                // and would have written it without the Z that says which clock it is on.
+                assertEquals("2026-11-24T23:30:00Z", rs.getString(1),
+                        "The business clock's moment, in the one format a moment is written in");
+                assertTrue(hu.due.rewear.dao.DaoDateUtil.isCanonicalMoment(rs.getString(1)));
+                assertEquals(LocalDateTime.of(2026, 11, 25, 0, 30),
+                        hu.due.rewear.dao.DaoDateUtil.parse(rs.getString(1)),
+                        "Read back in Budapest time it is half past midnight, which is the day it belongs to");
             }
         }
     }

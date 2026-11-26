@@ -384,13 +384,16 @@ public final class DowntimeDao {
                 FROM sorting_requests q
                 WHERE q.delivered_at IS NOT NULL AND q.requested_at IS NOT NULL
                 """);
+        // The window is a range of moments rather than a comparison of dates, because the call was stored
+        // as a UTC instant and the day asked about is a Budapest one: a call at half past midnight belongs
+        // to the day the sorter was working, not to the day UTC had reached.
         if (scope.from() != null) {
-            sql.append(" AND date(q.requested_at) >= ?");
-            params.add(scope.from().toString());
+            sql.append(" AND q.requested_at >= ?");
+            params.add(DaoDateUtil.dayRange(scope.from())[0]);
         }
         if (scope.to() != null) {
-            sql.append(" AND date(q.requested_at) <= ?");
-            params.add(scope.to().toString());
+            sql.append(" AND q.requested_at < ?");
+            params.add(DaoDateUtil.dayRange(scope.to())[1]);
         }
         if (scope.teamId() != null) {
             sql.append(" AND q.team_id = ?");

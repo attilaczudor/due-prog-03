@@ -867,7 +867,7 @@ final class SortingView extends JPanel implements NavigableView {
     }
 
     private static String time(String instant) {
-        return instant == null ? "" : TIME.format(Instant.parse(instant));
+        return instant == null ? "" : TIME.format(hu.due.rewear.dao.DaoDateUtil.parse(instant));
     }
 
     private static String percent(int basisPoints) {

@@ -2,7 +2,8 @@
 
 **Adatbázis-kezelő rendszer:** Beágyazott SQLite 3 (JDBC `sqlite-jdbc`, `PRAGMA foreign_keys = ON`)  
 **Séma fájl:** `src/main/resources/db/schema.sql`  
-**Séma:** **45 alkalmazástábla**, **26 név szerint deklarált index** és a kulcsmegszorítások SQLite-indexei
+**Séma:** **56 alkalmazástábla**, **36 név szerint deklarált index** (plusz egy kódból létrehozott) és a kulcsmegszorítások SQLite-indexei  
+**Sémaverzió:** a `schema_versions` tábla mondja meg, milyen alakban van egy adott adatbázis
 
 ---
 
@@ -20,6 +21,8 @@ Az alkalmazástáblák tíz logikai csoportot alkotnak.
 8. **Kézi és demó banki nyilvántartás (2 tábla):** `bank_accounts`, `bank_transactions`
 9. **Válogatás (7 tábla, nyersanyag-tételekkel):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
 10. **Bérszámfejtési előkészítés (4 tábla):** `payroll_departments`, `payroll_worker_base`, `payroll_department_rates`, `payroll_shifts`
+11. **Eredet, hozam, állásidő és műszakátadás (8 tábla):** `purchase_lots`, `purchase_lot_events`, `grade_yield_baselines`, `grade_yield_baseline_shares`, `downtime_reasons`, `downtime_events`, `shift_handovers`, `shift_handover_issues`
+12. **NAV adatszolgáltatás és sémaverzió (3 tábla):** `nav_invoice_reports`, `nav_report_events`, `schema_versions`
 
 ---
 
@@ -489,6 +492,19 @@ soha nem írja le magától, mert annak eldöntése emberi felelősség.
 
 ---
 
+### 3.56 `schema_versions` (Sémaverzió)
+
+| Oszlop | Típus | Megjegyzés |
+|---|---|---|
+| `version` | INTEGER PK | A séma alakja, amelyet ez az adatbázis elért |
+| `note` | TEXT NOT NULL | Egy mondat arról, mi ez a verzió — annak, aki a táblát olvassa, nem a kódot |
+| `applied_at` | TEXT | Mikor érte el. **Üres**, ha a verzió már megvolt, mielőtt a nyilvántartás elindult: senki nem írta fel, és egy hihetőnek látszó dátum rosszabb lenne a bevallott hiánynál |
+| `recorded_at` | TEXT NOT NULL | Mikor került a sorba |
+
+Huszonöt körön át nem volt ilyen tábla: a sémát egymás után lefutó, ismételhető lépések tartották naprakészen, és azt, hogy egy adott fájlon mi futott le, csak az oszlopai alapján lehetett kitalálni. Ez addig elég, amíg egy program nyit egy fájlt egy gépen. Abban a pillanatban, hogy egy második program is beszél ugyanarra az adatra — például egy offline is működő kézi eszköz —, a „nézd meg, megvan-e az az oszlop” nem válasz, amit a vonal túloldalára el lehet küldeni. A verziót ezért az adatbázis magáról írja le, és a sor csak egyszer keletkezik: az elérés dátuma nyilvántartás, nem utolsó-indítás bélyeg.
+
+---
+
 ## 4. Normalizálás igazolása (1NF → 2NF → 3NF)
 
 - **Első normálforma (1NF):** Minden attribútum atomi értéket tartalmaz (a raktárhely `zone`, `aisle`, `shelf` mezőkre bontott, a rendelési tételek az `order_items`, a számlasorok az `invoice_items`, a chatszoba-tagságok a `chat_room_members`, a modul-szabályok pedig a `role_module_permissions` kapcsolótáblában élnek). Minden tábla rendelkezik egyértelmű elsődleges kulccsal.
@@ -517,11 +533,12 @@ soha nem írja le magától, mert annak eldöntése emberi felelősség.
 
 ## 5. Indexek, tranzakciók és adatbiztonság
 
-- **26 deklarált index:** Gyorsítják a készlet, mozgásnapló, rendelések, számlák, üzenetek, értesítések, teendők, válogatási naplók és banki tranzakciók lekérdezéseit. A `idx_sorting_bag_inventory` egyediséget is biztosít a készlethez kapcsolt válogatott csomagokra, az `idx_invoice_events_invoice` pedig a számlák előzményeit gyorsítja.
+- **36 deklarált index:** Gyorsítják a készlet, mozgásnapló, rendelések, számlák, üzenetek, értesítések, teendők, válogatási naplók és banki tranzakciók lekérdezéseit. A `idx_sorting_bag_inventory` egyediséget is biztosít a készlethez kapcsolt válogatott csomagokra, az `idx_invoice_events_invoice` pedig a számlák előzményeit gyorsítja.
 - **Tranzakciókezelés:** Minden összetett üzleti művelet (csomagfelvétel + `INTAKE`, kötegelt áthelyezés, targoncás komissiózás, ellenőrzött vevői kiadás + `SHIP`, számla + tételek + jóváíró számla, számlaállapot-váltás + naplóbejegyzés) atomi tranzakcióban fut a `DatabaseManager.runInTransaction(...)` segítségével egyetlen megosztott JDBC kapcsolaton.
 - **Kiadás és bizonylatok:** Az összekészítés egy tranzakcióban frissíti a csomag helyét, a mozgásnaplót és a rendelés állapotát. A bizonylattár csak a teljes fájl másolása után cseréli le a számla fájlhivatkozását.
 - **Hivatkozási védelem és hordozható mentés:** `PRAGMA foreign_keys = ON` + `DictionaryDao` használat-ellenőrzés; rollback-journal mód + `BackupService` (`VACUUM INTO`) egyetlen hordozható `.db` mentési fájllal és visszaállítás előtti `.db.bak` biztonsági másolattal.
 - **Teljes mentés:** az Adminban készített `.zip` mentés az SQLite-pillanatképet és a `data/invoices/`, `data/receipts/`, `data/mail-attachments/` mappák összes fájlját tartalmazza, egy `manifest.txt` pedig minden elem SHA-256 ellenőrző összegét és méretét. Visszaállításkor a program mindent egy átmeneti mappában ellenőriz (a jegyzék teljessége, biztonságos elérési utak, méret, ellenőrző összeg, az adatbázis `PRAGMA integrity_check` vizsgálata), és csak ezután cseréli a mappákat: a régi tartalmat a `data/pre-restore-<idő>-files/` mappába teszi, az adatbázist utolsóként cseréli, hiba esetén pedig a mappamozgatásokat visszavonja. A korábbi, csak `.db` mentés továbbra is visszaállítható, ez csak az adatbázist érinti.
 - **Levélcsatolmányok:** a küldött vagy mentett csatolmányt a program a `data/mail-attachments/ÉÉÉÉ/HH/` mappába másolja (engedélyezett típus és fájlfejléc-ellenőrzés után, legfeljebb 25 MB). A fájlt csak az utolsó rá hivatkozó levél végleges törlése szabadítja fel.
-- **Időkezelés:** minden üzleti időbélyeg és dátum a raktár saját időzónájában (`Europe/Budapest`) készül egyetlen `BusinessClock` osztályból, `yyyy-MM-dd HH:mm:ss` szöveggel tárolva. Az SQLite `datetime('now')` UTC-t adna, ezért egy automatikus teszt tiltja a használatát. Kivétel a válogatás, amely ISO-8601 UTC időpontokat tárol, és a megjelenítéskor váltja Budapest szerinti napra.
+- **Időkezelés — egy időpont, egy alak:** az adatbázis kétféle dolgot tárol, és ezeket szándékosan különbözőképpen. Az **időpont** (mikor történt) UTC pillanat ISO-8601 szerint, egész másodpercre vágva, mindig pontosan húsz karakter: `2026-11-26T07:12:00Z`; az ilyen oszlop neve `_at`-re végződik. Az **üzleti dátum** (melyik nap munkája) helyi dátum, `2026-11-26`, és az oszlop neve `_day`, `_date`, `_on`, `_from` vagy `_until` végű — egy munkanap a telephelyé, nem egy időzónáé, és időponttá alakítva az éjszakás műszak átcsúszna a másik napra. Minden időpontot egyetlen `BusinessClock` óra ad és egyetlen `DaoDateUtil` írja le; az SQLite `datetime('now')` UTC-t adna és a tesztóra elől is elbújna, ezért automata teszt tiltja a kódban és a sémafájlban is. Egy helyi napra vonatkozó kérdés UTC-intervallumként megy a lekérdezésbe, mert a tárolt időpont első tíz karaktere este tizenegy után már a másnapot mutatja.
+- **Korábbi alak:** a válogatás eleve UTC pillanatokat tárolt, minden más helyi `yyyy-MM-dd HH:mm:ss` szöveget. Egy induláskor futó átalakítás minden `_at` oszlopot az egységes alakra hoz; a helyi értékeket budapesti időként olvassa (az volt az egyetlen óra, amit jelenthettek), és a nyári-téli időszámítás miatt Java-ban, soronként számol, mert az SQLite-nak nincs időzóna-adatbázisa.
 - A mentés csak a kész SQLite-pillanatkép elkészülte után cseréli le a korábbi mentési fájlt. A számla-PDF-ek, bizonylatok és levélcsatolmányok a teljes mentésben benne vannak; a csak `.db` mentés ezeket nem tartalmazza. Az új fájlok az év és a hónap szerinti almappákba kerülnek. A korábbi, közvetlenül a bizonylattár gyökerében tárolt csatolmányok továbbra is megnyithatók.
