@@ -1,6 +1,6 @@
 # Where the application stands
 
-**Stock-taking · 26 November 2026, after optimization pass 24**
+**Stock-taking · 26 November 2026, taken after pass 24 and kept current through pass 29**
 
 Twenty-four passes have been built against this application since 24 November, the last five of them from the
 role-by-role research report. The research roadmap now has one item left on it, and it is the largest: a handheld
@@ -13,12 +13,12 @@ do next — which is not the handheld.
 
 | | |
 |---|---|
-| Java | 220 main classes, 46,939 lines; 57 test classes, 10,364 lines |
-| Database | 55 tables, 37 indexes (36 in `schema.sql`, one created in code) |
-| Layers | 28 DAOs, 47 services, 61 model types, 21 screens |
+| Java | 231 main classes, 49,451 lines; 63 test classes, 12,528 lines |
+| Database | 60 tables, 38 indexes (37 in `schema.sql`, one created in code), version recorded in the database |
+| Layers | 31 DAOs, 48 services, 62 model types, 21 screens |
 | Roles and menus | 11 roles, 21 modules, per-role module matrix |
-| Languages | 1,074 translation keys, Hungarian and English |
-| Tests | 277, of which 1 skipped (the 50,000-package load measurement) |
+| Languages | 1,112 translation keys, Hungarian and English |
+| Tests | 362, of which 1 skipped (the 50,000-package load measurement) |
 | Dependencies | unchanged since the first pass: Swing, FlatLaf, XChart, SQLite JDBC, JUnit 5 |
 
 The business the application now covers, end to end: material is bought as a purchase lot with a supplier, a
@@ -31,7 +31,7 @@ quarantine, grade-yield reporting, the downtime log and the shift handover.
 
 ## 2. What is verified, and what is not
 
-**Verified by test.** All 277 tests pass on `./mvnw clean verify`. Every screen each of the eleven roles can open
+**Verified by test.** All 362 tests pass on `./mvnw clean verify`. Every screen each of the eleven roles can open
 is rendered through the real main window and the rendered result looked at (`ScreenWalkthroughTest`); since pass 24
 that test also asserts that every module a role may reach has a sidebar button, because one did not. Three modal
 dialogs are driven too (`DialogWalkthroughTest`). One clock, one money representation and one weight representation

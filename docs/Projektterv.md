@@ -39,7 +39,7 @@ A **ReWear WMS** egy többplatformos, asztali **Java 17 GUI alkalmazás**, amely
    - Elkülönített deviza-főkönyvek (`EUR`, `HUF`, `USD`, egyedi devizák), ország-alapú adótípusok (`HU 27%`, `EU B2B 0%`, `Export 0%`), Adminban szerkeszthető eladói cégprofil címmezőkkel és devizánkénti IBAN-okkal, többsoros számlák, 1-kattintásos **Jóváíró számla (`CN-YYYY-NNNN`)**, automatikus **`OVERDUE`** detektálás + `mailto:` felszólítás, hordozható **számlaarchívum és bizonylattár (`./data/invoices/ÉÉÉÉ/HH/`, `./data/receipts/ÉÉÉÉ/HH/`)**, és A4 **P&L + Készletértékelés PDF**.
 7. **Szuper Admin modul-alapú jogosultságkezelés (`Szerepkörök`):** A **18 menüpont** külön modulként szerepel (`AppModule`), amelyeket a `SUPER_ADMIN` szerepkörönként valós időben ki- és bekapcsolhat az adatbázisban tárolt mátrixból.
 8. **NAV- és banki integrációs demó:** Helyi NAV Online Számla 3.0 előnézet, számlánkénti iránnyal. Banki számlák és tranzakciók pontos, külön devizás egyenleggel.
-9. **CSV-alapú többnyelvűség (917 EN/HU kulcs) és Brutalist monokróm UX:** Egyetlen UTF-8 `translations.csv` fájlból töltődő kétnyelvű felület, kontrasztos világos/sötét monokróm megjelenés (`#FFFFFF`/`#000000`, `arc = 0`), manuális Frissítés gombok nélküli azonnali és 10 mp-es háttér-frissítés, háttérszálú `AsyncUiRunner`, valamint gyorsbillentyűk (`Cmd/Ctrl+1..9/0`, `F5`, `Esc`).
+9. **CSV-alapú többnyelvűség (1112 EN/HU kulcs) és Brutalist monokróm UX:** Egyetlen UTF-8 `translations.csv` fájlból töltődő kétnyelvű felület, kontrasztos világos/sötét monokróm megjelenés (`#FFFFFF`/`#000000`, `arc = 0`), manuális Frissítés gombok nélküli azonnali és 10 mp-es háttér-frissítés, háttérszálú `AsyncUiRunner`, valamint gyorsbillentyűk (`Cmd/Ctrl+1..9/0`, `F5`, `Esc`).
 
 10. **Nyersanyag-ellátás a begyűjtéstől a válogatóig:** A napi járatok az ország különböző gyűjtési területeiről
     hozzák be a használt ruhát; minden begyűjtés külön tételként kerül be az anyag és a terület megnevezésével.
@@ -105,14 +105,14 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 |---|---|---|
 | Nyelv és futtatás | Java 17 LTS, Apache Maven (NetBeans-kompatibilis) | Java rekordok, szabványos build, futtatható fat `.jar` (`maven-shade-plugin`), platformfüggetlen indító szkriptek (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) |
 | Grafikus felület (GUI) | Java Swing + FlatLaf 3.5.4 + `SwingWorker` | Egyedi Brutalist monokróm világos/sötét téma, vektoros ikonok, összecsukható fő- és másodlagos oldalsáv (`SectionNavigation`), kereshető címzettválasztó és háttérszálú I/O (`AsyncUiRunner`) |
-| Adatbázis-kezelés | Beágyazott SQLite + `sqlite-jdbc` | **55 táblás 3NF relációs séma**, **37 deklarált index**, külső kulcsok, atomi tranzakciók, automatikus séma-migráció és explicit első indítási választás (saját cég vagy demó) |
+| Adatbázis-kezelés | Beágyazott SQLite + `sqlite-jdbc` | **60 táblás 3NF relációs séma**, **38 deklarált index**, külső kulcsok, atomi tranzakciók, automatikus séma-migráció és explicit első indítási választás (saját cég vagy demó) |
 | Biztonság & RBAC | `jBCrypt` + dinamikus `role_module_permissions` | Sóval ellátott BCrypt jelszó-hash-elés, 11 szerepkör, adatbázis-vezérelt modul-jogosultsági mátrix |
 | QR-kód kezelés | Google ZXing (`core` + `javase`) | Valós idejű QR generálás, PNG mentés, QR dekódolás képfájlból, szkenneléses komissiózás és átadás-ellenőrzés |
 | Nyomtatás és grafika | Java 2D (`Graphics2D`) + Java Print API (`PrinterJob`, `Printable`) | Vektoros hőcímke- és A4 dokumentum-rajzolás, mentés előtti előnézet, fizikai nyomtatás |
 | PDF generálás | OpenPDF 2.0.3 | Hőcímke/A4 4-es PDF címkék, többdevizás A4 PDF számlák/jóváírások, szállítólevelek, partner korosítási egyenlegközlők és P&L riportok |
 | Adatvizualizáció | XChart 3.8.8 | Dinamikus monokróm kör- és oszlopdiagramok a készlet súlyeloszlásáról |
-| Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (917 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
-| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **277 automatizált egység- és integrációs teszt** 55 tesztosztályban, Maven wrapper (`./mvnw`) |
+| Fájlkezelés & i18n | Saját RFC-4180 CSV motor + UTF-8 BOM CSV export + SQLite `VACUUM INTO` | Külső `translations.csv` (1112 kulcs) betöltés/export, Excel-barát CSV riportok, dátum szerint rendezett számlaarchívum, bizonylattár és levélcsatolmány-tár, teljes (`.zip`) és csak-adatbázis mentés/visszaállítás |
+| Naplózás és tesztelés | SLF4J + Logback, JUnit 5 | Napi rotált naplófájlok, **362 automatizált egység- és integrációs teszt** 63 tesztosztályban, Maven wrapper (`./mvnw`) |
 
 ---
 
@@ -136,7 +136,7 @@ A számlázás és a levelezés névvel és ikonnal ellátott intelligens mappá
 
 ## 5. Kockázatok és kezelésük
 
-- **Külső adatbázis-szerver vagy Java telepítés hiánya:** Beágyazott SQLite használatával és a mellékelt platformfüggetlen indító szkriptekkel (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) kiküszöbölve — a futtatható `.jar` indításkor automatikusan létrehozza vagy migrálja az 55 táblás sémát.
+- **Külső adatbázis-szerver vagy Java telepítés hiánya:** Beágyazott SQLite használatával és a mellékelt platformfüggetlen indító szkriptekkel (`run-mac.command`, `run-linux.sh`, `run-windows.bat`) kiküszöbölve — a futtatható `.jar` indításkor automatikusan létrehozza vagy migrálja a 60 táblás sémát.
 - **Fizikai QR szkenner vagy hőnyomtató hiánya:** A rendszer egyszerre támogatja a valódi USB/Bluetooth HID szkennereket és OS nyomtatókat, valamint a képfájlból való QR-olvasást, demó gyors-szkennelést és PDF/PNG exportot.
 - **Kódütközés vagy téves csomagrögzítés:** Minden csomag ütközésmentes 2 jegyű hexadecimális végződést (`00`–`FF`) kap, és a kötelező mentés előtti előnézet megakadályozza a hibás csomagok adatbázisba írását.
 - **Jogosultsági tévedés vagy adminisztrátori kizáródás:** A `SUPER_ADMIN` szerepkör nem zárható ki egyetlen modulból sem, az `Áttekintés` kezdőoldal pedig minden szerepkörnek aktív marad; minden más modul jogosultsága azonnali SQLite perzisztenciával kapcsolható.

@@ -1797,6 +1797,57 @@ is said out loud it becomes one line in the policy. It is not this application's
 
 ---
 
+## Pass 29 — housekeeping, and a handover somebody can start from (26 November 2026)
+
+No feature. Twenty-eight passes in two days leave sediment, and the next session — whoever or whatever it is —
+starts cold.
+
+### Swept out
+
+**Twenty-six translation keys nothing asks for.** Leftovers from screens that were renamed or removed: an
+invoice KPI row that no longer exists, two email scope filters, a to-do tab. `TranslationKeyUsageTest` checks
+that every key a screen asks for exists; nothing checked the other direction, so they sat there. 1,138 keys
+became 1,112.
+
+**Three methods with no callers**: a change-log accessor, a conflict listing and a trigger-name helper that
+only its own class used. Written in anticipation of a screen that does not exist yet, which is how dead code
+starts.
+
+**Stale figures in five documents.** The Hungarian program design still said 220 sources, 55 test classes and
+277 tests; the project plan still said a 55-table schema and 917 translation keys; the stock-taking document
+still carried pass 24's figures; the local handover still reported a build of 131 tests from four days ago.
+Every current-state figure in every document now matches the tree. The figures inside the *pass records* were
+left exactly as they were — those are history, and history is not stale.
+
+Checked and left alone: three empty catch blocks, all of them deliberate parse-and-validate fall-through with
+the exception named `ignored`; no `System.out`, no `printStackTrace`, no `TODO` or `FIXME` anywhere in the
+source; no dependency that nothing uses.
+
+### The handover
+
+[docs/HANDOVER.md](HANDOVER.md) is rewritten as the document to read first in a new session: what the
+application is, how to build and run it, the ten rules it holds itself to **and which test enforces each**,
+how a pass is worked here, the landmines that would bite somebody who does not know them, the demo accounts
+and a walkthrough that shows the last five passes' work, and what is open with who each item waits on — the
+business or the keyboard.
+
+The landmines section is the part worth keeping honest: the hand-written sidebar groups that made a finished
+screen unreachable, the local-day comparison that is wrong by an hour against an instant column, the change
+log's cost on a bulk write, grade value being priced from the garment type so cream is valued like rags, the
+demo seeder's version chain, and the mutation checks being a per-pass discipline with no standing record.
+
+[PRD.md](../PRD.md) now says plainly that it is the original requirements and the history up to v2.5, and
+carries a new section summarising what the twenty-nine passes since have added — and what they deliberately
+did not.
+
+### Verification
+
+362 tests, unchanged: this pass removed only what nothing referenced. The translation guard tests and the
+screen walkthrough were run first against the trimmed bundle, since a key removed in error shows up as
+`[key.name]` on a screen rather than as a compile failure.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

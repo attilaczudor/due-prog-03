@@ -1,7 +1,6 @@
 key,en,hu
 app.title,ReWear WMS — Second-Hand Clothing Warehouse,ReWear WMS — Használt Ruha Raktárkezelő
 app.logout,Sign Out,Kijelentkezés
-app.ready,Ready,Kész
 startup.progress,Startup progress,Indítás folyamatjelzője
 startup.storage,Preparing document folders,Tárhelymappák előkészítése
 startup.database,Opening the warehouse database,Raktári adatbázis megnyitása
@@ -15,7 +14,6 @@ common.edit,Edit,Szerkesztés
 common.delete,Delete,Törlés
 common.deactivate,Deactivate,Inaktiválás
 common.activate,Activate,Aktiválás
-common.refresh,Refresh,Frissítés
 common.search,Search,Keresés
 common.clear,Clear Filters,Szűrők törlése
 common.close,Close,Bezárás
@@ -279,8 +277,6 @@ invoice.kpi.income,Total Income (Outgoing),Összes bevétel (Kimenő)
 invoice.kpi.expenses,Total Expenses (Incoming),Összes kiadás (Bejövő)
 invoice.kpi.balance,Net Balance (Income − Expenses),Nettó egyenleg (Bevétel − Kiadás)
 invoice.kpi.unpaid,Open / Unpaid Invoices,Fizetésre váró számlák
-invoice.kpi.paid_sub,Paid: {0},Fizetve: {0}
-invoice.kpi.unpaid_sub,{0} open invoice(s),{0} nyitott számla
 invoice.direction,Type,Irányszám / Típus
 invoice.direction.OUTGOING,Outgoing (Income),Kimenő (Bevétel)
 invoice.direction.INCOMING,Incoming (Expense),Bejövő (Kiadás)
@@ -309,7 +305,6 @@ invoice.vat,VAT,ÁFA
 invoice.gross_amount,Gross Total,Bruttó végösszeg
 invoice.new_outgoing,New Outgoing Invoice,Új kimenő számla
 invoice.new_incoming,New Incoming Expense,Új bejövő számla (Kiadás)
-invoice.from_order,From Order (Optional),Rendelésből (opcionális)
 invoice.manual_entry,(Manual Entry),(Kézi rögzítés)
 invoice.preview_btn,Preview / Print / Email,Előnézet / Nyomtatás / E-mail
 invoice.status_update,Update Status,Állapot mentése
@@ -344,9 +339,7 @@ partners.filter.suppliers,Providers Only,Csak szállítók
 partners.history,Partner Orders & Invoices,Partner rendelései és számlái
 invoice.tab.list,Invoices,Számlák
 invoice.tab.settings,Invoice Settings,Számlabeállítások
-invoice.currency_view,Currency Ledger,Deviza nézet
 invoice.tax_type,VAT / Tax Type,ÁFA típus
-invoice.from_supplier,From Saved Provider (Optional),Mentett szállítóból (opcionális)
 invoice.settings.taxes,VAT / Tax Types,ÁFA / Adótípusok
 invoice.settings.currencies,Currencies,Devizák
 invoice.settings.tax_rate,Rate (%),Kulcs (%)
@@ -371,7 +364,6 @@ validation.location_fields_required,All fields are required and capacity must be
 orders.no_active_buyers,No active buyers available.,Nincs aktív vevő (ügyfél) a rendszerben.
 invoice.settings.company,Seller Company Profile,Eladói cégadatok
 invoice.settings.company_saved,Company profile and bank accounts saved.,A cégadatok és bankszámlaszámok elmentve.
-invoice.settings.iban_currency,Bank Account Currency,Bankszámla deviza
 invoice.settings.iban,IBAN / Account No.,IBAN / Bankszámlaszám
 invoice.reminder.btn,Send Reminder,Fizetési emlékeztető
 invoice.reminder.subject,Payment Reminder — Invoice {0} ({1}),Fizetési emlékeztető — {0} számla ({1})
@@ -381,7 +373,6 @@ invoice.reminder.no_email,No email address is recorded on this invoice.,Ehhez a 
 invoice.reminder.opened,Payment reminder draft opened in your email client.,A fizetési emlékeztető piszkozat megnyílt az e-mail kliensben.
 orders.edit_price,Edit Item Price,Tételár módosítása
 orders.edit_price.prompt,Negotiated unit price ({0}/kg) for {1} ({2} kg):,Egyedi egységár ({0}/kg) a(z) {1} csomaghoz ({2} kg):
-status.refreshed,Refreshed,Frissítve
 invoice.category.CREDIT_NOTE,Credit Note (Reversal),Sztornó számla (Helyesbítés)
 invoice.credit_note.btn,Credit Note,Sztornó számla
 invoice.credit_note.pdf_title,CREDIT NOTE // REVERSAL,SZTORNÓ SZÁMLA // HELYESBÍTÉS
@@ -441,7 +432,6 @@ print.presave.banner,"PRE-SAVE PREVIEW — {0} package(s) for {1} (not yet saved
 print.presave.save_only,Save Only,Csak mentés
 print.presave.save_pdf,Save & Export PDF,Mentés és PDF export
 print.presave.save_print,Save & Print,Mentés és nyomtatás
-transport.title,Forklift & In-House Transport Queue,Targonca és belső szállítási sor
 transport.tab.putaway,Putaway (Station → Shelf),Betárolás (Állomás → Polc)
 transport.tab.staging,Order Staging (Shelf → Dock),Összekészítés (Polc → Kiadó zóna)
 transport.target_shelf,Target Storage Shelf,Cél raktárpolc
@@ -493,8 +483,6 @@ email.subject,Subject,Tárgy
 email.attachment,Attachment,Csatolmány
 email.attachment_missing,This attachment is no longer available.,Ez a csatolmány már nem érhető el.
 email.attach,Attach File,Fájl csatolása
-email.directory,Directory,Címjegyzék
-email.quick_pick,Insert teammate or partner email,Csapattag vagy partner e-mail beszúrása
 email.recipient_search_placeholder,Type to search or pick recipients...,Keresés név vagy e-mail alapján...
 email.send,Send,Küldés
 email.save_draft,Save Draft,Piszkozat mentése
@@ -513,8 +501,6 @@ chat.members,Members,Résztvevők
 chat.add_member,Add Member,Résztvevő hozzáadása
 chat.all_members_in,All active users are already members of this room.,Minden aktív felhasználó már résztvevője ennek a szobának.
 chat.members_count,{0} member(s),{0} résztvevő
-email.scope.all,Internal & External Mail,Belső és külső levelezés
-email.scope.internal_only,Internal Team Mail Only,Csak belső céges levelezés
 nav.todo,To-Do,Teendők
 nav.notifications,Notifications,Értesítések
 notifications.title,Operational Notifications,Raktári értesítések
@@ -524,7 +510,6 @@ todo.title,To-Do Lists,Teendők
 todo.kpi.system,System To-Do Tasks,Rendszer teendők
 todo.kpi.personal,Personal To-Dos (Open / Total),Saját teendők (Nyitott / Összes)
 todo.kpi.notifications,Unread Notifications,Olvasatlan értesítések
-todo.tab.lists,To-Do Lists,Teendőlisták
 todo.tab.notifications,Notifications,Értesítések
 todo.system.header,System-Populated Tasks (Auto-Ordered by Priority),Rendszer által generált feladatok (prioritás szerint)
 todo.personal.header,Personal To-Do List (Private),Saját teendőlista (Privát)
@@ -630,12 +615,9 @@ order.handover.status.scanned,SCANNED,ELLENŐRIZVE
 order.handover.status.pending,PENDING,HÁTRAVAN
 invoice.new,New Invoice,Új számla
 invoice.choose_direction,Choose invoice direction,Válassza ki a számla irányát
-invoice.folder.outgoing,Outgoing Invoices,Kimenő számlák
-invoice.folder.incoming,Incoming Invoices,Bejövő számlák
 invoice.filter.direction,Direction,Irány
 invoice.filters.show,Show Filters,Szűrők megnyitása
 invoice.filters.hide,Hide Filters,Szűrők bezárása
-invoice.more_currencies,More Currencies,További devizák
 invoice.details,Invoice Details,Számla részletei
 smart.manage,Smart Folders,Intelligens mappák
 smart.new,New Smart Folder,Új intelligens mappa
@@ -648,17 +630,12 @@ smart.match_hint,All fields must match. Multiple checked values within a field a
 smart.invalid_name,Enter a folder name from 1 to 80 characters.,Adjon meg egy 1–80 karakter hosszú mappanevet.
 smart.duplicate,A smart folder with that name already exists.,Már van ilyen nevű intelligens mappa.
 smart.mailbox,Mailboxes,Postafiókmappák
-smart.mailbox_required,Select at least one mailbox.,Válasszon legalább egy postafiókmappát.
 smart.sender,Sender contains,A feladó tartalmazza
 smart.recipient,Recipient or CC contains,A címzett vagy a másolat címzettje tartalmazza
 smart.subject,Subject contains,A tárgy tartalmazza
 smart.body,Message body contains,Az üzenet szövege tartalmazza
 smart.keywords,Subject or message contains,A tárgy vagy az üzenet tartalmazza
 smart.read,Read,Olvasott
-invoice.kpi.short.income,Income,Bevétel
-invoice.kpi.short.expenses,Expenses,Kiadás
-invoice.kpi.short.balance,Net Balance,Nettó egyenleg
-invoice.kpi.short.unpaid,Unpaid,Fizetésre vár
 invoice.filters.active,Show active filters,Aktív szűrők megjelenítése
 invoice.entry.from_order,From Order,Rendelésből
 invoice.entry.order,Order,Rendelés
@@ -731,10 +708,8 @@ role.SORTING_HELPER,Sorting Helper,Válogatósegéd
 nav.sorting,Sorting,Válogatás
 sorting.requests,Raw supply requests,Alapanyagigények
 sorting.bags,Graded bags,Válogatott csomagok
-sorting.raw,Raw stock,Nyerskészlet
 sorting.teams,Sorting teams,Válogatócsapatok
 sorting.daily,Daily targets and bonuses,Napi célok és bónuszok
-sorting.request.new,Request raw stock,Alapanyag igénylése
 sorting.request.deliver,Confirm delivery,Átadás rögzítése
 sorting.request.report,Report graded bag,Válogatott csomag rögzítése
 sorting.request.finish,Close raw batch,Tétel lezárása
@@ -759,7 +734,6 @@ sorting.requested_kg,Requested input (kg),Igényelt alapanyag (kg)
 sorting.delivered_kg,Delivered input (kg),Átadott alapanyag (kg)
 sorting.processed_kg,Processed input (kg),Feldolgozott alapanyag (kg)
 sorting.received_kg,Received input (kg),Bevételezett alapanyag (kg)
-sorting.available_kg,Available input (kg),Elérhető alapanyag (kg)
 sorting.output_kg,Finished output (kg),Késztermék (kg)
 sorting.target_kg,Daily input target (kg),Napi alapanyagcél (kg)
 sorting.bonus_rate,Bonus rate (%),Bónusz mértéke (%)

@@ -95,7 +95,7 @@ public final class ChangeLog {
         }
     }
 
-    public static String triggerName(String table, String operation) {
+    private static String triggerName(String table, String operation) {
         return "log_" + table + "_" + operation.toLowerCase(java.util.Locale.ROOT);
     }
 
@@ -168,16 +168,6 @@ public final class ChangeLog {
                 setSetting(conn, ACTOR_SETTING, Long.toString(userId));
             }
         });
-    }
-
-    /** True while changes are being recorded. */
-    static boolean isLogging(Connection conn) throws SQLException {
-        try (var ps = conn.prepareStatement("SELECT 1 FROM app_settings WHERE setting_key = ?")) {
-            ps.setString(1, OFF_SETTING);
-            try (var rs = ps.executeQuery()) {
-                return !rs.next();
-            }
-        }
     }
 
     private static void setSetting(Connection conn, String key, String value) throws SQLException {

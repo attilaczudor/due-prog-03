@@ -120,10 +120,6 @@ public final class SyncConflictDao {
         return many(SELECT + " WHERE c.state = 'OPEN' ORDER BY c.id");
     }
 
-    public List<SyncConflict> findAll() {
-        return many(SELECT + " ORDER BY c.id DESC");
-    }
-
     public Optional<SyncConflict> find(long id) {
         List<SyncConflict> rows = many(SELECT + " WHERE c.id = " + id);
         return rows.isEmpty() ? Optional.empty() : Optional.of(rows.get(0));

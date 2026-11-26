@@ -2,6 +2,10 @@
 
 Desktop Java 17 GUI warehouse, QR labeling, scanning, forklift logistics, internal communications, B2B order management, and multi-currency invoicing system built for **used and sorted second-hand clothing packaged goods** (bales, bags, boxes, pallets) — Dunaújvárosi Egyetem, **Programozás III.** project by **Czudor Attila**.
 
+> **Picking this up?** Read [docs/HANDOVER.md](docs/HANDOVER.md) first: what the application is, how to build
+> and run it, the rules it holds itself to and which test enforces each, the landmines, the demo accounts, and
+> what is open with who each item waits on.
+
 ---
 
 ## Key Features

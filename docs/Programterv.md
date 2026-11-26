@@ -6,13 +6,13 @@ Ez a dokumentum a **ReWear WMS** szoftverarchitektúráját, használati eseteit
 
 ## 1. Rétegzett architektúra (Layered MVC)
 
-Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**220 fő Java forrásfájl**, **55 JUnit 5 tesztosztály**, **277 teszt**, ebből 1 csak kérésre fut):
+Az alkalmazás szigorúan elkülönített rétegekre épül a `hu.due.rewear` gyökércsomag alatt (**231 fő Java forrásfájl**, **63 JUnit 5 tesztosztály**, **362 teszt**, ebből 1 csak kérésre fut):
 
 ```mermaid
 flowchart TD
     UI["UI Réteg (hu.due.rewear.ui)<br/>LoginFrame, MainFrame (modul-alapú oldalsáv, élő jelvények, auto-refresh),<br/>18 oldalmenümodul (TransportView PUTAWAY/STAGING, TodoView,<br/>NotificationsView, MessagesView, EmailView + RecipientMultiSelectField,<br/>SortingView, PayrollView, AdminModulesPanel, AdminEmailSettingsPanel, OrderHandoverDialog, SetupWizardDialog (első indítás),<br/>PrintPreviewDialog, DocumentPreviewDialog, AsyncUiRunner, SectionNavigation)"]
     SVC["Üzleti Logika & PDF Réteg (hu.due.rewear.service)<br/>AuthService, SessionContext, RoleModuleService, ProductCodeService,<br/>QrCodeService, InventoryService, TransportService, SortingService, OrderService, PayrollService,<br/>ScannerService, InvoiceService, ReceiptVaultService, PartnerStatementService,<br/>EmailService, ChatService, NotificationService, TodoService,<br/>PDF/CSV exportálók (köztük PickListPdfExporter),<br/>BackupService + BackupBundle (teljes mentés), MailAttachmentVault, MailExportJanitor,<br/>InvoiceLifecycle, OnboardingService, PickListService"]
-    I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (917 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
+    I18N["Nyelvi & Téma Réteg (i18n / config)<br/>I18nManager (1112 EN/HU kulcs), CsvTranslationLoader,<br/>ThemeManager, AppPreferences, AppContext, StarterData, BusinessClock (util)"]
     DAO["Adatelérési Réteg (hu.due.rewear.dao)<br/>JDBC DAO-k, például RoleDao, UserDao, RoleModulePermissionDao, SettingsDao,<br/>FinanceConfigDao, DictionaryDao, WarehouseLocationDao, InventoryPackageDao,<br/>StockMovementDao, CustomerDao, OrderDao, OrderItemDao, InvoiceDao,<br/>EmailDao, ChatDao, NotificationDao, TodoDao<br/>(összesen 20 DAO osztály)"]
     MODEL["Domain Modellek (hu.due.rewear.model)<br/>Java 17 Record POJO-k és Enumok (AppModule, RoleCode, LocationType,<br/>InventoryPackage, Order, Invoice, EmailMessage, ChatRoom, AppNotification, ...)"]
     DB[("Beágyazott SQLite 3 (55 tábla, 37 deklarált index)<br/>data/rewear-wms.db + data/invoices/ + data/receipts/ + data/mail-attachments/")]
@@ -415,7 +415,7 @@ A rendszer üzleti logikáját, 60 táblás adatbázis-integritását, többdevi
 | `SortingToSaleWorkflowTest` | 2 | Alapanyag, válogatás, csomagolás és készletre vétel. Webshopimport, készletfoglalás, ellenőrzött kiadás és számlázás. |
 | `PayrollWorkflowTest` | 1 | Rugalmas csapatlétszám, tényleges segédteljesítmény, megosztott műszak és dátumfüggő díjtételek. |
 | `OfflineIntegrationTest` | 2 | A NAV demó adatainak mentése hitelesítő adatok nélkül. Több bankszámla, új deviza és pontos egyenleg újranyitás után. |
-| `I18nManagerTest` | 5 | EN/HU fordítások, paraméteres formázás, 3. nyelv (`de`) dinamikus CSV betöltése, export/újratöltés, teljes **1131 kulcsos** `translations.csv` szerkezeti integritás-ellenőrzés |
+| `I18nManagerTest` | 5 | EN/HU fordítások, paraméteres formázás, 3. nyelv (`de`) dinamikus CSV betöltése, export/újratöltés, teljes **1112 kulcsos** `translations.csv` szerkezeti integritás-ellenőrzés |
 | `ProductCodeServiceTest` | 4 | `YYYY-MM-DD-HH-MM-...` konvenció, tizedes súlyok, szegmens-normalizálás, 40 ütközésmentes hex végződés, hibás kódok elutasítása |
 | `DatabaseLayerIntegrationTest` | 4 | 60 táblás séma + idempotens demo seed, BCrypt ellenőrzés, egyedi kódtörzsek, `UNIQUE` és `FOREIGN KEY` megszorítások, telítettség és statisztikák |
 | `SmartFolderTest` | 2 | Mentett szűrések perzisztenciája, tulajdonos és nézet szerinti elkülönítése, valamint többfeltételes számla- és levélegyezés |
