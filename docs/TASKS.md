@@ -40,6 +40,9 @@
 
 ## Roadmap from the 25 November research
 
+Where the application stands after pass 24, what is actually verified and what the remaining item needs first:
+[state of the application](State-of-the-Application.md).
+
 The full reasoning, evidence and per-role detail is in [the research report](../reports/Warehouse%20system%20improvements%20by%20role.md).
 Its headline finding: the application sets and bonuses against kilograms processed, but premium "cream" grade is
 roughly a tenth of sorted weight and over half of revenue — grade mix, not throughput, is the profit lever.
@@ -78,7 +81,7 @@ margin scheme (Áfa tv. §§ 213–233), which no source covered and which may c
 
 - [ ] Design payroll approval history, closed periods, corrections, and controlled export after the business rules are agreed.
 - [x] Add stocktake sessions with damage, reweighing and quarantine. Damaged stock is held aside under its own status until somebody returns it to stock or writes it off.
-- [ ] Consider an S-shaped pick route once the physical layout is known. Consider an S-shaped pick route once the physical layout is known.
+- [ ] Consider an S-shaped pick route once the physical layout is known.
 - [x] Store money exactly. Chose decimal text over integer minor units, because minor units need the right scale at every read and write and one wrong scale changes an amount a hundredfold.
 - [ ] Decide which roles may create invoices (from an order, manually, from a receipt) and gate that too; assign invoice numbers at issue instead of at draft creation.
 - [ ] Let a demo workspace become a company workspace without a backup restore; offer encrypted backups and clean-up of old `pre-restore-*` copies.

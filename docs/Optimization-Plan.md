@@ -1389,6 +1389,19 @@ The conditional swap the research flagged is still open: if the operation ships 
 
 ---
 
+## Stock-taking after pass 24 (26 November 2026)
+
+No code was written for this. It is an account of what is here, what is actually verified rather than merely
+compiled, and the four things I would act on before the last roadmap item: the five roles that open the application
+to an empty work list and a dashboard still measuring stock and throughput; the database with no version marker; the
+two timestamp conventions nothing enforces; and the research's headline finding, which is now measured but is still
+not what anybody is scored on. Two of the four turn out to be the handheld client's prerequisites rather than
+separate work.
+
+See [the state of the application](State-of-the-Application.md).
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
