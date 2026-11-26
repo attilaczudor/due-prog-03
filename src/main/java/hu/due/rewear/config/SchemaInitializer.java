@@ -70,6 +70,9 @@ public final class SchemaInitializer {
             // lot they never came from.
             addColumnIfMissing(conn, "sorting_raw_lots", "purchase_lot_id",
                     "INTEGER REFERENCES purchase_lots(id)");
+            // The change log learned to record the person as well as the machine: a disagreement between
+            // two machines is settled by asking the two people.
+            addColumnIfMissing(conn, "change_log", "user_id", "INTEGER REFERENCES users(id)");
             try (Statement stmt = conn.createStatement()) {
                 stmt.execute("CREATE INDEX IF NOT EXISTS idx_sorting_pack_worker_day ON sorting_bags(packed_by, pack_day)");
             }

@@ -691,6 +691,8 @@ admin.system.device,This device,Ez az eszköz
 admin.system.change_log,Change log,Változásnapló
 admin.system.changes_recorded,"{0} changes, last number {1}","{0} változás, utolsó sorszám: {1}"
 admin.system.before_the_record,before the record,a nyilvántartás előtt
+admin.system.conflicts,Disagreements,Nézeteltérések
+admin.system.conflicts_open,{0} waiting to be settled,{0} vár eldöntésre
 invoice.folder.all,All Invoices,Összes számla
 bank.accounts,Bank Accounts,Bankszámlák
 bank.add_account,Add Account,Számla hozzáadása

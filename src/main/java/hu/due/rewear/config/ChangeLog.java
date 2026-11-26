@@ -55,6 +55,13 @@ public final class ChangeLog {
     private static final String DEVICE =
             "(SELECT CAST(setting_value AS INTEGER) FROM app_settings WHERE setting_key = 'device.id')";
 
+    /** Where the trigger finds the person at the keyboard. Empty when nobody is signed in. */
+    private static final String ACTOR =
+            "(SELECT CAST(setting_value AS INTEGER) FROM app_settings WHERE setting_key = 'session.user')";
+
+    /** Where the application writes that person, for the trigger to read. */
+    public static final String ACTOR_SETTING = "session.user";
+
     /** While this setting is there, the triggers write nothing. */
     static final String OFF_SETTING = "change_log.off";
 
@@ -63,7 +70,7 @@ public final class ChangeLog {
      * Without it the triggers would have to be dropped and written again on every start, which is
      * eighty-four statements of nothing for a database that already has them.
      */
-    private static final int TRIGGER_VERSION = 1;
+    private static final int TRIGGER_VERSION = 2;
 
     private static final String VERSION_SETTING = "change_log.triggers";
 
@@ -144,6 +151,25 @@ public final class ChangeLog {
         }
     }
 
+    /**
+     * Writes down who is at the keyboard, so that a change can say whose it was.
+     *
+     * <p>Nobody is a real answer: the escalation that runs at startup and the application's own
+     * housekeeping are changes with a machine behind them and no person.
+     */
+    public static void setActor(DatabaseManager db, Long userId) {
+        db.runInTransaction(conn -> {
+            if (userId == null) {
+                try (var ps = conn.prepareStatement("DELETE FROM app_settings WHERE setting_key = ?")) {
+                    ps.setString(1, ACTOR_SETTING);
+                    ps.executeUpdate();
+                }
+            } else {
+                setSetting(conn, ACTOR_SETTING, Long.toString(userId));
+            }
+        });
+    }
+
     /** True while changes are being recorded. */
     static boolean isLogging(Connection conn) throws SQLException {
         try (var ps = conn.prepareStatement("SELECT 1 FROM app_settings WHERE setting_key = ?")) {
@@ -208,8 +234,9 @@ public final class ChangeLog {
                 CREATE TRIGGER IF NOT EXISTS %1$s AFTER %2$s ON %3$s
                 WHEN (SELECT 1 FROM app_settings WHERE setting_key = '%6$s') IS NULL
                 BEGIN
-                    INSERT INTO change_log(table_name, row_id, operation, device_id)
-                    VALUES ('%3$s', %4$s, '%2$s', %5$s);
-                END""".formatted(triggerName(table, operation), operation, table, rowId, DEVICE, OFF_SETTING);
+                    INSERT INTO change_log(table_name, row_id, operation, device_id, user_id)
+                    VALUES ('%3$s', %4$s, '%2$s', %5$s, %7$s);
+                END""".formatted(triggerName(table, operation), operation, table, rowId, DEVICE, OFF_SETTING,
+                ACTOR);
     }
 }

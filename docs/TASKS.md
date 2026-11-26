@@ -35,6 +35,8 @@
 
 - [x] Add the outbox and device identity the handheld needs: fourteen tables logged by trigger rather than by the application, a sequence that never repeats, the machine each change was made on, and nothing recorded for the sample warehouse or for the schema's own upgrade steps. The conflict policy is deliberately not invented — detecting a conflict is built, deciding who wins is a business question, and it differs by table.
 
+- [x] Write down what happens when two machines have changed the same row: two classes rather than three, the person at the keyboard recorded alongside the machine, how far each pair of machines has got with each other, and a held disagreement with both accounts on it that a person settles in a sentence. No automatic resolution anywhere, because the two cases it would get wrong look identical from the log.
+
 ## Next session
 
 - [x] Walk every screen each role can open, through the real main window, and look at the rendered result. Covered by `ScreenWalkthroughTest`; remaining dialogs (invoice details, pick list preview, package intake preview) are still only compile-verified.

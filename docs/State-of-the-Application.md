@@ -136,16 +136,16 @@ stock sharpens that into something concrete. A handheld that works offline needs
   guard tests.
 - ~~**A change log the application writes to.**~~ Done in pass 27: fourteen tables logged by trigger, with a
   sequence that is never handed out twice.
-- ~~**A device identity**~~, done in the same pass — but **the conflict policy is not**, and was deliberately
-  left alone. Detecting a conflict is built: every change carries the row, the machine and its place in the
-  order. Deciding who wins is a business question that differs by table. Two sorters reporting bags against
-  the same run are both right and both should be kept; a stocktake count and a putaway that disagree about
-  where a package is cannot both be right, and the site has to say which authority wins.
+- ~~**A device identity and a conflict policy**~~, done in passes 27 and 28. The policy has two classes:
+  insert-only tables merge by being brought together, and everything else is held for a person with both
+  accounts on it. No automatic resolution anywhere, because the two cases it would get wrong — two sorters
+  both telling the truth, and a count and a putaway that cannot both be right — look identical from the log.
 
-Three and a half of the four were built on 26 November, in passes 26 and 27. What is left is the half that
-is not code: the rule for who wins when two machines have changed the same row since they last spoke. That
-is the first thing to settle before a handheld is built, and the one thing on this page that cannot be
-settled by building it.
+All four were built on 26 November, in passes 26, 27 and 28 — with the fourth built as a refusal: the
+application now detects a disagreement, records both accounts and asks a person, rather than deciding by a
+rule that would be wrong in half the cases. What is left for the handheld is the transport and the client
+itself, and one thing the site may decide later: whether any of the eleven held tables has an answer in
+practice, which would be one line in the policy.
 
 ## 5. Still open, and not mine to decide
 

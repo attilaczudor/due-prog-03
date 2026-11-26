@@ -27,12 +27,20 @@ public final class ChangeLogDao {
      *                 reused, so "everything after 412" means the same thing tomorrow.
      */
     public record Change(long sequence, String tableName, long rowId, Operation operation,
-                         Long deviceId, String deviceName) { }
+                         Long deviceId, String deviceName, Long userId, String userName) {
+
+        /** Who to ask about this change: the person if there was one, otherwise the machine. */
+        public String madeBy() {
+            return userName != null ? userName : (deviceName == null ? "—" : deviceName);
+        }
+    }
 
     private static final String SELECT = """
-            SELECT c.id, c.table_name, c.row_id, c.operation, c.device_id, d.name AS device_name
+            SELECT c.id, c.table_name, c.row_id, c.operation, c.device_id, d.name AS device_name,
+                   c.user_id, u.full_name AS user_name
             FROM change_log c
             LEFT JOIN devices d ON d.id = c.device_id
+            LEFT JOIN users u ON u.id = c.user_id
             """;
 
     private final DatabaseManager db;
@@ -109,9 +117,11 @@ public final class ChangeLogDao {
     private static Change map(ResultSet rs) throws SQLException {
         long deviceId = rs.getLong("device_id");
         boolean noDevice = rs.wasNull();
+        long userId = rs.getLong("user_id");
+        boolean nobody = rs.wasNull();
         return new Change(rs.getLong("id"), rs.getString("table_name"), rs.getLong("row_id"),
                 Operation.valueOf(rs.getString("operation")), noDevice ? null : deviceId,
-                rs.getString("device_name"));
+                rs.getString("device_name"), nobody ? null : userId, rs.getString("user_name"));
     }
 
     private long scalar(String sql) {

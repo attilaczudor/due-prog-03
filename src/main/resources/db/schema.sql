@@ -876,7 +876,48 @@ CREATE TABLE IF NOT EXISTS change_log (
     table_name TEXT   NOT NULL,
     row_id    INTEGER NOT NULL,
     operation TEXT    NOT NULL CHECK (operation IN ('INSERT', 'UPDATE', 'DELETE')),
-    device_id INTEGER REFERENCES devices(id)
+    device_id INTEGER REFERENCES devices(id),
+    -- Who was at the keyboard, where there was anybody: the escalation that runs at startup and the
+    -- application's own housekeeping are changes with a machine behind them and no person. A machine is
+    -- not a person, and settling a disagreement between two of them means asking the two people.
+    user_id   INTEGER REFERENCES users(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_change_log_row ON change_log(table_name, row_id);
+
+-- 31. How far this database and each device have got with each other, and what they disagree about.
+-- "Since we last spoke" is sent_through: our own changes after it are ones that device has not seen, so a
+-- change of theirs to the same row was made without knowing about ours. That is the whole definition of the
+-- disagreement, and the only one available without either side keeping a copy of the other's data.
+CREATE TABLE IF NOT EXISTS device_sync_state (
+    device_id        INTEGER PRIMARY KEY REFERENCES devices(id),
+    sent_through     INTEGER NOT NULL DEFAULT 0,
+    received_through INTEGER NOT NULL DEFAULT 0,
+    last_synced_at   TEXT
+);
+
+-- A disagreement is held rather than settled by rule. Two sorters reporting work against one run are both
+-- telling the truth; a stocktake count and a putaway that disagree about a package cannot both be right.
+-- No rule this application could ship would tell those apart, so both accounts are kept and a person says
+-- which is right, in a sentence that is written down beside it.
+CREATE TABLE IF NOT EXISTS sync_conflicts (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    table_name     TEXT    NOT NULL,
+    row_id         INTEGER NOT NULL,
+    state          TEXT    NOT NULL CHECK (state IN ('OPEN', 'RESOLVED')),
+    our_sequence   INTEGER NOT NULL,
+    our_device_id  INTEGER REFERENCES devices(id),
+    our_user_id    INTEGER REFERENCES users(id),
+    their_device   TEXT,
+    their_user     TEXT,
+    their_sequence INTEGER NOT NULL,
+    noticed_at     TEXT    NOT NULL,
+    resolved_at    TEXT,
+    resolved_by    INTEGER REFERENCES users(id),
+    resolution     TEXT,
+    CHECK ((state = 'OPEN' AND resolved_at IS NULL AND resolved_by IS NULL AND resolution IS NULL)
+        OR (state = 'RESOLVED' AND resolved_at IS NOT NULL AND resolved_by IS NOT NULL
+            AND resolution IS NOT NULL))
+);
+
+CREATE INDEX IF NOT EXISTS idx_sync_conflicts_open ON sync_conflicts(state, table_name, row_id);

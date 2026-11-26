@@ -705,10 +705,14 @@ public final class AdminView extends JPanel implements NavigableView {
         }
     }
 
-    /** How much a device that has never synced would have to catch up on. */
+    /** How much a device that has never synced would have to catch up on, and what is in dispute. */
     private String changeLogLine() {
         var log = ctx.getChangeLogDao();
-        return ctx.getI18n().t("admin.system.changes_recorded", log.count(), log.latestSequence());
+        String line = ctx.getI18n().t("admin.system.changes_recorded", log.count(), log.latestSequence());
+        long disputed = ctx.getSyncConflictDao().countOpen();
+        return disputed == 0 ? line
+                : line + " &nbsp;|&nbsp; <b>" + ctx.getI18n().t("admin.system.conflicts") + ":</b> "
+                + ctx.getI18n().t("admin.system.conflicts_open", disputed);
     }
 
     private void updateSystemDiagnostics() {

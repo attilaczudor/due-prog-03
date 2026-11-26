@@ -12,8 +12,20 @@ import java.util.Optional;
  */
 public final class SessionContext {
 
+    /**
+     * Told whenever the person at the keyboard changes.
+     *
+     * <p>It exists so that the change log can record who made a change as well as which machine it was
+     * made on. A trigger cannot be told anything; it can only read, so the person has to be written down
+     * somewhere it can look.
+     */
+    public interface SignedInListener {
+        void signedIn(Long userId);
+    }
+
     private User currentUser;
     private RoleModuleService roleModuleService;
+    private SignedInListener signedInListener;
 
     public synchronized void setRoleModuleService(RoleModuleService roleModuleService) {
         this.roleModuleService = roleModuleService;
@@ -32,8 +44,14 @@ public final class SessionContext {
         return module.defaultEnabledFor(currentUser.roleCode());
     }
 
+    public synchronized void setSignedInListener(SignedInListener listener) {
+        this.signedInListener = listener;
+        announce();
+    }
+
     public synchronized void login(User user) {
         this.currentUser = user;
+        announce();
     }
 
     public synchronized void updateCurrentUser(User user) {
@@ -44,6 +62,13 @@ public final class SessionContext {
 
     public synchronized void logout() {
         this.currentUser = null;
+        announce();
+    }
+
+    private void announce() {
+        if (signedInListener != null) {
+            signedInListener.signedIn(currentUser == null ? null : currentUser.id());
+        }
     }
 
     public synchronized Optional<User> getCurrentUser() {

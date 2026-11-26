@@ -2,7 +2,7 @@
 
 **Adatbázis-kezelő rendszer:** Beágyazott SQLite 3 (JDBC `sqlite-jdbc`, `PRAGMA foreign_keys = ON`)  
 **Séma fájl:** `src/main/resources/db/schema.sql`  
-**Séma:** **58 alkalmazástábla**, **37 név szerint deklarált index** (plusz egy kódból létrehozott) és a kulcsmegszorítások SQLite-indexei  
+**Séma:** **60 alkalmazástábla**, **38 név szerint deklarált index** (plusz egy kódból létrehozott) és a kulcsmegszorítások SQLite-indexei  
 **Sémaverzió:** a `schema_versions` tábla mondja meg, milyen alakban van egy adott adatbázis
 
 ---
@@ -22,7 +22,7 @@ Az alkalmazástáblák tíz logikai csoportot alkotnak.
 9. **Válogatás (7 tábla, nyersanyag-tételekkel):** `sorting_teams`, `sorting_team_members`, `sorting_team_helpers`, `sorting_raw_lots`, `sorting_requests`, `sorting_request_helpers`, `sorting_bags`
 10. **Bérszámfejtési előkészítés (4 tábla):** `payroll_departments`, `payroll_worker_base`, `payroll_department_rates`, `payroll_shifts`
 11. **Eredet, hozam, állásidő és műszakátadás (8 tábla):** `purchase_lots`, `purchase_lot_events`, `grade_yield_baselines`, `grade_yield_baseline_shares`, `downtime_reasons`, `downtime_events`, `shift_handovers`, `shift_handover_issues`
-12. **NAV adatszolgáltatás, sémaverzió és szinkronizáció (5 tábla):** `nav_invoice_reports`, `nav_report_events`, `schema_versions`, `devices`, `change_log`
+12. **NAV adatszolgáltatás, sémaverzió és szinkronizáció (7 tábla):** `nav_invoice_reports`, `nav_report_events`, `schema_versions`, `devices`, `change_log`, `device_sync_state`, `sync_conflicts`
 
 ---
 
@@ -524,6 +524,29 @@ Huszonöt körön át nem volt ilyen tábla: a sémát egymás után lefutó, is
 A naplót **triggerek írják, nem az alkalmazás**: pontosan az a hiba, amit ez a tábla meg akar előzni, az, hogy egy írás elfelejti naplózni magát, és ezt úgy lehet lehetetlenné tenni, hogy kivesszük annak a kezéből, aki elfelejtené. Tizennégy tábla van naplózva — a készlet és mozgásai, a rendelések és tételeik, a beszerzési tételek, a válogatósor, a leállások, a műszakátadások és ügyeik, a leltárak és számlálásaik —, táblánként három trigger. Az iroda munkája nem: felhasználót, jogosultságot, beállítást, számlát, bért, levelet és chatet nem egy lefedettség nélküli sarokban álló kézi eszközön módosítanak.
 
 **Időbélyeg nincs benne.** Egy trigger csak az SQLite saját óráját tudná olvasni, ami nem az üzleti óra, és amit teszt nem tud rögzíteni. A napló ezért a *sorrendet* hordozza — a visszajátszáshoz ez kell —, az üzleti időpont pedig a sor saját `_at` oszlopában marad, ahol rendesen készült. Ami nem munka, az nem is kerül a naplóba: a mintaadat betöltése és a séma saját frissítő lépései kikapcsolt triggerekkel futnak, és a triggerek akkor is visszakerülnek, ha közben hiba történt.
+
+---
+
+### 3.59–3.60 `device_sync_state` és `sync_conflicts` (Szinkronállapot és nézeteltérések)
+
+| `device_sync_state` | Típus | Megjegyzés |
+|---|---|---|
+| `device_id` | INTEGER PK | Melyik géppel |
+| `sent_through` | INTEGER NOT NULL | A mi naplónkból meddig kapta meg |
+| `received_through` | INTEGER NOT NULL | Az ő naplójából meddig vettük át |
+| `last_synced_at` | TEXT | Mikor beszéltek utoljára |
+
+| `sync_conflicts` | Típus | Megjegyzés |
+|---|---|---|
+| `table_name`, `row_id` | TEXT / INTEGER NOT NULL | Melyik sorról van szó |
+| `state` | TEXT NOT NULL | `OPEN` vagy `RESOLVED`, párosított megszorítással |
+| `our_sequence`, `our_device_id`, `our_user_id` | INTEGER | A mi oldalunk: melyik változás, melyik gépen, kitől |
+| `their_device`, `their_user`, `their_sequence` | TEXT / INTEGER | Az ő oldaluk, ahogy megérkezett |
+| `resolved_at`, `resolved_by`, `resolution` | TEXT / INTEGER | Ki döntötte el, és egy mondatban mit |
+
+**„Amióta utoljára beszéltek” a `sent_through`**: a mi naplónkban az utána következő saját változásainkat az az eszköz még nem látta, tehát az ő ugyanarra a sorra vonatkozó változása ezek ismerete nélkül született. Ez a nézeteltérés teljes meghatározása, és az egyetlen, amihez nem kell, hogy bármelyik fél másolatot tartson a másik adatairól.
+
+**Két osztály van, szándékosan nem három.** Amit csak beszúrnak és soha nem módosítanak (`stock_movements`, `sorting_request_helpers`, `stocktake_counts`), azon két gép nem tud összeveszni: egyszerűen egyesíteni kell a két halmazt. Minden más **megőrzésre kerül**: mindkét fél verziója rögzül, és ember dönt, egy mellé írt mondattal. A „a tulajdonos verziója nyer” szabály azért nincs, mert a trigger a gépet ismeri, a gép pedig nem ember — ezért a napló mostantól a billentyűzetnél ülő személyt is rögzíti —, és hogy ki ír felül kit, az a telephely szabálya, nem az alkalmazásé. Az automatikus feloldás két esetet nem tud megkülönböztetni: két válogató ugyanarra a futásra adott jelentése mindkettő igaz, egy leltárszámlálás és egy betárolás ellentmondása viszont nem lehet egyszerre igaz.
 
 ---
 

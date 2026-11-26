@@ -29,6 +29,7 @@ import hu.due.rewear.dao.SmartFolderDao;
 import hu.due.rewear.dao.StockMovementDao;
 import hu.due.rewear.dao.TodoDao;
 import hu.due.rewear.dao.ChangeLogDao;
+import hu.due.rewear.dao.SyncConflictDao;
 import hu.due.rewear.dao.WorkListDao;
 import hu.due.rewear.dao.UserDao;
 import hu.due.rewear.dao.WarehouseLocationDao;
@@ -63,6 +64,7 @@ import hu.due.rewear.service.ScannerService;
 import hu.due.rewear.service.SessionContext;
 import hu.due.rewear.service.SortingService;
 import hu.due.rewear.service.TicketLabelPainter;
+import hu.due.rewear.service.SyncService;
 import hu.due.rewear.service.TodoService;
 import hu.due.rewear.service.TransportService;
 import org.slf4j.Logger;
@@ -121,6 +123,8 @@ public final class AppContext {
     private final TodoDao todoDao;
     private final WorkListDao workListDao;
     private final ChangeLogDao changeLogDao;
+    private final SyncConflictDao syncConflictDao;
+    private final SyncService syncService;
     private final RoleModulePermissionDao roleModulePermissionDao;
 
     private final AuthService authService;
@@ -294,6 +298,11 @@ public final class AppContext {
                 notificationService);
         this.workListDao = new WorkListDao(databaseManager);
         this.changeLogDao = new ChangeLogDao(databaseManager);
+        this.syncConflictDao = new SyncConflictDao(databaseManager);
+        this.syncService = new SyncService(databaseManager, session, changeLogDao, syncConflictDao);
+        // Every change the log records says who was at the keyboard, which means the database
+        // has to be told when that changes.
+        session.setSignedInListener(userId -> ChangeLog.setActor(databaseManager, userId));
         // The work list is built last because it reads from most of the floor: the stoppage log, the
         // handover record and the yield baseline all have to exist before a role can be told about them.
         this.todoService = new TodoService(todoDao, transportService, packageDao, locationDao, orderDao,
@@ -527,6 +536,14 @@ public final class AppContext {
 
     public NotificationService getNotificationService() {
         return notificationService;
+    }
+
+    public SyncService getSyncService() {
+        return syncService;
+    }
+
+    public SyncConflictDao getSyncConflictDao() {
+        return syncConflictDao;
     }
 
     public ChangeLogDao getChangeLogDao() {

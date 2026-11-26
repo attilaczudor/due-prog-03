@@ -1714,6 +1714,89 @@ conflict policy first, since a change that has not reached every device cannot b
 
 ---
 
+## Pass 28 — the rule for when two machines disagree (26 November 2026)
+
+### The question, and the answer this application is not allowed to give
+
+A handheld that works in a dead spot and merges afterwards will sometimes bring back a change to a row this
+database has also changed in the meantime. Something has to decide what happens then, and the usual answer —
+last write wins — is wrong here in a way that would not show up for months. Two sorters reporting bags
+against the same run are both telling the truth and both reports should be kept. A stocktake count and a
+putaway that disagree about which shelf a package is on cannot both be right, and picking by clock skew
+would quietly delete the correct one.
+
+So the policy has two classes and deliberately not three.
+
+- **Append.** Rows that are inserted and never updated: movements, the helpers named on a run, stocktake
+  counts. Two machines cannot disagree about such a row because neither changes one — they each add their
+  own, and bringing the two sets together is the whole of the merge. Three of the fourteen logged tables.
+- **Held.** Everything else. Both accounts are recorded, and a person settles it in a sentence that is
+  written down beside the result.
+
+The third class everybody reaches for — "the owner's change wins" — was not written, and the reason is worth
+keeping. A trigger knows the machine; a machine is not a person. A sorter's own run edited by the shift
+leader from the office is not the same case as the same run edited twice by two sorters, and nothing in the
+log told those apart. So the log was taught to record the person as well, which is an improvement on its own
+— and even with it, who outranks whom is the site's rule to state, not this application's to assume.
+
+### Built
+
+**The policy, as data with its reasons.** Each of the fourteen tables carries the rule and a sentence saying
+why, written for the person settling a disagreement rather than for the person reading the code. A guard
+test holds the two lists to each other: a table worth logging is a table worth saying how to merge.
+
+**The append-only claim, checked against the application.** The three tables merge by being brought together
+only while nobody edits a row of them, so a test scans the source for an `UPDATE` against any of them. If
+somebody adds one tomorrow, the claim stops being true silently, and the only sign would be work lost after
+a sync months later.
+
+**The person at the keyboard, in the change log.** The session tells the database who is signed in — the
+same trick as the device id, because a trigger cannot be told anything, only read — and every logged change
+now names a person as well as a machine. Nobody is a real answer: the escalation that runs at startup is a
+change with a machine behind it and no person.
+
+**How far each pair of machines has got.** `device_sync_state` holds what this database has sent a device and
+taken from it. "Since we last spoke" is that number, and our own changes after it are ones the device has not
+seen — so a change of theirs to the same row was made without knowing about ours. That is the whole
+definition of the disagreement, and the only one available without either side keeping a copy of the other's
+data. Both figures only ever move forward.
+
+**The decision procedure.** Given a set of changes a device says it made, each is taken or held, change by
+change rather than the batch refused as a whole. A held one becomes a `sync_conflicts` row naming the table,
+the row, and for each side the machine, the person and where their change fell in their own order of events.
+Settling it requires a sentence, happens once, and belongs to the production leadership — a sorter whose own
+run is in dispute is the person to ask, not the person to decide.
+
+**Admin shows what is in dispute**, beside the schema version, the device and the size of the log.
+
+### Verification
+
+362 tests (346 before), of which 16 are new. Eleven mutation checks, among them: a contested table quietly
+declared safe to merge, last-write-wins reinstated, a disagreement noticed but not written down, our side of
+the story naming whoever is looking at it rather than whoever made the change, the sync position allowed to
+go backwards, a disagreement settled without saying what was decided or settled twice, anybody allowed to
+settle one, a change that does not say who made it, and a table with no rule guessed at rather than refused.
+
+### Not done, and what is honestly still missing
+
+**There is no transport, and this pass did not invent one.** What is built decides; it does not apply. A
+change that is taken is not written anywhere by this code, because the log carries what changed and not what
+it changed to, and because there is no second machine to take it from. Writing the applying half against an
+imagined protocol would be guesswork of exactly the kind this pass exists to avoid.
+
+**The log still holds what changed, not what it changed to.** A device replaying it has to come back and
+read the row. That is right for a sync against one server and wrong for two databases that are both offline,
+which is a choice that can be revisited when there is a second machine to test it with.
+
+**Nothing trims the log, and nothing can until the policy is exercised.** A change that has not reached every
+device cannot be thrown away, and no device has yet received one.
+
+**If the site decides a rule.** Some of the eleven held tables may turn out to have an answer in practice —
+"the handheld is right about where a package is, because the person holding it is standing there". When that
+is said out loud it becomes one line in the policy. It is not this application's to say first.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.
