@@ -1848,6 +1848,79 @@ screen walkthrough were run first against the trimmed bundle, since a key remove
 
 ---
 
+## Pass 30 — the documents check themselves now (27 November 2026)
+
+### Why
+
+Pass 29 went through five documents by hand and found the program design claiming 220 sources and 277 tests,
+the project plan a fifty-five-table schema and 917 translation keys, and the stock-taking document the
+figures of four passes earlier. Every one of those was true when it was written. That is what makes a number
+in prose different from a sentence in prose: it has an expiry date nobody can see, and a reader cannot tell a
+current figure from a stale one without going and counting.
+
+Research into handover and documentation practice put a name to the answer — documentation that is asserted
+rather than proof-read — and to the honest limits of the rest of the advice. The evidence for documentation
+quality mattering at all is good (DORA's capability work measures the performance lift from every other
+practice as multiplied by it); the evidence for most specific documentation rituals is thin or absent, and
+the report says so rather than dressing advocacy as findings.
+
+### Built
+
+`DocumentationFiguresTest`, three assertions:
+
+- **Every figure the current documents quote is the figure the tree has.** Twenty-six claims across the
+  README, the handover, the stock-taking document and the three Hungarian reports — tables, indexes, tests,
+  test classes, main sources, translation keys — each checked against `schema.sql`, the test sources and the
+  translation bundle. The optimization plan is not read at all: it is a history, and "131 tests" in the
+  record of pass 6 was true in pass 6. A line in a current document that is genuinely about the past is
+  marked `<!-- figures:historical -->`, which renders as nothing.
+- **Every link between documents resolves.** A dangling link survives a rename and is discovered by the
+  person who needed the thing it promised.
+- **The documents a new session starts from exist and say something.**
+
+### What it found on its first run
+
+Two stale figures that pass 29's hand sweep missed, both in places the eye slides over: a mermaid diagram
+node in the program design still saying `55 tábla, 37 deklarált index`, and an index count in a bullet of the
+database design. It also forced an honest correction — the index figure had been quoted three different ways
+across four documents, because `schema.sql` declares thirty-eight and the upgrade steps add two more, and
+nobody had said which number they meant.
+
+It also caught itself: the first version counted the word `@Test` anywhere in a test file, and this file
+mentions the word while counting it, so the suite was four tests larger than it was. It counts the annotation
+on its own line now. A test that cannot count itself correctly is not in a position to correct anybody else's
+arithmetic.
+
+### Verification
+
+365 tests. Four checks, each one a document broken on purpose: a figure made stale, a link pointed at a file
+that is not there, a historical line stripped of its marker, and the test's own counting put back the way
+that counted itself. All four fail the build, which is the only evidence that matters for a test whose
+subject is prose.
+
+### Also
+
+The repository now carries [AGENTS.md](../AGENTS.md): the build and verification commands, the standing
+`graphify update .` rule, the rules the build enforces with the test that enforces each, the four things that
+bite somebody who does not know them, and what not to touch. It points at the handover rather than
+summarising it — the one controlled study found that duplicating existing documentation is where
+context files do harm, and that an overview of the architecture does not help an agent find the right file.
+A one-line `CLAUDE.md` beside it exists only because Claude Code looks for that name first and would
+otherwise never reach the other file.
+
+Until now the standing rule about refreshing the graph lived in the maintainer's own memory, which does not
+travel with a clone. It travels now.
+
+### Not done
+
+**Time-based freshness stamps**, which would need something to run on a schedule, and this project has no CI
+service on purpose.
+
+**Checking prose rather than figures.** A document can be entirely wrong while every number in it is right.
+Nothing here detects that, and nothing reasonable would.
+
+---
+
 ## Phase 3 — Carried forward from the November 24 review
 
 These remain open. They are product work, not cleanup. Passes 2 and 3 only prepared the ground for the backup bundle; the rest are untouched.

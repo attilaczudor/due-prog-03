@@ -18,7 +18,7 @@ New here? Read [the handover](HANDOVER.md) first.
 - [x] Separate the demo workspace from real onboarding: a new installation starts empty and asks (own company, demo, or restore); default-password accounts and sample data are no longer recreated.
 - [x] Guard the invoice lifecycle (no return to draft, cancel only through a credit note), record every step, link credit notes structurally, enforce the Invoices module in the service, and show the history in the invoice dialog.
 - [x] Add route-sorted pick lists with collected/total progress to Order Staging.
-- [x] Bring the three Hungarian reports and the README up to date with the code (42 tables, 24 indexes, 847 keys, 36 test classes, 131 tests); details and the audit trail are in the [optimization plan](Optimization-Plan.md).
+- [x] Bring the three Hungarian reports and the README up to date with the code (42 tables, 24 indexes, 847 keys, 36 test classes, 131 tests); details and the audit trail are in the [optimization plan](Optimization-Plan.md). <!-- figures:historical -->
 
 - [x] Track raw material as daily collection lines (material, collection area, storage location). A sorter now calls for a line instead of typing kilograms, since the delivered weight is only known when the driver brings it.
 
@@ -40,6 +40,8 @@ New here? Read [the handover](HANDOVER.md) first.
 - [x] Write down what happens when two machines have changed the same row: two classes rather than three, the person at the keyboard recorded alongside the machine, how far each pair of machines has got with each other, and a held disagreement with both accounts on it that a person settles in a sentence. No automatic resolution anywhere, because the two cases it would get wrong look identical from the log.
 
 - [x] Housekeeping and a handover: twenty-six unused translation keys and three uncalled methods removed, every current-state figure in every document brought in line with the tree, and [the handover](HANDOVER.md) rewritten as the document a new session starts from — the rules and which test enforces each, the working method, the landmines, the demo accounts and what is open with who it waits on.
+
+- [x] Make the documents check themselves: every figure the current documents quote is asserted against the tree, every link between them has to resolve, and a line that is about the past says so. It found two stale figures the hand sweep had missed, and an index count that had been quoted three different ways.
 
 ## Next session
 

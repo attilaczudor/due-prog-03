@@ -24,8 +24,8 @@ attachments) live in folders beside it and travel together in one backup bundle.
 | | |
 |---|---|
 | Java | 231 main sources, 49,451 lines |
-| Tests | 362 in 63 classes, 1 skipped (the load measurement runs on request) |
-| Database | 60 tables, 38 indexes, schema version recorded inside the database |
+| Tests | 365 tests in 64 test classes, 1 skipped (the load measurement runs on request) |
+| Database | 60 tables, 38 indexes in `schema.sql` (two more are added by the upgrade steps), schema version recorded inside the database |
 | Layers | 31 DAOs, 48 services, 62 model types, 21 screens |
 | Roles | 11, with a database-driven module matrix |
 | Languages | 1,112 translation keys, English and Hungarian, from one CSV |

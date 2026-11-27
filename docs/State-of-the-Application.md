@@ -13,8 +13,8 @@ do next — which is not the handheld.
 
 | | |
 |---|---|
-| Java | 231 main classes, 49,451 lines; 63 test classes, 12,528 lines |
-| Database | 60 tables, 38 indexes (37 in `schema.sql`, one created in code), version recorded in the database |
+| Java | 231 main classes, 49,451 lines; 64 test classes, 12,528 lines |
+| Database | 60 tables, 38 indexes in `schema.sql` and two more added by the upgrade steps, version recorded in the database |
 | Layers | 31 DAOs, 48 services, 62 model types, 21 screens |
 | Roles and menus | 11 roles, 21 modules, per-role module matrix |
 | Languages | 1,112 translation keys, Hungarian and English |
@@ -31,7 +31,7 @@ quarantine, grade-yield reporting, the downtime log and the shift handover.
 
 ## 2. What is verified, and what is not
 
-**Verified by test.** All 362 tests pass on `./mvnw clean verify`. Every screen each of the eleven roles can open
+**Verified by test.** All 365 tests pass on `./mvnw clean verify`. Every screen each of the eleven roles can open
 is rendered through the real main window and the rendered result looked at (`ScreenWalkthroughTest`); since pass 24
 that test also asserts that every module a role may reach has a sidebar button, because one did not. Three modal
 dialogs are driven too (`DialogWalkthroughTest`). One clock, one money representation and one weight representation
