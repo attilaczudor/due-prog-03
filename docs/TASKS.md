@@ -2,7 +2,7 @@
 
 **Updated · 26 November 2026 (after pass 29)**
 
-New here? Read [the handover](HANDOVER.md) first.
+New here? Read [the handover](HANDOVER.md) first — its last section is the prompt to start a new session with.
 
 ## Completed in this checkpoint
 

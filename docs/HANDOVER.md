@@ -257,3 +257,45 @@ the private planning notes (`PRD.md`, `PHASES_AND_TASKS.md`, the root `HANDOVER.
 For architecture questions in a checkout that has `graphify-out/graph.json`, query the local graph and verify
 what it says against the source. Refresh it with `graphify update .` after code changes — and always before a
 commit.
+
+---
+
+## 11. Starting a new session
+
+Paste this as the first message of a fresh session. It is deliberately short: it names the two files to read,
+the way work is done here, and the one thing an agent must not do, which is decide something that belongs to
+the business. Everything else is in the repository and should be read rather than recited.
+
+```text
+You are picking up ReWear WMS: a Java 17 Swing + SQLite desktop warehouse application for a
+second-hand textile operation. I am its only developer.
+
+Read AGENTS.md first, then docs/HANDOVER.md, before changing anything. Between them they have
+the build commands, the rules the build enforces and the test that enforces each, the things
+that will bite you, the demo accounts, and what is open. Verify what they say against the
+source as you go — several of them are claims a test checks, and you should know which.
+
+Where it stands: thirty passes are written up in docs/Optimization-Plan.md, newest last.
+365 tests in 64 classes; `./mvnw clean verify` is green and takes about eleven minutes.
+docs/TASKS.md is the task board and docs/State-of-the-Application.md is the standing audit of
+what is strong and what is missing.
+
+How work is done here, and what I expect of you:
+- One pass, one commit. Build it properly, verify with tests, then break each new guard on
+  purpose and confirm a test fails. For anything that touches a screen, render it
+  (-Dshot.dir=...) and look at it.
+- Write the pass up in docs/Optimization-Plan.md, including what you deliberately did not do
+  and why. Keep the three Hungarian reports current in the same pass.
+- Run `graphify update .` before every commit.
+- No new dependencies without asking. There have been none in thirty passes.
+- Where a decision belongs to the business — a target, a price, a payroll rule, who wins when
+  two machines disagree — ask me rather than inventing one. Refusing to guess is a feature of
+  this codebase, and docs/HANDOVER.md §8 lists what is waiting on me.
+
+Start by telling me what you make of where it stands and what you would do next. Do not start
+building until I have answered.
+```
+
+If the session is for one specific piece of work rather than a general pick-up, say which — "the handheld
+client", "the submission bundle", "grade pricing" — and point it at the relevant pass record, which will say
+what was deliberately left undone and why.
